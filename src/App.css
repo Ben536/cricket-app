@@ -1,0 +1,990 @@
+/* Main Layout */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  background: var(--gradient-header);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid var(--sky-gold);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  font-size: 28px;
+}
+
+.header-title {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  background: var(--gradient-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+/* Overs Display */
+.overs-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--sky-blue-light);
+}
+
+.overs-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey);
+}
+
+.overs-value {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--sky-gold);
+}
+
+/* Difficulty Selector */
+.difficulty-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.difficulty-selector label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey-light);
+}
+
+.difficulty-selector select {
+  background: var(--sky-blue-dark);
+  border: 1px solid var(--sky-blue-light);
+  color: var(--white);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.difficulty-selector select:hover {
+  border-color: var(--sky-gold);
+}
+
+/* New Session Button */
+.new-session-btn {
+  background: var(--sky-red);
+  border: none;
+  color: var(--white);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.new-session-btn:hover {
+  background: #ff4d5a;
+  transform: translateY(-1px);
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  padding: 24px;
+  gap: 24px;
+}
+
+/* Scoreboard Panel */
+.scoreboard-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Batsman Selector */
+.batsman-selector {
+  background: var(--gradient-panel);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.batsman-selector h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--sky-gold);
+  margin-bottom: 12px;
+}
+
+.batsman-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.batsman-btn {
+  background: var(--sky-blue-dark);
+  border: 2px solid transparent;
+  color: var(--white);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.batsman-btn:hover {
+  background: var(--sky-blue);
+  border-color: var(--sky-blue-light);
+}
+
+.batsman-btn.active {
+  background: var(--sky-gold);
+  color: var(--text-dark);
+  border-color: var(--sky-gold-light);
+}
+
+.add-batsman-btn {
+  background: transparent;
+  border: 2px dashed var(--grey);
+  color: var(--grey);
+}
+
+.add-batsman-btn:hover {
+  border-color: var(--sky-gold);
+  color: var(--sky-gold);
+}
+
+/* Profile Button with History */
+.profile-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--sky-gold);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.history-btn:hover {
+  background: var(--sky-gold);
+  color: var(--text-dark);
+  border-color: var(--sky-gold);
+}
+
+/* Edit Name */
+.edit-name-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.edit-name-btn:hover {
+  opacity: 1;
+}
+
+.profile-name-input {
+  background: var(--sky-blue-dark);
+  border: 2px solid var(--sky-gold);
+  color: var(--white);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  width: 120px;
+  outline: none;
+}
+
+.profile-name-input:focus {
+  box-shadow: 0 0 8px rgba(245, 166, 35, 0.4);
+}
+
+/* Main Scoreboard */
+.scoreboard {
+  background: var(--gradient-panel);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.scoreboard-header {
+  background: var(--sky-blue);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--sky-gold);
+}
+
+.batsman-name-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.batsman-name {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inline-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.inline-btn:hover {
+  background: var(--sky-gold);
+  border-color: var(--sky-gold);
+}
+
+.inline-btn.history {
+  font-size: 12px;
+  color: var(--sky-gold);
+}
+
+.inline-btn.history:hover {
+  color: var(--text-dark);
+}
+
+.profile-name-input.large {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  width: 200px;
+}
+
+.batsman-status {
+  font-size: 14px;
+  color: var(--sky-gold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.score-display {
+  padding: 32px;
+  text-align: center;
+}
+
+.runs {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 120px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--white);
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.runs.flash {
+  animation: scoreFlash 0.5s ease-out;
+}
+
+.score-details {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  margin-top: 24px;
+}
+
+.score-stat {
+  text-align: center;
+}
+
+.score-stat-value {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--sky-gold);
+}
+
+.score-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey);
+  margin-top: 4px;
+}
+
+/* Strike Rate */
+.strike-rate {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.strike-rate-label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey);
+}
+
+.strike-rate-value {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+/* Over Tracker */
+.over-tracker {
+  background: var(--gradient-panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.over-tracker-header {
+  background: var(--sky-blue);
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--sky-gold);
+}
+
+.over-number {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.over-runs {
+  font-size: 14px;
+  color: var(--sky-gold);
+  font-weight: 500;
+}
+
+.over-balls {
+  display: flex;
+  gap: 8px;
+  padding: 16px 20px;
+  justify-content: center;
+}
+
+.ball-result {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  transition: transform 0.2s;
+}
+
+.ball-result.dot {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--grey);
+}
+
+.ball-result.runs {
+  background: var(--sky-blue-light);
+  color: var(--white);
+}
+
+.ball-result.four {
+  background: var(--sky-gold);
+  color: var(--text-dark);
+  animation: pulse 0.3s ease-out;
+}
+
+.ball-result.six {
+  background: var(--sky-green);
+  color: var(--white);
+  animation: pulse 0.3s ease-out;
+}
+
+.ball-result.wicket {
+  background: var(--sky-red);
+  color: var(--white);
+  animation: pulse 0.3s ease-out;
+}
+
+.ball-result.wide {
+  background: #9b59b6;
+  color: var(--white);
+  font-size: 12px;
+}
+
+.ball-result.empty {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Previous Overs */
+.previous-overs {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.prev-over {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.prev-over:last-child {
+  border-bottom: none;
+}
+
+.prev-over-num {
+  color: var(--grey);
+  font-weight: 500;
+  width: 50px;
+}
+
+.prev-over-balls {
+  flex: 1;
+  text-align: center;
+  font-family: 'Roboto Condensed', sans-serif;
+  letter-spacing: 2px;
+  color: var(--grey-light);
+}
+
+.prev-over-runs {
+  color: var(--sky-gold);
+  font-weight: 700;
+  width: 30px;
+  text-align: right;
+}
+
+/* Last Ball Display */
+.last-ball {
+  background: var(--gradient-panel);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.last-ball h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey);
+  margin-bottom: 12px;
+}
+
+.last-ball-result {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+}
+
+.last-ball-result.four {
+  color: var(--sky-gold);
+}
+
+.last-ball-result.six {
+  color: var(--sky-green);
+}
+
+.last-ball-result.wicket {
+  color: var(--sky-red);
+}
+
+.last-ball-result.wide {
+  color: #9b59b6;
+}
+
+.last-ball-result.dot {
+  color: var(--grey);
+}
+
+/* Manual Score Input */
+.manual-input {
+  background: var(--gradient-panel);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.manual-input h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--sky-gold);
+  margin-bottom: 12px;
+}
+
+.manual-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.score-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.score-btn.runs {
+  background: var(--sky-blue);
+  color: var(--white);
+}
+
+.score-btn.runs:hover {
+  background: var(--sky-blue-light);
+  transform: translateY(-2px);
+}
+
+.score-btn.four {
+  background: var(--sky-gold);
+  color: var(--text-dark);
+}
+
+.score-btn.four:hover {
+  background: var(--sky-gold-light);
+  transform: translateY(-2px);
+}
+
+.score-btn.six {
+  background: var(--sky-green);
+  color: var(--white);
+}
+
+.score-btn.six:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.score-btn.wide {
+  background: #9b59b6;
+  color: var(--white);
+}
+
+.score-btn.wide:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.score-btn.wicket {
+  background: var(--sky-red);
+  color: var(--white);
+  width: auto;
+  padding: 0 16px;
+}
+
+.score-btn.wicket:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+/* Field Editor Toggle */
+.field-toggle {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--sky-gold);
+  color: var(--text-dark);
+  border: none;
+  padding: 16px 12px;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+  z-index: 100;
+}
+
+.field-toggle:hover {
+  padding-right: 20px;
+  background: var(--sky-gold-light);
+}
+
+/* Field Editor Panel */
+.field-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 200;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.field-editor {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 500px;
+  background: var(--sky-blue-dark);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.5);
+  z-index: 201;
+  animation: slideIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.field-editor-header {
+  background: var(--sky-blue);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--sky-gold);
+}
+
+.field-editor-header h2 {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--white);
+  font-size: 28px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--sky-gold);
+}
+
+.field-editor-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* Cricket Field */
+.cricket-field {
+  width: 100%;
+  aspect-ratio: 1;
+  background: radial-gradient(ellipse at center, #2d5a27 0%, #1e4620 60%, #153515 100%);
+  border-radius: 50%;
+  position: relative;
+  border: 4px solid #fff;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.pitch {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8%;
+  height: 35%;
+  background: #c4a574;
+  border-radius: 2px;
+}
+
+.fielder {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: var(--sky-blue);
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--white);
+  transform: translate(-50%, -50%);
+  transition: box-shadow 0.2s;
+  user-select: none;
+}
+
+.fielder:hover {
+  box-shadow: 0 0 12px var(--sky-gold);
+}
+
+.fielder:active {
+  cursor: grabbing;
+}
+
+.fielder.keeper {
+  background: var(--sky-gold);
+  color: var(--text-dark);
+}
+
+.fielder.batsman {
+  background: var(--sky-red);
+}
+
+/* Field Presets */
+.field-presets {
+  margin-top: 20px;
+}
+
+.field-presets h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--sky-gold);
+  margin-bottom: 12px;
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-btn {
+  background: var(--sky-blue);
+  border: 1px solid var(--sky-blue-light);
+  color: var(--white);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  background: var(--sky-blue-light);
+  border-color: var(--sky-gold);
+}
+
+/* Session History Modal */
+.session-history-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  background: var(--sky-blue-dark);
+  border-radius: 12px;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+  z-index: 201;
+  animation: fadeIn 0.2s ease-out;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.session-history-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.no-sessions {
+  text-align: center;
+  color: var(--grey);
+  padding: 40px 0;
+  font-style: italic;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-card {
+  background: var(--gradient-panel);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.session-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.session-card.clickable {
+  cursor: pointer;
+}
+
+.session-card.clickable:hover {
+  border-color: var(--sky-gold);
+}
+
+.session-resume-hint {
+  padding: 8px 16px;
+  background: rgba(245, 166, 35, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  color: var(--sky-gold);
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.session-card.clickable:hover .session-resume-hint {
+  opacity: 1;
+}
+
+.session-card-header {
+  background: var(--sky-blue);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.session-date {
+  font-size: 13px;
+  color: var(--grey-light);
+}
+
+.session-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.session-status.out {
+  background: var(--sky-red);
+  color: var(--white);
+}
+
+.session-status.not-out {
+  background: var(--sky-green);
+  color: var(--white);
+}
+
+.session-card-stats {
+  padding: 16px;
+}
+
+.session-stat-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.session-runs {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.session-balls {
+  font-size: 18px;
+  color: var(--grey);
+}
+
+.session-stat-details {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--grey-light);
+}
+
+.session-stat-details span {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .runs {
+    font-size: 80px;
+  }
+
+  .field-editor {
+    width: 100%;
+  }
+}

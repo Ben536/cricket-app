@@ -1,0 +1,76 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Sky Sports Cricket palette */
+  --sky-blue-dark: #00234b;
+  --sky-blue: #003976;
+  --sky-blue-light: #0055a4;
+  --sky-gold: #f5a623;
+  --sky-gold-light: #ffc857;
+  --sky-red: #e63946;
+  --sky-green: #2ecc71;
+  --white: #ffffff;
+  --grey-light: #e8e8e8;
+  --grey: #888888;
+  --text-dark: #1a1a1a;
+
+  /* Gradients */
+  --gradient-header: linear-gradient(180deg, #004488 0%, #002244 100%);
+  --gradient-panel: linear-gradient(135deg, #003366 0%, #001a33 100%);
+  --gradient-gold: linear-gradient(90deg, #f5a623 0%, #ffc857 100%);
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d1f2d 100%);
+  color: var(--white);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes scoreFlash {
+  0% {
+    background: var(--sky-gold);
+  }
+  100% {
+    background: transparent;
+  }
+}
