@@ -9,6 +9,7 @@ interface Session {
   balls: number
   fours: number
   sixes: number
+  wickets: number
   isOut: boolean
   overs: Over[]
   strikeRate: number
@@ -97,6 +98,7 @@ const createEmptySession = (): Session => ({
   balls: 0,
   fours: 0,
   sixes: 0,
+  wickets: 0,
   isOut: false,
   overs: [{ balls: [], runs: 0 }],
   strikeRate: 0,
@@ -152,7 +154,7 @@ function App() {
   const [isFlashing, setIsFlashing] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [previousSession, setPreviousSession] = useState<Session | null>(null)
+  const [sessionHistory, setSessionHistory] = useState<Session[]>([])
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -180,8 +182,8 @@ function App() {
   }
 
   const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false) => {
-    // Save current state for undo
-    setPreviousSession({ ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) })
+    // Save current state for undo (push to history stack)
+    setSessionHistory(prev => [...prev, { ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) }])
 
     let ballResult: BallResult
     if (isNoBall) {
@@ -223,6 +225,7 @@ function App() {
         balls: isExtra ? session.balls : session.balls + 1, // Extras don't count as balls faced
         fours: runs === 4 && isBoundary ? session.fours + 1 : session.fours,
         sixes: runs === 6 ? session.sixes + 1 : session.sixes,
+        wickets: isWicket ? session.wickets + 1 : session.wickets,
         isOut: isWicket ? true : session.isOut,
         overs: newOvers,
       }
@@ -234,7 +237,9 @@ function App() {
   }
 
   const undoLastBall = () => {
-    if (!previousSession) return
+    if (sessionHistory.length === 0) return
+
+    const previousSession = sessionHistory[sessionHistory.length - 1]
 
     setProfiles(prev => prev.map(profile => {
       if (profile.id !== activeProfileId) return profile
@@ -253,7 +258,8 @@ function App() {
       setLastBall(null)
     }
 
-    setPreviousSession(null)
+    // Pop from history stack
+    setSessionHistory(prev => prev.slice(0, -1))
   }
 
   const addNewProfile = () => {
@@ -284,6 +290,7 @@ function App() {
       }
     }))
     setLastBall(null)
+    setSessionHistory([])
   }
 
   const openSessionHistory = (profileId: string) => {
@@ -335,6 +342,7 @@ function App() {
     setActiveProfileId(historyProfileId)
     setShowSessionHistory(false)
     setLastBall(null)
+    setSessionHistory([])
   }
 
   const formatDate = (dateString: string): string => {
@@ -457,7 +465,7 @@ function App() {
             </div>
             <div className="score-display">
               <div className={`runs ${isFlashing ? 'flash' : ''}`}>
-                {currentSession.runs}
+                {currentSession.runs}-{currentSession.wickets}
               </div>
               <div className="score-details">
                 <div className="score-stat">
@@ -563,7 +571,7 @@ function App() {
               <button
                 className="score-btn undo"
                 onClick={undoLastBall}
-                disabled={!previousSession}
+                disabled={sessionHistory.length === 0}
               >
                 Undo
               </button>
@@ -636,7 +644,7 @@ function App() {
                       </div>
                       <div className="session-card-stats">
                         <div className="session-stat-main">
-                          <span className="session-runs">{session.runs}</span>
+                          <span className="session-runs">{session.runs}-{session.wickets ?? 0}</span>
                           <span className="session-balls">({session.balls})</span>
                         </div>
                         <div className="session-stat-details">
