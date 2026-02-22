@@ -7,7 +7,9 @@
 
 // Field dimensions in meters
 const FIELD_DIAMETER = 140
-const FIELD_RADIUS = FIELD_DIAMETER / 2
+const FIELD_RADIUS = 70
+// Field center is offset from batter - batter is ~8.85m below field center
+const FIELD_CENTER_Y = 8.85
 
 // Seed positions for each fielding position (x, y in meters from batter)
 // x: negative = off side, positive = leg side
@@ -121,9 +123,9 @@ function findNearestZone(fieldX: number, fieldY: number, isLeftHanded: boolean):
   const x = isLeftHanded ? -fieldX : fieldX
   const y = fieldY
 
-  // Check if point is within field boundary
-  const dist = Math.sqrt(x * x + y * y)
-  if (dist > FIELD_RADIUS) return null
+  // Check if point is within field boundary (measured from field center, not batter)
+  const distFromCenter = Math.sqrt(x * x + (y - FIELD_CENTER_Y) * (y - FIELD_CENTER_Y))
+  if (distFromCenter > FIELD_RADIUS) return null
 
   let nearest: string | null = null
   let minDist = Infinity
