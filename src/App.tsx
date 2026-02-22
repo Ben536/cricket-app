@@ -30,7 +30,7 @@ interface Fielder {
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
-type BallResult = 'dot' | '1' | '2' | '3' | '4' | '6' | 'W' | 'wd'
+type BallResult = 'dot' | '1' | '2' | '3' | '4' | '6' | 'W' | 'wd' | 'nb'
 type LastBallResult = null | BallResult
 
 interface Over {
@@ -152,12 +152,13 @@ function App() {
   const [isFlashing, setIsFlashing] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [previousSession, setPreviousSession] = useState<Session | null>(null)
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
   const currentOver = currentSession.overs[currentSession.overs.length - 1]
   const currentOverNumber = currentSession.overs.length
-  const legalBallsInOver = currentOver.balls.filter(b => b !== 'wd').length
+  const legalBallsInOver = currentOver.balls.filter(b => b !== 'wd' && b !== 'nb').length
 
   // Save to localStorage when profiles change
   useEffect(() => {
@@ -178,9 +179,14 @@ function App() {
     }))
   }
 
-  const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false) => {
+  const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false) => {
+    // Save current state for undo
+    setPreviousSession({ ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) })
+
     let ballResult: BallResult
-    if (isWide) {
+    if (isNoBall) {
+      ballResult = 'nb'
+    } else if (isWide) {
       ballResult = 'wd'
     } else if (isWicket) {
       ballResult = 'W'
@@ -194,25 +200,27 @@ function App() {
       ballResult = runs.toString() as BallResult
     }
 
+    const isExtra = isWide || isNoBall
+
     updateCurrentSession(session => {
       const newOvers = [...session.overs]
       const currentOverIndex = newOvers.length - 1
       const currentOver = { ...newOvers[currentOverIndex] }
 
       currentOver.balls = [...currentOver.balls, ballResult]
-      currentOver.runs += (isWide ? 1 : (isWicket ? 0 : runs))
+      currentOver.runs += (isExtra ? 1 : (isWicket ? 0 : runs))
       newOvers[currentOverIndex] = currentOver
 
-      // Count legal deliveries (not wides) to determine end of over
-      const legalBalls = currentOver.balls.filter(b => b !== 'wd').length
+      // Count legal deliveries (not wides or no balls) to determine end of over
+      const legalBalls = currentOver.balls.filter(b => b !== 'wd' && b !== 'nb').length
       if (legalBalls === 6) {
         newOvers.push({ balls: [], runs: 0 })
       }
 
       return {
         ...session,
-        runs: session.runs + (isWide ? 1 : (isWicket ? 0 : runs)),
-        balls: isWide ? session.balls : session.balls + 1, // Wides don't count as balls faced
+        runs: session.runs + (isExtra ? 1 : (isWicket ? 0 : runs)),
+        balls: isExtra ? session.balls : session.balls + 1, // Extras don't count as balls faced
         fours: runs === 4 && isBoundary ? session.fours + 1 : session.fours,
         sixes: runs === 6 ? session.sixes + 1 : session.sixes,
         isOut: isWicket ? true : session.isOut,
@@ -223,6 +231,29 @@ function App() {
     setLastBall(ballResult)
     setIsFlashing(true)
     setTimeout(() => setIsFlashing(false), 500)
+  }
+
+  const undoLastBall = () => {
+    if (!previousSession) return
+
+    setProfiles(prev => prev.map(profile => {
+      if (profile.id !== activeProfileId) return profile
+      return { ...profile, currentSession: previousSession }
+    }))
+
+    // Set last ball to the previous ball (if any)
+    const prevOvers = previousSession.overs
+    const prevOver = prevOvers[prevOvers.length - 1]
+    if (prevOver.balls.length > 0) {
+      setLastBall(prevOver.balls[prevOver.balls.length - 1])
+    } else if (prevOvers.length > 1) {
+      const overBefore = prevOvers[prevOvers.length - 2]
+      setLastBall(overBefore.balls[overBefore.balls.length - 1])
+    } else {
+      setLastBall(null)
+    }
+
+    setPreviousSession(null)
   }
 
   const addNewProfile = () => {
@@ -318,8 +349,9 @@ function App() {
   }
 
   const formatOvers = (overs: Over[]): string => {
-    const completedOvers = overs.filter(o => o.balls.length === 6).length
-    const ballsInCurrentOver = overs[overs.length - 1]?.balls.length || 0
+    const countLegalBalls = (balls: BallResult[]) => balls.filter(b => b !== 'wd' && b !== 'nb').length
+    const completedOvers = overs.filter(o => countLegalBalls(o.balls) === 6).length
+    const ballsInCurrentOver = countLegalBalls(overs[overs.length - 1]?.balls || [])
     return `${completedOvers}.${ballsInCurrentOver}`
   }
 
@@ -465,10 +497,11 @@ function App() {
                     ball === '6' ? 'six' :
                     ball === 'W' ? 'wicket' :
                     ball === 'wd' ? 'wide' :
+                    ball === 'nb' ? 'noball' :
                     ball === 'dot' ? 'dot' : 'runs'
                   }`}
                 >
-                  {ball === 'dot' ? '•' : ball === 'W' ? 'W' : ball === 'wd' ? 'wd' : ball}
+                  {ball === 'dot' ? '•' : ball === 'W' ? 'W' : ball === 'wd' ? 'wd' : ball === 'nb' ? 'nb' : ball}
                 </span>
               ))}
               {Array(Math.max(0, 6 - legalBallsInOver)).fill(null).map((_, idx) => (
@@ -483,7 +516,7 @@ function App() {
                       Ov {currentSession.overs.length - (currentSession.overs.slice(0, -1).slice(-4).length - idx)}
                     </span>
                     <span className="prev-over-balls">
-                      {over.balls.map(b => b === 'dot' ? '•' : b === 'W' ? 'W' : b === 'wd' ? 'wd' : b).join(' ')}
+                      {over.balls.map(b => b === 'dot' ? '•' : b === 'W' ? 'W' : b === 'wd' ? 'wd' : b === 'nb' ? 'nb' : b).join(' ')}
                     </span>
                     <span className="prev-over-runs">{over.runs}</span>
                   </div>
@@ -500,12 +533,14 @@ function App() {
               lastBall === '6' ? 'six' :
               lastBall === 'W' ? 'wicket' :
               lastBall === 'wd' ? 'wide' :
+              lastBall === 'nb' ? 'noball' :
               lastBall === 'dot' ? 'dot' : ''
             }`}>
               {lastBall === null ? '—' :
                lastBall === 'dot' ? '•' :
                lastBall === 'W' ? 'OUT!' :
                lastBall === 'wd' ? 'WIDE' :
+               lastBall === 'nb' ? 'NO BALL' :
                lastBall}
             </div>
           </div>
@@ -520,8 +555,18 @@ function App() {
               <button className="score-btn runs" onClick={() => addRuns(3)}>3</button>
               <button className="score-btn four" onClick={() => addRuns(4, true)}>4</button>
               <button className="score-btn six" onClick={() => addRuns(6)}>6</button>
-              <button className="score-btn wide" onClick={() => addRuns(0, false, false, true)}>Wd</button>
+            </div>
+            <div className="manual-buttons extras-row">
+              <button className="score-btn wide" onClick={() => addRuns(0, false, false, true)}>Wide</button>
+              <button className="score-btn noball" onClick={() => addRuns(0, false, false, false, true)}>No Ball</button>
               <button className="score-btn wicket" onClick={() => addRuns(0, false, true)}>OUT</button>
+              <button
+                className="score-btn undo"
+                onClick={undoLastBall}
+                disabled={!previousSession}
+              >
+                Undo
+              </button>
             </div>
           </div>
         </div>
@@ -624,17 +669,13 @@ function FieldView({ fielders, setFielders }: {
   const fieldRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<string | null>(null)
 
-  const handleMouseDown = (e: React.MouseEvent, fielderId: string) => {
-    e.preventDefault()
-    setDragging(fielderId)
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Shared position update logic for mouse and touch
+  const updateFielderPosition = (clientX: number, clientY: number) => {
     if (!dragging || !fieldRef.current) return
 
     const rect = fieldRef.current.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
+    const x = ((clientX - rect.left) / rect.width) * 100
+    const y = ((clientY - rect.top) / rect.height) * 100
 
     const clampedX = Math.max(5, Math.min(95, x))
     const clampedY = Math.max(5, Math.min(95, y))
@@ -644,15 +685,46 @@ function FieldView({ fielders, setFielders }: {
     ))
   }
 
+  const handleMouseDown = (e: React.MouseEvent, fielderId: string) => {
+    e.preventDefault()
+    setDragging(fielderId)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    updateFielderPosition(e.clientX, e.clientY)
+  }
+
   const handleMouseUp = () => {
+    setDragging(null)
+  }
+
+  // Touch event handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent, fielderId: string) => {
+    e.preventDefault()
+    setDragging(fielderId)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!dragging) return
+    e.preventDefault()
+    const touch = e.touches[0]
+    updateFielderPosition(touch.clientX, touch.clientY)
+  }
+
+  const handleTouchEnd = () => {
     setDragging(null)
   }
 
   useEffect(() => {
     if (dragging) {
       const handleGlobalMouseUp = () => setDragging(null)
+      const handleGlobalTouchEnd = () => setDragging(null)
       window.addEventListener('mouseup', handleGlobalMouseUp)
-      return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
+      window.addEventListener('touchend', handleGlobalTouchEnd)
+      return () => {
+        window.removeEventListener('mouseup', handleGlobalMouseUp)
+        window.removeEventListener('touchend', handleGlobalTouchEnd)
+      }
     }
   }, [dragging])
 
@@ -663,6 +735,8 @@ function FieldView({ fielders, setFielders }: {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <div className="pitch" />
       <div
@@ -677,6 +751,7 @@ function FieldView({ fielders, setFielders }: {
           className={`fielder ${fielder.isKeeper ? 'keeper' : ''}`}
           style={{ left: `${fielder.x}%`, top: `${fielder.y}%` }}
           onMouseDown={(e) => handleMouseDown(e, fielder.id)}
+          onTouchStart={(e) => handleTouchStart(e, fielder.id)}
         >
           {fielder.name}
         </div>
