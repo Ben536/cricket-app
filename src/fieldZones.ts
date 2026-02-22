@@ -30,23 +30,35 @@ const FIELD_RADIUS = 70
 // Field top y=78.6, bottom y=-60.9, so center = (78.6 + -60.9)/2 = 8.85m from batter
 const FIELD_CENTER_Y = 8.85
 
-// Pitch dimensions (in meters)
-const PITCH_LENGTH = 19  // Distance from batter to bowler
-
 // Screen position of batter (in percentage coordinates)
 const BATTER_SCREEN_X = 50
 const BATTER_SCREEN_Y = 36
 
+// Pitch visual dimensions (slightly larger than real for visibility)
+const PITCH_VISUAL_WIDTH = 3    // meters (real pitch is ~3m wide)
+const PITCH_VISUAL_LENGTH = 22  // meters (full pitch including creases)
+
 // Derived screen values for export
 export const SCREEN_GEOMETRY = {
+  // Batter position
   batterX: BATTER_SCREEN_X,
   batterY: BATTER_SCREEN_Y,
-  // Pitch spans from batter (36%) toward bowler
-  pitchTop: BATTER_SCREEN_Y,
-  pitchLength: (PITCH_LENGTH / FIELD_DIAMETER) * 100,  // ~13.6%
-  pitchBottom: BATTER_SCREEN_Y + (PITCH_LENGTH / FIELD_DIAMETER) * 100,  // ~49.6%
-  pitchCenterY: BATTER_SCREEN_Y + (PITCH_LENGTH / FIELD_DIAMETER) * 50,  // ~42.8%
-  scale: FIELD_DIAMETER / 100,  // meters per percentage point
+
+  // Field center (geometric center of the circular field)
+  fieldCenterX: BATTER_SCREEN_X,  // 50%
+  fieldCenterY: BATTER_SCREEN_Y + (FIELD_CENTER_Y / FIELD_DIAMETER) * 100,  // ~42.3%
+
+  // Field boundary (radius in screen %)
+  fieldRadius: (FIELD_RADIUS / FIELD_DIAMETER) * 100,  // 50%
+
+  // Pitch dimensions and position
+  pitchWidth: (PITCH_VISUAL_WIDTH / FIELD_DIAMETER) * 100,   // ~2.1%
+  pitchLength: (PITCH_VISUAL_LENGTH / FIELD_DIAMETER) * 100, // ~15.7%
+  pitchTop: BATTER_SCREEN_Y - 2,  // Start slightly above batter for crease
+  pitchCenterX: BATTER_SCREEN_X,
+
+  // Scale factor
+  scale: FIELD_DIAMETER / 100,  // meters per percentage point (1.4)
 }
 
 // Seed positions for each fielding position (x, y in meters from batter)
@@ -171,6 +183,40 @@ export function fieldToScreen(fieldX: number, fieldY: number): { x: number; y: n
 export function isInsideField(fieldX: number, fieldY: number): boolean {
   const distFromCenter = Math.sqrt(fieldX * fieldX + (fieldY - FIELD_CENTER_Y) * (fieldY - FIELD_CENTER_Y))
   return distFromCenter <= FIELD_RADIUS
+}
+
+/**
+ * Check if a screen coordinate is within the circular field boundary
+ */
+export function isInsideFieldScreen(screenX: number, screenY: number): boolean {
+  const field = screenToField(screenX, screenY)
+  return isInsideField(field.x, field.y)
+}
+
+/**
+ * Constrain a screen coordinate to stay inside the circular field boundary
+ * Returns the closest point on or inside the field circle
+ */
+export function constrainToField(screenX: number, screenY: number): { x: number; y: number } {
+  const field = screenToField(screenX, screenY)
+
+  // Distance from field center (not batter)
+  const dx = field.x
+  const dy = field.y - FIELD_CENTER_Y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+
+  // If inside field, return as-is
+  if (dist <= FIELD_RADIUS) {
+    return { x: screenX, y: screenY }
+  }
+
+  // Otherwise, project to the boundary (with small margin)
+  const margin = 2  // meters inside the boundary
+  const ratio = (FIELD_RADIUS - margin) / dist
+  const constrainedFieldX = dx * ratio
+  const constrainedFieldY = FIELD_CENTER_Y + dy * ratio
+
+  return fieldToScreen(constrainedFieldX, constrainedFieldY)
 }
 
 /**

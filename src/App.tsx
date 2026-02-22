@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
-import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, type FielderWithZone } from './fieldZones'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, type FielderWithZone } from './fieldZones'
 
 // Types
 interface Session {
@@ -677,11 +677,11 @@ function FieldView({
     const x = ((clientX - rect.left) / rect.width) * 100
     const y = ((clientY - rect.top) / rect.height) * 100
 
-    const clampedX = Math.max(5, Math.min(95, x))
-    const clampedY = Math.max(5, Math.min(95, y))
+    // Constrain position to inside the circular field boundary
+    const constrained = constrainToField(x, y)
 
     setFielderPositions(prev => prev.map(f =>
-      f.id === dragging ? { ...f, x: clampedX, y: clampedY } : f
+      f.id === dragging ? { ...f, x: constrained.x, y: constrained.y } : f
     ))
   }
 
@@ -731,10 +731,10 @@ function FieldView({
   // Pitch styling based on geometry constants
   const pitchStyle = {
     position: 'absolute' as const,
-    left: `${SCREEN_GEOMETRY.batterX}%`,
+    left: `${SCREEN_GEOMETRY.pitchCenterX}%`,
     top: `${SCREEN_GEOMETRY.pitchTop}%`,
     transform: 'translateX(-50%)',
-    width: '4%',
+    width: `${Math.max(SCREEN_GEOMETRY.pitchWidth, 5)}%`,  // Min 5% for visibility
     height: `${SCREEN_GEOMETRY.pitchLength}%`,
     background: '#c4a574',
     borderRadius: '2px',
