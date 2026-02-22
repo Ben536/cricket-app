@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
-import { calculateFielderZones, FIELD_PRESET_POSITIONS, type FielderWithZone } from './fieldZones'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, type FielderWithZone } from './fieldZones'
 
 // Types
 interface Session {
@@ -728,6 +728,18 @@ function FieldView({
     }
   }, [dragging])
 
+  // Pitch styling based on geometry constants
+  const pitchStyle = {
+    position: 'absolute' as const,
+    left: `${SCREEN_GEOMETRY.batterX}%`,
+    top: `${SCREEN_GEOMETRY.pitchTop}%`,
+    transform: 'translateX(-50%)',
+    width: '4%',
+    height: `${SCREEN_GEOMETRY.pitchLength}%`,
+    background: '#c4a574',
+    borderRadius: '2px',
+  }
+
   return (
     <div
       ref={fieldRef}
@@ -738,10 +750,10 @@ function FieldView({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="pitch" />
+      <div style={pitchStyle} />
       <div
         className="fielder batsman"
-        style={{ left: '50%', top: '36%' }}
+        style={{ left: `${SCREEN_GEOMETRY.batterX}%`, top: `${SCREEN_GEOMETRY.batterY}%` }}
       >
         BAT
       </div>

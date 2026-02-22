@@ -3,13 +3,51 @@
  *
  * Uses nearest-neighbor to seed positions to determine fielding zones.
  * Coordinate system: batter at (0,0), +y toward bowler, +x toward leg side (right-hander)
+ *
+ * FIELD GEOMETRY (in meters, from batter at origin):
+ * - Batter: (0, 0)
+ * - Bowler: (0, 19)
+ * - Field top (furthest from batter toward bowler): (0, 78.6)
+ * - Field bottom (behind batter): (0, -60.9)
+ * - Field left edge: (-69.8, 9.5)
+ * - Field right edge: (69.8, 9.5)
+ * - Field center: (0, 8.85) - the geometric center of the circular field
+ * - Field radius: 70m
+ *
+ * SCREEN MAPPING (percentage coordinates 0-100):
+ * - Screen represents 140m x 140m area (field diameter)
+ * - Batter positioned at (50%, 36%) on screen
+ * - Scale: 1% screen = 1.4 meters
+ * - Y increases downward on screen = toward bowler in field coords
  */
 
 // Field dimensions in meters
 const FIELD_DIAMETER = 140
 const FIELD_RADIUS = 70
-// Field center is offset from batter - batter is ~8.85m below field center
+
+// Field center offset from batter (in meters)
+// The field is a circle, but the batter isn't at the center
+// Field top y=78.6, bottom y=-60.9, so center = (78.6 + -60.9)/2 = 8.85m from batter
 const FIELD_CENTER_Y = 8.85
+
+// Pitch dimensions (in meters)
+const PITCH_LENGTH = 19  // Distance from batter to bowler
+
+// Screen position of batter (in percentage coordinates)
+const BATTER_SCREEN_X = 50
+const BATTER_SCREEN_Y = 36
+
+// Derived screen values for export
+export const SCREEN_GEOMETRY = {
+  batterX: BATTER_SCREEN_X,
+  batterY: BATTER_SCREEN_Y,
+  // Pitch spans from batter (36%) toward bowler
+  pitchTop: BATTER_SCREEN_Y,
+  pitchLength: (PITCH_LENGTH / FIELD_DIAMETER) * 100,  // ~13.6%
+  pitchBottom: BATTER_SCREEN_Y + (PITCH_LENGTH / FIELD_DIAMETER) * 100,  // ~49.6%
+  pitchCenterY: BATTER_SCREEN_Y + (PITCH_LENGTH / FIELD_DIAMETER) * 50,  // ~42.8%
+  scale: FIELD_DIAMETER / 100,  // meters per percentage point
+}
 
 // Seed positions for each fielding position (x, y in meters from batter)
 // x: negative = off side, positive = leg side
@@ -97,15 +135,16 @@ const SHORT_NAMES: Record<string, string> = {
   "Deep Third Man": "D3M", "Fine Third Man": "F3M", "Square Third Man": "Sq3M",
 }
 
-// Batter position on screen (percentage coordinates)
-// Batter is at TOP of pitch, above field center
-// Field center = 50%, batter offset = -8.84m = -6.3% of field diameter
-const BATTER_SCREEN_X = 50
-const BATTER_SCREEN_Y = 36
-
 /**
  * Convert screen coordinates (0-100%) to field coordinates (meters from batter)
- * Screen: Y increases downward. Field: Y increases toward bowler (also down).
+ * Screen: Y increases downward (0% = top of screen)
+ * Field: Y increases toward bowler (positive Y = toward bowler)
+ *
+ * Examples:
+ * - Batter at screen (50%, 36%) → field (0, 0)
+ * - Bowler at screen (50%, 49.6%) → field (0, 19)
+ * - Point at screen (30%, 36%) → field (-28, 0) - off side
+ * - Point at screen (70%, 36%) → field (28, 0) - leg side
  */
 function screenToField(screenX: number, screenY: number): { x: number; y: number } {
   const scale = FIELD_DIAMETER / 100
@@ -113,6 +152,25 @@ function screenToField(screenX: number, screenY: number): { x: number; y: number
     x: (screenX - BATTER_SCREEN_X) * scale,
     y: (screenY - BATTER_SCREEN_Y) * scale
   }
+}
+
+/**
+ * Convert field coordinates (meters from batter) to screen coordinates (0-100%)
+ */
+export function fieldToScreen(fieldX: number, fieldY: number): { x: number; y: number } {
+  const scale = FIELD_DIAMETER / 100
+  return {
+    x: BATTER_SCREEN_X + (fieldX / scale),
+    y: BATTER_SCREEN_Y + (fieldY / scale)
+  }
+}
+
+/**
+ * Check if a field coordinate is within the circular field boundary
+ */
+export function isInsideField(fieldX: number, fieldY: number): boolean {
+  const distFromCenter = Math.sqrt(fieldX * fieldX + (fieldY - FIELD_CENTER_Y) * (fieldY - FIELD_CENTER_Y))
+  return distFromCenter <= FIELD_RADIUS
 }
 
 /**
