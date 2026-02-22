@@ -4,61 +4,79 @@
  * Uses nearest-neighbor to seed positions to determine fielding zones.
  * Coordinate system: batter at (0,0), +y toward bowler, +x toward leg side (right-hander)
  *
+ * VISUAL UI ALIGNMENT:
+ * The .cricket-field div is a circle (border-radius: 50%) with:
+ * - Center at screen (50%, 50%)
+ * - Radius of 50% (fills the container)
+ * - White border = boundary rope
+ *
  * FIELD GEOMETRY (in meters, from batter at origin):
  * - Batter: (0, 0)
  * - Bowler: (0, 19)
- * - Field top (furthest from batter toward bowler): (0, 78.6)
- * - Field bottom (behind batter): (0, -60.9)
- * - Field left edge: (-69.8, 9.5)
- * - Field right edge: (69.8, 9.5)
- * - Field center: (0, 8.85) - the geometric center of the circular field
+ * - Field center: (0, 8.85) - batter is NOT at center of field
  * - Field radius: 70m
  *
- * SCREEN MAPPING (percentage coordinates 0-100):
- * - Screen represents 140m x 140m area (field diameter)
- * - Batter positioned at (50%, 36%) on screen
- * - Scale: 1% screen = 1.4 meters
- * - Y increases downward on screen = toward bowler in field coords
+ * SCREEN MAPPING:
+ * - Visual circle center: (50%, 50%)
+ * - Visual circle radius: 50%
+ * - Scale: 50% screen = 70m, so 1% = 1.4m
+ * - Batter is 8.85m from center, so 8.85/70*50 = 6.3% above center
+ * - Therefore batter is at (50%, 43.7%)
  */
 
-// Field dimensions in meters
-const FIELD_DIAMETER = 140
-const FIELD_RADIUS = 70
+// ============================================
+// VISUAL UI CONSTANTS (aligned to CSS)
+// ============================================
+// The visual field circle as rendered by CSS
+const SCREEN_FIELD_CENTER_X = 50  // Center of .cricket-field circle
+const SCREEN_FIELD_CENTER_Y = 50  // Center of .cricket-field circle
+const SCREEN_FIELD_RADIUS = 50    // The circle fills 0-100%
 
-// Field center offset from batter (in meters)
-// The field is a circle, but the batter isn't at the center
-// Field top y=78.6, bottom y=-60.9, so center = (78.6 + -60.9)/2 = 8.85m from batter
-const FIELD_CENTER_Y = 8.85
+// ============================================
+// REAL WORLD DIMENSIONS (in meters)
+// ============================================
+const FIELD_RADIUS_METERS = 70
+const FIELD_CENTER_OFFSET_FROM_BATTER = 8.85  // Field center is 8.85m toward bowler from batter
 
-// Screen position of batter (in percentage coordinates)
-const BATTER_SCREEN_X = 50
-const BATTER_SCREEN_Y = 36
+// Scale: 1% screen = how many meters
+const METERS_PER_PERCENT = FIELD_RADIUS_METERS / SCREEN_FIELD_RADIUS  // 70/50 = 1.4
 
-// Pitch visual dimensions (slightly larger than real for visibility)
-const PITCH_VISUAL_WIDTH = 3    // meters (real pitch is ~3m wide)
-const PITCH_VISUAL_LENGTH = 22  // meters (full pitch including creases)
+// ============================================
+// DERIVED BATTER POSITION
+// ============================================
+// Batter is 8.85m from field center (toward the back/top of screen)
+// In screen terms: 8.85m / 1.4 (m/%) = 6.32%
+const BATTER_OFFSET_FROM_CENTER = FIELD_CENTER_OFFSET_FROM_BATTER / METERS_PER_PERCENT
+const BATTER_SCREEN_X = SCREEN_FIELD_CENTER_X
+const BATTER_SCREEN_Y = SCREEN_FIELD_CENTER_Y - BATTER_OFFSET_FROM_CENTER  // 50 - 6.32 = 43.68%
 
-// Derived screen values for export
+// ============================================
+// PITCH DIMENSIONS
+// ============================================
+const PITCH_LENGTH_METERS = 20.12  // Standard cricket pitch length
+const PITCH_WIDTH_METERS = 3.05    // Standard cricket pitch width
+const PITCH_LENGTH_SCREEN = PITCH_LENGTH_METERS / METERS_PER_PERCENT  // ~14.4%
+const PITCH_WIDTH_SCREEN = PITCH_WIDTH_METERS / METERS_PER_PERCENT    // ~2.2%
+
+// Exported geometry for UI components
 export const SCREEN_GEOMETRY = {
-  // Batter position
+  // Visual field circle (matches CSS)
+  fieldCenterX: SCREEN_FIELD_CENTER_X,
+  fieldCenterY: SCREEN_FIELD_CENTER_Y,
+  fieldRadius: SCREEN_FIELD_RADIUS,
+
+  // Batter position (derived from field geometry)
   batterX: BATTER_SCREEN_X,
   batterY: BATTER_SCREEN_Y,
 
-  // Field center (geometric center of the circular field)
-  fieldCenterX: BATTER_SCREEN_X,  // 50%
-  fieldCenterY: BATTER_SCREEN_Y + (FIELD_CENTER_Y / FIELD_DIAMETER) * 100,  // ~42.3%
-
-  // Field boundary (radius in screen %)
-  fieldRadius: (FIELD_RADIUS / FIELD_DIAMETER) * 100,  // 50%
-
-  // Pitch dimensions and position
-  pitchWidth: (PITCH_VISUAL_WIDTH / FIELD_DIAMETER) * 100,   // ~2.1%
-  pitchLength: (PITCH_VISUAL_LENGTH / FIELD_DIAMETER) * 100, // ~15.7%
-  pitchTop: BATTER_SCREEN_Y - 2,  // Start slightly above batter for crease
+  // Pitch (centered horizontally, starts at batter)
   pitchCenterX: BATTER_SCREEN_X,
+  pitchTop: BATTER_SCREEN_Y - 1,  // Slight offset for crease
+  pitchWidth: Math.max(PITCH_WIDTH_SCREEN, 4),  // Min 4% for visibility
+  pitchLength: PITCH_LENGTH_SCREEN,
 
   // Scale factor
-  scale: FIELD_DIAMETER / 100,  // meters per percentage point (1.4)
+  scale: METERS_PER_PERCENT,
 }
 
 // Seed positions for each fielding position (x, y in meters from batter)
@@ -151,18 +169,11 @@ const SHORT_NAMES: Record<string, string> = {
  * Convert screen coordinates (0-100%) to field coordinates (meters from batter)
  * Screen: Y increases downward (0% = top of screen)
  * Field: Y increases toward bowler (positive Y = toward bowler)
- *
- * Examples:
- * - Batter at screen (50%, 36%) → field (0, 0)
- * - Bowler at screen (50%, 49.6%) → field (0, 19)
- * - Point at screen (30%, 36%) → field (-28, 0) - off side
- * - Point at screen (70%, 36%) → field (28, 0) - leg side
  */
 function screenToField(screenX: number, screenY: number): { x: number; y: number } {
-  const scale = FIELD_DIAMETER / 100
   return {
-    x: (screenX - BATTER_SCREEN_X) * scale,
-    y: (screenY - BATTER_SCREEN_Y) * scale
+    x: (screenX - BATTER_SCREEN_X) * METERS_PER_PERCENT,
+    y: (screenY - BATTER_SCREEN_Y) * METERS_PER_PERCENT
   }
 }
 
@@ -170,10 +181,9 @@ function screenToField(screenX: number, screenY: number): { x: number; y: number
  * Convert field coordinates (meters from batter) to screen coordinates (0-100%)
  */
 export function fieldToScreen(fieldX: number, fieldY: number): { x: number; y: number } {
-  const scale = FIELD_DIAMETER / 100
   return {
-    x: BATTER_SCREEN_X + (fieldX / scale),
-    y: BATTER_SCREEN_Y + (fieldY / scale)
+    x: BATTER_SCREEN_X + fieldX / METERS_PER_PERCENT,
+    y: BATTER_SCREEN_Y + fieldY / METERS_PER_PERCENT
   }
 }
 
@@ -181,42 +191,47 @@ export function fieldToScreen(fieldX: number, fieldY: number): { x: number; y: n
  * Check if a field coordinate is within the circular field boundary
  */
 export function isInsideField(fieldX: number, fieldY: number): boolean {
-  const distFromCenter = Math.sqrt(fieldX * fieldX + (fieldY - FIELD_CENTER_Y) * (fieldY - FIELD_CENTER_Y))
-  return distFromCenter <= FIELD_RADIUS
+  const distFromCenter = Math.sqrt(
+    fieldX * fieldX +
+    (fieldY - FIELD_CENTER_OFFSET_FROM_BATTER) * (fieldY - FIELD_CENTER_OFFSET_FROM_BATTER)
+  )
+  return distFromCenter <= FIELD_RADIUS_METERS
 }
 
 /**
- * Check if a screen coordinate is within the circular field boundary
+ * Check if a screen coordinate is within the VISUAL circular field boundary
+ * This checks against the actual rendered circle (centered at 50%, 50% with radius 50%)
  */
 export function isInsideFieldScreen(screenX: number, screenY: number): boolean {
-  const field = screenToField(screenX, screenY)
-  return isInsideField(field.x, field.y)
+  const dx = screenX - SCREEN_FIELD_CENTER_X
+  const dy = screenY - SCREEN_FIELD_CENTER_Y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  return dist <= SCREEN_FIELD_RADIUS
 }
 
 /**
- * Constrain a screen coordinate to stay inside the circular field boundary
- * Returns the closest point on or inside the field circle
+ * Constrain a screen coordinate to stay inside the VISUAL circular field boundary
+ * This aligns with the actual rendered circle (centered at 50%, 50% with radius 50%)
  */
 export function constrainToField(screenX: number, screenY: number): { x: number; y: number } {
-  const field = screenToField(screenX, screenY)
-
-  // Distance from field center (not batter)
-  const dx = field.x
-  const dy = field.y - FIELD_CENTER_Y
+  const dx = screenX - SCREEN_FIELD_CENTER_X
+  const dy = screenY - SCREEN_FIELD_CENTER_Y
   const dist = Math.sqrt(dx * dx + dy * dy)
 
-  // If inside field, return as-is
-  if (dist <= FIELD_RADIUS) {
+  // Margin from boundary (in screen %)
+  const margin = 3
+
+  // If inside field (with margin), return as-is
+  if (dist <= SCREEN_FIELD_RADIUS - margin) {
     return { x: screenX, y: screenY }
   }
 
-  // Otherwise, project to the boundary (with small margin)
-  const margin = 2  // meters inside the boundary
-  const ratio = (FIELD_RADIUS - margin) / dist
-  const constrainedFieldX = dx * ratio
-  const constrainedFieldY = FIELD_CENTER_Y + dy * ratio
-
-  return fieldToScreen(constrainedFieldX, constrainedFieldY)
+  // Otherwise, project to the boundary with margin
+  const ratio = (SCREEN_FIELD_RADIUS - margin) / dist
+  return {
+    x: SCREEN_FIELD_CENTER_X + dx * ratio,
+    y: SCREEN_FIELD_CENTER_Y + dy * ratio
+  }
 }
 
 /**
@@ -228,8 +243,11 @@ function findNearestZone(fieldX: number, fieldY: number, isLeftHanded: boolean):
   const y = fieldY
 
   // Check if point is within field boundary (measured from field center, not batter)
-  const distFromCenter = Math.sqrt(x * x + (y - FIELD_CENTER_Y) * (y - FIELD_CENTER_Y))
-  if (distFromCenter > FIELD_RADIUS) return null
+  const distFromCenter = Math.sqrt(
+    x * x +
+    (y - FIELD_CENTER_OFFSET_FROM_BATTER) * (y - FIELD_CENTER_OFFSET_FROM_BATTER)
+  )
+  if (distFromCenter > FIELD_RADIUS_METERS) return null
 
   let nearest: string | null = null
   let minDist = Infinity
