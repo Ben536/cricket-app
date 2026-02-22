@@ -734,7 +734,7 @@ function FieldView({
     left: `${SCREEN_GEOMETRY.pitchCenterX}%`,
     top: `${SCREEN_GEOMETRY.pitchTop}%`,
     transform: 'translateX(-50%)',
-    width: `${Math.max(SCREEN_GEOMETRY.pitchWidth, 5)}%`,  // Min 5% for visibility
+    width: `${SCREEN_GEOMETRY.pitchWidth}%`,
     height: `${SCREEN_GEOMETRY.pitchLength}%`,
     background: '#c4a574',
     borderRadius: '2px',

@@ -55,8 +55,9 @@ const BATTER_SCREEN_Y = SCREEN_FIELD_CENTER_Y - BATTER_OFFSET_FROM_CENTER  // 50
 // ============================================
 const PITCH_LENGTH_METERS = 20.12  // Standard cricket pitch length
 const PITCH_WIDTH_METERS = 3.05    // Standard cricket pitch width
-const PITCH_LENGTH_SCREEN = PITCH_LENGTH_METERS / METERS_PER_PERCENT  // ~14.4%
-const PITCH_WIDTH_SCREEN = PITCH_WIDTH_METERS / METERS_PER_PERCENT    // ~2.2%
+const PITCH_VISUAL_SCALE = 1.5     // Scale up for visibility
+const PITCH_LENGTH_SCREEN = (PITCH_LENGTH_METERS / METERS_PER_PERCENT) * PITCH_VISUAL_SCALE  // ~21.6%
+const PITCH_WIDTH_SCREEN = (PITCH_WIDTH_METERS / METERS_PER_PERCENT) * PITCH_VISUAL_SCALE    // ~3.3%
 
 // Exported geometry for UI components
 export const SCREEN_GEOMETRY = {
@@ -72,7 +73,7 @@ export const SCREEN_GEOMETRY = {
   // Pitch (centered horizontally, starts at batter)
   pitchCenterX: BATTER_SCREEN_X,
   pitchTop: BATTER_SCREEN_Y - 1,  // Slight offset for crease
-  pitchWidth: Math.max(PITCH_WIDTH_SCREEN, 4),  // Min 4% for visibility
+  pitchWidth: PITCH_WIDTH_SCREEN,
   pitchLength: PITCH_LENGTH_SCREEN,
 
   // Scale factor
