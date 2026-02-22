@@ -864,6 +864,85 @@
   border-color: var(--sky-gold);
 }
 
+/* Custom Field Buttons */
+.custom-field-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.delete-field-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--grey);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.delete-field-btn:hover {
+  background: var(--sky-red);
+  border-color: var(--sky-red);
+  color: var(--white);
+}
+
+.save-field-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.field-name-input {
+  background: var(--sky-blue-dark);
+  border: 1px solid var(--sky-blue-light);
+  color: var(--white);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.field-name-input:focus {
+  outline: none;
+  border-color: var(--sky-gold);
+}
+
+.save-current-btn {
+  margin-top: 12px;
+  background: var(--sky-gold);
+  color: var(--text-dark);
+  border-color: var(--sky-gold);
+}
+
+.save-current-btn:hover {
+  background: var(--sky-gold-light);
+  border-color: var(--sky-gold-light);
+}
+
+.save-btn {
+  background: var(--sky-green);
+  border-color: var(--sky-green);
+}
+
+.save-btn:hover {
+  filter: brightness(1.1);
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* Session History Modal */
 .session-history-modal {
   position: fixed;

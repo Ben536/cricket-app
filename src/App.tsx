@@ -70,6 +70,32 @@ const createDefaultProfiles = (): Profile[] => [
 
 // LocalStorage helpers
 const STORAGE_KEY = 'cricket-app-profiles'
+const CUSTOM_FIELDS_KEY = 'cricket-app-custom-fields'
+
+type CustomFieldPreset = {
+  name: string
+  positions: Array<{ id: string; x: number; y: number }>
+}
+
+const loadCustomFields = (): CustomFieldPreset[] => {
+  try {
+    const saved = localStorage.getItem(CUSTOM_FIELDS_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.error('Failed to load custom fields:', e)
+  }
+  return []
+}
+
+const saveCustomFields = (fields: CustomFieldPreset[]) => {
+  try {
+    localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(fields))
+  } catch (e) {
+    console.error('Failed to save custom fields:', e)
+  }
+}
 
 const migrateSession = (session: Session): Session => ({
   ...session,
@@ -116,6 +142,9 @@ function App() {
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [sessionHistory, setSessionHistory] = useState<Session[]>([])
+  const [customFields, setCustomFields] = useState<CustomFieldPreset[]>(loadCustomFields)
+  const [isNamingField, setIsNamingField] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -127,6 +156,27 @@ function App() {
   useEffect(() => {
     saveProfiles(profiles)
   }, [profiles])
+
+  // Save to localStorage when custom fields change
+  useEffect(() => {
+    saveCustomFields(customFields)
+  }, [customFields])
+
+  const handleSaveCustomField = () => {
+    if (newFieldName.trim()) {
+      const newField: CustomFieldPreset = {
+        name: newFieldName.trim(),
+        positions: fielderPositions.map(f => ({ id: f.id, x: f.x, y: f.y }))
+      }
+      setCustomFields(prev => [...prev, newField])
+      setNewFieldName('')
+      setIsNamingField(false)
+    }
+  }
+
+  const handleDeleteCustomField = (name: string) => {
+    setCustomFields(prev => prev.filter(f => f.name !== name))
+  }
 
   const calculateStrikeRate = (runs: number, balls: number): number => {
     if (balls === 0) return 0
@@ -590,6 +640,66 @@ function App() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="field-presets">
+                  <h3>Custom</h3>
+                  <div className="preset-buttons">
+                    {customFields.map(field => (
+                      <div key={field.name} className="custom-field-btn-wrapper">
+                        <button
+                          className="preset-btn"
+                          onClick={() => setFielderPositions(field.positions)}
+                        >
+                          {field.name}
+                        </button>
+                        <button
+                          className="delete-field-btn"
+                          onClick={() => handleDeleteCustomField(field.name)}
+                          title="Delete"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {isNamingField ? (
+                    <div className="save-field-form">
+                      <input
+                        type="text"
+                        className="field-name-input"
+                        placeholder="Field name..."
+                        value={newFieldName}
+                        onChange={(e) => setNewFieldName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveCustomField()
+                          if (e.key === 'Escape') {
+                            setIsNamingField(false)
+                            setNewFieldName('')
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button className="preset-btn save-btn" onClick={handleSaveCustomField}>
+                        Save
+                      </button>
+                      <button
+                        className="preset-btn cancel-btn"
+                        onClick={() => {
+                          setIsNamingField(false)
+                          setNewFieldName('')
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="preset-btn save-current-btn"
+                      onClick={() => setIsNamingField(true)}
+                    >
+                      Save Current Field
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
