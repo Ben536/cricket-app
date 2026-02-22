@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, type FielderWithZone } from './fieldZones'
 
 // Types
 interface Session {
@@ -22,14 +23,14 @@ interface Profile {
   currentSession: Session
 }
 
-interface Fielder {
+// Simple fielder position (zone calculated dynamically)
+interface FielderPosition {
   id: string
-  name: string
   x: number
   y: number
-  isKeeper?: boolean
 }
 
+type BattingHand = 'right' | 'left'
 type Difficulty = 'easy' | 'medium' | 'hard'
 type BallResult = 'dot' | '1' | '2' | '3' | '4' | '6' | 'W' | 'wd' | 'nb'
 type LastBallResult = null | BallResult
@@ -37,58 +38,6 @@ type LastBallResult = null | BallResult
 interface Over {
   balls: BallResult[]
   runs: number
-}
-
-// Field presets
-const FIELD_PRESETS: Record<string, Fielder[]> = {
-  'Standard Pace': [
-    { id: '1', name: 'WK', x: 50, y: 72, isKeeper: true },
-    { id: '2', name: '1st', x: 62, y: 68 },
-    { id: '3', name: '2nd', x: 68, y: 62 },
-    { id: '4', name: 'Gly', x: 72, y: 55 },
-    { id: '5', name: 'Pt', x: 70, y: 40 },
-    { id: '6', name: 'Cov', x: 75, y: 30 },
-    { id: '7', name: 'MO', x: 55, y: 20 },
-    { id: '8', name: 'MW', x: 30, y: 30 },
-    { id: '9', name: 'SL', x: 28, y: 50 },
-    { id: '10', name: 'FL', x: 35, y: 80 },
-  ],
-  'Spin Attack': [
-    { id: '1', name: 'WK', x: 50, y: 72, isKeeper: true },
-    { id: '2', name: 'Slp', x: 60, y: 68 },
-    { id: '3', name: 'SL', x: 40, y: 55 },
-    { id: '4', name: 'SP', x: 58, y: 48 },
-    { id: '5', name: 'BP', x: 42, y: 48 },
-    { id: '6', name: 'Cov', x: 80, y: 35 },
-    { id: '7', name: 'MO', x: 55, y: 15 },
-    { id: '8', name: 'MW', x: 25, y: 35 },
-    { id: '9', name: 'DM', x: 20, y: 60 },
-    { id: '10', name: 'LO', x: 30, y: 15 },
-  ],
-  'T20 Death': [
-    { id: '1', name: 'WK', x: 50, y: 72, isKeeper: true },
-    { id: '2', name: 'LO', x: 30, y: 12 },
-    { id: '3', name: 'LOff', x: 70, y: 12 },
-    { id: '4', name: 'DS', x: 15, y: 50 },
-    { id: '5', name: '3M', x: 60, y: 25 },
-    { id: '6', name: 'DF', x: 85, y: 50 },
-    { id: '7', name: 'FL', x: 25, y: 85 },
-    { id: '8', name: 'TL', x: 15, y: 70 },
-    { id: '9', name: 'Cov', x: 75, y: 35 },
-    { id: '10', name: 'MW', x: 35, y: 35 },
-  ],
-  'Defensive': [
-    { id: '1', name: 'WK', x: 50, y: 72, isKeeper: true },
-    { id: '2', name: 'LO', x: 25, y: 15 },
-    { id: '3', name: 'LOff', x: 75, y: 15 },
-    { id: '4', name: 'DS', x: 12, y: 50 },
-    { id: '5', name: 'DF', x: 88, y: 50 },
-    { id: '6', name: 'FL', x: 30, y: 85 },
-    { id: '7', name: 'TL', x: 15, y: 75 },
-    { id: '8', name: 'DP', x: 80, y: 25 },
-    { id: '9', name: 'DC', x: 85, y: 40 },
-    { id: '10', name: 'DM', x: 20, y: 35 },
-  ],
 }
 
 const createEmptySession = (): Session => ({
@@ -156,7 +105,8 @@ const saveProfiles = (profiles: Profile[]) => {
 function App() {
   const [profiles, setProfiles] = useState<Profile[]>(loadProfiles)
   const [activeProfileId, setActiveProfileId] = useState<string>('1')
-  const [fielders, setFielders] = useState<Fielder[]>(FIELD_PRESETS['Standard Pace'])
+  const [fielderPositions, setFielderPositions] = useState<FielderPosition[]>(FIELD_PRESET_POSITIONS['Standard Pace'])
+  const [batterHand, setBatterHand] = useState<BattingHand>('right')
   const [showFieldEditor, setShowFieldEditor] = useState(false)
   const [showSessionHistory, setShowSessionHistory] = useState(false)
   const [historyProfileId, setHistoryProfileId] = useState<string | null>(null)
@@ -606,19 +556,40 @@ function App() {
               <button className="close-btn" onClick={() => setShowFieldEditor(false)}>×</button>
             </div>
             <div className="field-editor-content">
-              <FieldView fielders={fielders} setFielders={setFielders} />
-              <div className="field-presets">
-                <h3>Presets</h3>
-                <div className="preset-buttons">
-                  {Object.keys(FIELD_PRESETS).map(preset => (
-                    <button
-                      key={preset}
-                      className="preset-btn"
-                      onClick={() => setFielders(FIELD_PRESETS[preset])}
-                    >
-                      {preset}
-                    </button>
-                  ))}
+              <FieldView
+                fielderPositions={fielderPositions}
+                setFielderPositions={setFielderPositions}
+                batterHand={batterHand}
+              />
+              <div className="field-controls">
+                <div className="batter-hand-toggle">
+                  <span>Batter:</span>
+                  <button
+                    className={`hand-btn ${batterHand === 'right' ? 'active' : ''}`}
+                    onClick={() => setBatterHand('right')}
+                  >
+                    Right
+                  </button>
+                  <button
+                    className={`hand-btn ${batterHand === 'left' ? 'active' : ''}`}
+                    onClick={() => setBatterHand('left')}
+                  >
+                    Left
+                  </button>
+                </div>
+                <div className="field-presets">
+                  <h3>Presets</h3>
+                  <div className="preset-buttons">
+                    {Object.keys(FIELD_PRESET_POSITIONS).map(preset => (
+                      <button
+                        key={preset}
+                        className="preset-btn"
+                        onClick={() => setFielderPositions(FIELD_PRESET_POSITIONS[preset])}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -680,13 +651,23 @@ function App() {
   )
 }
 
-// Field View Component
-function FieldView({ fielders, setFielders }: {
-  fielders: Fielder[]
-  setFielders: React.Dispatch<React.SetStateAction<Fielder[]>>
+// Field View Component with dynamic zone labels
+function FieldView({
+  fielderPositions,
+  setFielderPositions,
+  batterHand,
+}: {
+  fielderPositions: FielderPosition[]
+  setFielderPositions: React.Dispatch<React.SetStateAction<FielderPosition[]>>
+  batterHand: BattingHand
 }) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<string | null>(null)
+
+  // Calculate zones for all fielders (recalculated when positions or batter hand changes)
+  const fieldersWithZones: FielderWithZone[] = useMemo(() => {
+    return calculateFielderZones(fielderPositions, batterHand === 'left')
+  }, [fielderPositions, batterHand])
 
   // Shared position update logic for mouse and touch
   const updateFielderPosition = (clientX: number, clientY: number) => {
@@ -699,7 +680,7 @@ function FieldView({ fielders, setFielders }: {
     const clampedX = Math.max(5, Math.min(95, x))
     const clampedY = Math.max(5, Math.min(95, y))
 
-    setFielders(prev => prev.map(f =>
+    setFielderPositions(prev => prev.map(f =>
       f.id === dragging ? { ...f, x: clampedX, y: clampedY } : f
     ))
   }
@@ -764,15 +745,16 @@ function FieldView({ fielders, setFielders }: {
       >
         BAT
       </div>
-      {fielders.map(fielder => (
+      {fieldersWithZones.map(fielder => (
         <div
           key={fielder.id}
-          className={`fielder ${fielder.isKeeper ? 'keeper' : ''}`}
+          className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
           style={{ left: `${fielder.x}%`, top: `${fielder.y}%` }}
           onMouseDown={(e) => handleMouseDown(e, fielder.id)}
           onTouchStart={(e) => handleTouchStart(e, fielder.id)}
+          title={fielder.zoneName}
         >
-          {fielder.name}
+          {fielder.shortName}
         </div>
       ))}
     </div>

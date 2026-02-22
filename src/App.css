@@ -1126,10 +1126,66 @@
 /* Touch-friendly fielder dragging */
 .fielder {
   touch-action: none;
+  cursor: grab;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.fielder:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.fielder.dragging {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 100;
 }
 
 .cricket-field {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Field controls */
+.field-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.batter-hand-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.batter-hand-toggle span {
+  font-size: 14px;
+  color: var(--grey-light);
+}
+
+.hand-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: var(--grey-light);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hand-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hand-btn.active {
+  background: var(--sky-blue);
+  border-color: var(--sky-blue);
+  color: var(--dark);
+  font-weight: 600;
 }
