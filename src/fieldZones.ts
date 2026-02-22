@@ -97,17 +97,17 @@ const SHORT_NAMES: Record<string, string> = {
 
 // Batter position on screen (percentage coordinates)
 const BATTER_SCREEN_X = 50
-const BATTER_SCREEN_Y = 56.31 // Calculated from field geometry
+const BATTER_SCREEN_Y = 56.31 // Batter slightly above center (from zone editor)
 
 /**
  * Convert screen coordinates (0-100%) to field coordinates (meters from batter)
+ * Screen: Y increases downward. Field: Y increases toward bowler (also down).
  */
 function screenToField(screenX: number, screenY: number): { x: number; y: number } {
-  // Scale: field is 140m, displayed in ~100% width
   const scale = FIELD_DIAMETER / 100
   return {
     x: (screenX - BATTER_SCREEN_X) * scale,
-    y: (BATTER_SCREEN_Y - screenY) * scale  // Flip Y: screen Y increases down, field Y increases toward bowler
+    y: (screenY - BATTER_SCREEN_Y) * scale
   }
 }
 
