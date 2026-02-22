@@ -96,8 +96,10 @@ const SHORT_NAMES: Record<string, string> = {
 }
 
 // Batter position on screen (percentage coordinates)
+// Batter is at TOP of pitch, above field center
+// Field center = 50%, batter offset = -8.84m = -6.3% of field diameter
 const BATTER_SCREEN_X = 50
-const BATTER_SCREEN_Y = 56.31 // Batter slightly above center (from zone editor)
+const BATTER_SCREEN_Y = 43.7
 
 /**
  * Convert screen coordinates (0-100%) to field coordinates (meters from batter)
