@@ -674,14 +674,17 @@ function FieldView({
     if (!dragging || !fieldRef.current) return
 
     const rect = fieldRef.current.getBoundingClientRect()
-    const x = ((clientX - rect.left) / rect.width) * 100
+    const screenX = ((clientX - rect.left) / rect.width) * 100
     const y = ((clientY - rect.top) / rect.height) * 100
 
     // Constrain position to inside the circular field boundary
-    const constrained = constrainToField(x, y)
+    const constrained = constrainToField(screenX, y)
+
+    // Convert screen x back to stored x (mirror for left-handed)
+    const storedX = batterHand === 'left' ? 100 - constrained.x : constrained.x
 
     setFielderPositions(prev => prev.map(f =>
-      f.id === dragging ? { ...f, x: constrained.x, y: constrained.y } : f
+      f.id === dragging ? { ...f, x: storedX, y: constrained.y } : f
     ))
   }
 
@@ -757,18 +760,22 @@ function FieldView({
       >
         BAT
       </div>
-      {fieldersWithZones.map(fielder => (
-        <div
-          key={fielder.id}
-          className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
-          style={{ left: `${fielder.x}%`, top: `${fielder.y}%` }}
-          onMouseDown={(e) => handleMouseDown(e, fielder.id)}
-          onTouchStart={(e) => handleTouchStart(e, fielder.id)}
-          title={fielder.zoneName}
-        >
-          {fielder.shortName}
-        </div>
-      ))}
+      {fieldersWithZones.map(fielder => {
+        // Mirror x position for left-handed batter
+        const displayX = batterHand === 'left' ? 100 - fielder.x : fielder.x
+        return (
+          <div
+            key={fielder.id}
+            className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
+            style={{ left: `${displayX}%`, top: `${fielder.y}%` }}
+            onMouseDown={(e) => handleMouseDown(e, fielder.id)}
+            onTouchStart={(e) => handleTouchStart(e, fielder.id)}
+            title={fielder.zoneName}
+          >
+            {fielder.shortName}
+          </div>
+        )
+      })}
     </div>
   )
 }
