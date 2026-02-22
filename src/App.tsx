@@ -665,12 +665,13 @@ function FieldView({
   const [dragging, setDragging] = useState<string | null>(null)
 
   // Calculate zones for all fielders (recalculated when positions or batter hand changes)
-  // For left-handed, mirror the x positions first, then calculate zones without additional mirroring
+  // For left-handed: mirror positions AND mirror zone seeds (via isLeftHanded=true)
   const fieldersWithZones: FielderWithZone[] = useMemo(() => {
-    const positionsToUse = batterHand === 'left'
+    const isLeftHanded = batterHand === 'left'
+    const positionsToUse = isLeftHanded
       ? fielderPositions.map(f => ({ ...f, x: 100 - f.x }))
       : fielderPositions
-    return calculateFielderZones(positionsToUse, false)  // No additional mirroring needed
+    return calculateFielderZones(positionsToUse, isLeftHanded)
   }, [fielderPositions, batterHand])
 
   // Shared position update logic for mouse and touch
