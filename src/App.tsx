@@ -665,8 +665,12 @@ function FieldView({
   const [dragging, setDragging] = useState<string | null>(null)
 
   // Calculate zones for all fielders (recalculated when positions or batter hand changes)
+  // For left-handed, mirror the x positions first, then calculate zones without additional mirroring
   const fieldersWithZones: FielderWithZone[] = useMemo(() => {
-    return calculateFielderZones(fielderPositions, batterHand === 'left')
+    const positionsToUse = batterHand === 'left'
+      ? fielderPositions.map(f => ({ ...f, x: 100 - f.x }))
+      : fielderPositions
+    return calculateFielderZones(positionsToUse, false)  // No additional mirroring needed
   }, [fielderPositions, batterHand])
 
   // Shared position update logic for mouse and touch
@@ -760,22 +764,18 @@ function FieldView({
       >
         BAT
       </div>
-      {fieldersWithZones.map(fielder => {
-        // Mirror x position for left-handed batter
-        const displayX = batterHand === 'left' ? 100 - fielder.x : fielder.x
-        return (
-          <div
-            key={fielder.id}
-            className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
-            style={{ left: `${displayX}%`, top: `${fielder.y}%` }}
-            onMouseDown={(e) => handleMouseDown(e, fielder.id)}
-            onTouchStart={(e) => handleTouchStart(e, fielder.id)}
-            title={fielder.zoneName}
-          >
-            {fielder.shortName}
-          </div>
-        )
-      })}
+      {fieldersWithZones.map(fielder => (
+        <div
+          key={fielder.id}
+          className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
+          style={{ left: `${fielder.x}%`, top: `${fielder.y}%` }}
+          onMouseDown={(e) => handleMouseDown(e, fielder.id)}
+          onTouchStart={(e) => handleTouchStart(e, fielder.id)}
+          title={fielder.zoneName}
+        >
+          {fielder.shortName}
+        </div>
+      ))}
     </div>
   )
 }
