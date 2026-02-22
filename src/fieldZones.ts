@@ -99,7 +99,7 @@ const SHORT_NAMES: Record<string, string> = {
 // Batter is at TOP of pitch, above field center
 // Field center = 50%, batter offset = -8.84m = -6.3% of field diameter
 const BATTER_SCREEN_X = 50
-const BATTER_SCREEN_Y = 34
+const BATTER_SCREEN_Y = 36
 
 /**
  * Convert screen coordinates (0-100%) to field coordinates (meters from batter)

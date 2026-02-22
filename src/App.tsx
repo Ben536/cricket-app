@@ -741,7 +741,7 @@ function FieldView({
       <div className="pitch" />
       <div
         className="fielder batsman"
-        style={{ left: '50%', top: '34%' }}
+        style={{ left: '50%', top: '36%' }}
       >
         BAT
       </div>
