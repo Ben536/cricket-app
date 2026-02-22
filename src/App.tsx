@@ -122,11 +122,22 @@ const createDefaultProfiles = (): Profile[] => [
 // LocalStorage helpers
 const STORAGE_KEY = 'cricket-app-profiles'
 
+const migrateSession = (session: Session): Session => ({
+  ...session,
+  wickets: session.wickets ?? 0,
+})
+
 const loadProfiles = (): Profile[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      const profiles: Profile[] = JSON.parse(saved)
+      // Migrate old sessions to include wickets field
+      return profiles.map(profile => ({
+        ...profile,
+        currentSession: migrateSession(profile.currentSession),
+        sessions: profile.sessions.map(migrateSession),
+      }))
     }
   } catch (e) {
     console.error('Failed to load profiles:', e)
