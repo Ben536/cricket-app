@@ -69,9 +69,9 @@ export const SCREEN_GEOMETRY = {
   batterX: BATTER_SCREEN_X,
   batterY: BATTER_SCREEN_Y,
 
-  // Pitch (centered horizontally, starts at batter)
-  pitchCenterX: BATTER_SCREEN_X,
-  pitchTop: BATTER_SCREEN_Y - 1,  // Slight offset for crease
+  // Pitch (centered on field)
+  pitchCenterX: SCREEN_FIELD_CENTER_X,
+  pitchCenterY: SCREEN_FIELD_CENTER_Y,
   pitchWidth: PITCH_WIDTH_SCREEN,
   pitchLength: PITCH_LENGTH_SCREEN,
 

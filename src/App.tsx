@@ -728,12 +728,12 @@ function FieldView({
     }
   }, [dragging])
 
-  // Pitch styling based on geometry constants
+  // Pitch styling based on geometry constants (centered on field)
   const pitchStyle = {
     position: 'absolute' as const,
     left: `${SCREEN_GEOMETRY.pitchCenterX}%`,
-    top: `${SCREEN_GEOMETRY.pitchTop}%`,
-    transform: 'translateX(-50%)',
+    top: `${SCREEN_GEOMETRY.pitchCenterY}%`,
+    transform: 'translate(-50%, -50%)',
     width: `${SCREEN_GEOMETRY.pitchWidth}%`,
     height: `${SCREEN_GEOMETRY.pitchLength}%`,
     background: '#c4a574',
