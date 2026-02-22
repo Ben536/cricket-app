@@ -344,8 +344,8 @@ export const FIELD_PRESET_POSITIONS: Record<string, Array<{ id: string; x: numbe
   ],
   'T20 Death': [
     { id: '1', x: 50, y: 36 },   // Keeper
-    { id: '2', x: 60, y: 98 },   // Long on
-    { id: '3', x: 40, y: 98 },   // Long off
+    { id: '2', x: 60, y: 94 },   // Long on
+    { id: '3', x: 40, y: 94 },   // Long off
     { id: '4', x: 88, y: 42 },   // Deep square
     { id: '5', x: 35, y: 58 },   // Cover
     { id: '6', x: 12, y: 42 },   // Deep point
@@ -356,8 +356,8 @@ export const FIELD_PRESET_POSITIONS: Record<string, Array<{ id: string; x: numbe
   ],
   'Defensive': [
     { id: '1', x: 50, y: 36 },   // Keeper
-    { id: '2', x: 62, y: 96 },   // Long on
-    { id: '3', x: 38, y: 96 },   // Long off
+    { id: '2', x: 62, y: 92 },   // Long on
+    { id: '3', x: 38, y: 92 },   // Long off
     { id: '4', x: 90, y: 42 },   // Deep square leg
     { id: '5', x: 10, y: 42 },   // Deep point
     { id: '6', x: 67, y: 19 },   // Fine leg
