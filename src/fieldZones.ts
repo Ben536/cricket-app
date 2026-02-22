@@ -344,26 +344,26 @@ export const FIELD_PRESET_POSITIONS: Record<string, Array<{ id: string; x: numbe
   ],
   'T20 Death': [
     { id: '1', x: 50, y: 26 },   // Keeper
-    { id: '2', x: 60, y: 88 },   // Long on
-    { id: '3', x: 40, y: 88 },   // Long off
-    { id: '4', x: 88, y: 32 },   // Deep square
+    { id: '2', x: 58, y: 82 },   // Long on
+    { id: '3', x: 42, y: 82 },   // Long off
+    { id: '4', x: 85, y: 35 },   // Deep square
     { id: '5', x: 35, y: 48 },   // Cover
-    { id: '6', x: 12, y: 32 },   // Deep point
-    { id: '7', x: 70, y: 8 },    // Fine leg
-    { id: '8', x: 85, y: 18 },   // Deep backward square
+    { id: '6', x: 15, y: 35 },   // Deep point
+    { id: '7', x: 68, y: 12 },   // Fine leg
+    { id: '8', x: 82, y: 22 },   // Deep backward square
     { id: '9', x: 20, y: 53 },   // Deep cover
     { id: '10', x: 65, y: 48 },  // Mid-wicket
   ],
   'Defensive': [
     { id: '1', x: 50, y: 26 },   // Keeper
-    { id: '2', x: 62, y: 86 },   // Long on
-    { id: '3', x: 38, y: 86 },   // Long off
-    { id: '4', x: 90, y: 32 },   // Deep square leg
-    { id: '5', x: 10, y: 32 },   // Deep point
-    { id: '6', x: 68, y: 6 },    // Fine leg
-    { id: '7', x: 32, y: 6 },    // Third man
-    { id: '8', x: 15, y: 56 },   // Deep cover
-    { id: '9', x: 12, y: 48 },   // Deep extra cover
-    { id: '10', x: 78, y: 50 },  // Deep mid-wicket
+    { id: '2', x: 58, y: 82 },   // Long on
+    { id: '3', x: 42, y: 82 },   // Long off
+    { id: '4', x: 85, y: 35 },   // Deep square leg
+    { id: '5', x: 15, y: 35 },   // Deep point
+    { id: '6', x: 65, y: 12 },   // Fine leg
+    { id: '7', x: 35, y: 12 },   // Third man
+    { id: '8', x: 18, y: 56 },   // Deep cover
+    { id: '9', x: 15, y: 48 },   // Deep extra cover
+    { id: '10', x: 75, y: 50 },  // Deep mid-wicket
   ],
 }
