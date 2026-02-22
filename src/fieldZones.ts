@@ -304,66 +304,66 @@ export function getFielderDisplayName(fielder: FielderWithZone): string {
 export function createDefaultFielders(): Array<{ id: string; x: number; y: number }> {
   // Batter at (50, 44). Behind batter = smaller Y, toward bowler = larger Y
   return [
-    { id: '1', x: 50, y: 26 },   // Keeper (behind batter)
-    { id: '2', x: 47, y: 25 },   // 1st slip
-    { id: '3', x: 44, y: 25 },   // 2nd slip
-    { id: '4', x: 37, y: 27 },   // Gully
-    { id: '5', x: 30, y: 32 },   // Point
-    { id: '6', x: 30, y: 48 },   // Cover (toward bowler)
-    { id: '7', x: 41, y: 58 },   // Mid-off
-    { id: '8', x: 60, y: 48 },   // Mid-wicket
-    { id: '9', x: 70, y: 32 },   // Square leg
-    { id: '10', x: 62, y: 16 },  // Fine leg (behind batter)
+    { id: '1', x: 50, y: 34 },   // Keeper (behind batter)
+    { id: '2', x: 47, y: 33 },   // 1st slip
+    { id: '3', x: 44, y: 33 },   // 2nd slip
+    { id: '4', x: 37, y: 35 },   // Gully
+    { id: '5', x: 30, y: 40 },   // Point
+    { id: '6', x: 30, y: 56 },   // Cover (toward bowler)
+    { id: '7', x: 41, y: 66 },   // Mid-off
+    { id: '8', x: 60, y: 56 },   // Mid-wicket
+    { id: '9', x: 70, y: 40 },   // Square leg
+    { id: '10', x: 62, y: 24 },  // Fine leg (behind batter)
   ]
 }
 
 export const FIELD_PRESET_POSITIONS: Record<string, Array<{ id: string; x: number; y: number }>> = {
   'Standard Pace': [
-    { id: '1', x: 50, y: 26 },   // Keeper (behind batter)
-    { id: '2', x: 47, y: 25 },   // 1st slip
-    { id: '3', x: 44, y: 25 },   // 2nd slip
-    { id: '4', x: 37, y: 27 },   // Gully
-    { id: '5', x: 30, y: 32 },   // Point
-    { id: '6', x: 30, y: 48 },   // Cover
-    { id: '7', x: 41, y: 58 },   // Mid-off
-    { id: '8', x: 60, y: 48 },   // Mid-wicket
-    { id: '9', x: 70, y: 32 },   // Square leg
-    { id: '10', x: 62, y: 16 },  // Fine leg
+    { id: '1', x: 50, y: 34 },   // Keeper (behind batter)
+    { id: '2', x: 47, y: 33 },   // 1st slip
+    { id: '3', x: 44, y: 33 },   // 2nd slip
+    { id: '4', x: 37, y: 35 },   // Gully
+    { id: '5', x: 30, y: 40 },   // Point
+    { id: '6', x: 30, y: 56 },   // Cover
+    { id: '7', x: 41, y: 66 },   // Mid-off
+    { id: '8', x: 60, y: 56 },   // Mid-wicket
+    { id: '9', x: 70, y: 40 },   // Square leg
+    { id: '10', x: 62, y: 24 },  // Fine leg
   ],
   'Spin Attack': [
-    { id: '1', x: 50, y: 28 },   // Keeper (closer)
-    { id: '2', x: 47, y: 27 },   // Slip
-    { id: '3', x: 55, y: 33 },   // Short leg
-    { id: '4', x: 45, y: 35 },   // Silly point
-    { id: '5', x: 54, y: 35 },   // Silly mid-on
-    { id: '6', x: 15, y: 48 },   // Deep cover
-    { id: '7', x: 45, y: 83 },   // Long off
-    { id: '8', x: 75, y: 48 },   // Deep mid-wicket
-    { id: '9', x: 85, y: 32 },   // Deep square
-    { id: '10', x: 60, y: 83 },  // Long on
+    { id: '1', x: 50, y: 36 },   // Keeper (closer)
+    { id: '2', x: 47, y: 35 },   // Slip
+    { id: '3', x: 55, y: 41 },   // Short leg
+    { id: '4', x: 45, y: 43 },   // Silly point
+    { id: '5', x: 54, y: 43 },   // Silly mid-on
+    { id: '6', x: 15, y: 56 },   // Deep cover
+    { id: '7', x: 45, y: 91 },   // Long off
+    { id: '8', x: 75, y: 56 },   // Deep mid-wicket
+    { id: '9', x: 85, y: 40 },   // Deep square
+    { id: '10', x: 60, y: 91 },  // Long on
   ],
   'T20 Death': [
-    { id: '1', x: 50, y: 26 },   // Keeper
-    { id: '2', x: 60, y: 88 },   // Long on
-    { id: '3', x: 40, y: 88 },   // Long off
-    { id: '4', x: 88, y: 32 },   // Deep square
-    { id: '5', x: 35, y: 48 },   // Cover
-    { id: '6', x: 12, y: 32 },   // Deep point
-    { id: '7', x: 70, y: 8 },    // Fine leg
-    { id: '8', x: 83, y: 20 },   // Deep backward square (was 85,18 - outside)
-    { id: '9', x: 20, y: 53 },   // Deep cover
-    { id: '10', x: 65, y: 48 },  // Mid-wicket
+    { id: '1', x: 50, y: 34 },   // Keeper
+    { id: '2', x: 60, y: 96 },   // Long on
+    { id: '3', x: 40, y: 96 },   // Long off
+    { id: '4', x: 88, y: 40 },   // Deep square
+    { id: '5', x: 35, y: 56 },   // Cover
+    { id: '6', x: 12, y: 40 },   // Deep point
+    { id: '7', x: 70, y: 16 },   // Fine leg
+    { id: '8', x: 83, y: 28 },   // Deep backward square
+    { id: '9', x: 20, y: 61 },   // Deep cover
+    { id: '10', x: 65, y: 56 },  // Mid-wicket
   ],
   'Defensive': [
-    { id: '1', x: 50, y: 26 },   // Keeper
-    { id: '2', x: 62, y: 86 },   // Long on
-    { id: '3', x: 38, y: 86 },   // Long off
-    { id: '4', x: 90, y: 32 },   // Deep square leg
-    { id: '5', x: 10, y: 32 },   // Deep point
-    { id: '6', x: 67, y: 9 },    // Fine leg (was 68,6 - outside)
-    { id: '7', x: 33, y: 9 },    // Third man (was 32,6 - outside)
-    { id: '8', x: 15, y: 56 },   // Deep cover
-    { id: '9', x: 12, y: 48 },   // Deep extra cover
-    { id: '10', x: 78, y: 50 },  // Deep mid-wicket
+    { id: '1', x: 50, y: 34 },   // Keeper
+    { id: '2', x: 62, y: 94 },   // Long on
+    { id: '3', x: 38, y: 94 },   // Long off
+    { id: '4', x: 90, y: 40 },   // Deep square leg
+    { id: '5', x: 10, y: 40 },   // Deep point
+    { id: '6', x: 67, y: 17 },   // Fine leg
+    { id: '7', x: 33, y: 17 },   // Third man
+    { id: '8', x: 15, y: 64 },   // Deep cover
+    { id: '9', x: 12, y: 56 },   // Deep extra cover
+    { id: '10', x: 78, y: 58 },  // Deep mid-wicket
   ],
 }
