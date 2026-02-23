@@ -70,8 +70,8 @@ FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving
 
 # Ground fielding time constants
 PITCH_LENGTH = 20.12          # metres between stumps (22 yards)
-TIME_FOR_FIRST_RUN = 5.0      # seconds - includes reaction, call, start from stationary
-TIME_FOR_EXTRA_RUN = 4.0      # seconds - already moving, just turn and run
+TIME_FOR_FIRST_RUN = 4.0      # seconds - includes reaction, call, start from stationary
+TIME_FOR_EXTRA_RUN = 3.0      # seconds - already moving, just turn and run
 THROW_SPEED = 28.0            # m/s - average professional throw speed
 COLLECTION_TIME_DIRECT = 0.7  # seconds - ball straight to fielder, clean pickup
 COLLECTION_TIME_MOVING = 1.2  # seconds - fielder moves to collect while ball moving
