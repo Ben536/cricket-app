@@ -52,23 +52,27 @@ DIFFICULTY_SETTINGS = {
 # Catch Difficulty Thresholds
 # =============================================================================
 
-# Distance from fielder to ball path (metres)
-CATCH_LATERAL_EASY = 1.0      # Ball within 1m = regulation
-CATCH_LATERAL_HARD = 2.5      # Ball 1-2.5m = hard catch
-CATCH_LATERAL_MAX = 3.0       # Beyond 3m = no catch possible
-
 # Height thresholds (metres)
 CATCH_HEIGHT_MIN = 0.3        # Below this = half-volley, not catchable
-CATCH_HEIGHT_EASY_MIN = 0.5   # Comfortable catching zone
-CATCH_HEIGHT_EASY_MAX = 2.2   # Above head height gets harder
 CATCH_HEIGHT_MAX = 3.5        # Above this = uncatchable
-
-# Speed thresholds (km/h)
-CATCH_SPEED_EASY = 80         # Below this = comfortable
-CATCH_SPEED_HARD = 120        # Above this = very difficult
 
 # Ground fielding range (metres)
 GROUND_FIELDING_RANGE = 4.0   # Fielder can reach 4m either side
+
+# =============================================================================
+# Fielder Movement Constants
+# =============================================================================
+
+FIELDER_REACTION_TIME = 0.25  # seconds to react and start moving
+FIELDER_RUN_SPEED = 6.5       # m/s - professional fielder sprint speed
+FIELDER_DIVE_RANGE = 2.0      # metres - diving catch extension
+FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving
+
+# Difficulty weights for catch scoring
+WEIGHT_REACTION = 0.25        # How much time pressure matters
+WEIGHT_MOVEMENT = 0.35        # How far fielder must move
+WEIGHT_HEIGHT = 0.20          # Awkwardness of catch height
+WEIGHT_SPEED = 0.20           # Ball speed at fielder
 
 
 # =============================================================================
@@ -256,82 +260,292 @@ def _distance_from_batter(x: float, y: float) -> float:
     return math.sqrt(x * x + y * y)
 
 
-def _classify_catch_difficulty(
-    lateral_distance: float,
-    height: float,
-    ball_speed: float
-) -> Optional[str]:
+def _calculate_full_trajectory(
+    speed_kmh: float,
+    horizontal_angle: float,
+    vertical_angle: float
+) -> dict:
     """
-    Classify whether a catch is possible and its difficulty.
+    Calculate full trajectory data including timing for fielder calculations.
 
     Returns:
-        'regulation', 'hard', or None (no catch possible)
+        dict with: projected_distance, max_height, landing_x, landing_y,
+                   time_of_flight, horizontal_speed, vertical_speed,
+                   direction_x, direction_y
     """
-    # Check if catch is possible at all
-    if lateral_distance > CATCH_LATERAL_MAX:
-        return None
-    if height < CATCH_HEIGHT_MIN or height > CATCH_HEIGHT_MAX:
-        return None
+    speed_ms = speed_kmh / 3.6
+    h_rad = math.radians(horizontal_angle)
+    v_rad = math.radians(vertical_angle)
 
-    # Determine difficulty based on multiple factors
-    difficulty_score = 0
+    v_horizontal = speed_ms * math.cos(v_rad)
+    v_vertical = speed_ms * math.sin(v_rad)
+    g = 9.81
 
-    # Lateral distance factor
-    if lateral_distance > CATCH_LATERAL_EASY:
-        difficulty_score += 1
-    if lateral_distance > CATCH_LATERAL_HARD:
-        difficulty_score += 1
+    if v_vertical > 0:
+        t_up = v_vertical / g
+        apex_height = 1 + (v_vertical ** 2) / (2 * g)
+        t_down = math.sqrt(2 * apex_height / g)
+        t_flight = t_up + t_down
+        max_height = apex_height
+    else:
+        t_flight = math.sqrt(2 / g)
+        max_height = 1.0
 
-    # Height factor
-    if height < CATCH_HEIGHT_EASY_MIN or height > CATCH_HEIGHT_EASY_MAX:
-        difficulty_score += 1
-    if height < CATCH_HEIGHT_MIN + 0.1 or height > CATCH_HEIGHT_MAX - 0.3:
-        difficulty_score += 1
+    distance = v_horizontal * t_flight
+    landing_x = -distance * math.sin(h_rad)
+    landing_y = -distance * math.cos(h_rad)
 
-    # Speed factor
-    if ball_speed > CATCH_SPEED_EASY:
-        difficulty_score += 1
-    if ball_speed > CATCH_SPEED_HARD:
-        difficulty_score += 1
+    # Calculate direction unit vector
+    dir_mag = math.sqrt(landing_x ** 2 + landing_y ** 2)
+    dir_x = landing_x / dir_mag if dir_mag > 0 else 0
+    dir_y = landing_y / dir_mag if dir_mag > 0 else -1
 
-    # Classify based on total difficulty
-    if difficulty_score >= 2:
-        return 'hard'
-    return 'regulation'
+    return {
+        'projected_distance': distance,
+        'max_height': max_height,
+        'landing_x': landing_x,
+        'landing_y': landing_y,
+        'time_of_flight': t_flight,
+        'horizontal_speed': v_horizontal,
+        'vertical_speed': v_vertical,
+        'direction_x': dir_x,
+        'direction_y': dir_y,
+    }
 
 
-def _roll_fielding_outcome(
-    outcome_type: str,
-    probabilities: dict
+def _get_ball_position_at_time(trajectory: dict, time: float) -> tuple[float, float, float]:
+    """
+    Get ball position (x, y, z) at a specific time along trajectory.
+    """
+    g = 9.81
+    horizontal_dist = trajectory['horizontal_speed'] * time
+    x = horizontal_dist * trajectory['direction_x']
+    y = horizontal_dist * trajectory['direction_y']
+    z = 1 + trajectory['vertical_speed'] * time - 0.5 * g * time ** 2
+    return x, y, max(0.0, z)
+
+
+def _get_time_at_distance(trajectory: dict, distance: float) -> float:
+    """Calculate time when ball reaches a given horizontal distance."""
+    if trajectory['horizontal_speed'] <= 0:
+        return float('inf')
+    return distance / trajectory['horizontal_speed']
+
+
+def _find_catchable_intercept(
+    fielder_x: float,
+    fielder_y: float,
+    trajectory: dict
+) -> tuple[float, float, float]:
+    """
+    Find the best point along the trajectory where a fielder could catch the ball.
+
+    Scans the trajectory to find points where:
+    1. Ball is at a catchable height (CATCH_HEIGHT_MIN to CATCH_HEIGHT_MAX)
+    2. Fielder could potentially reach (within movement range given time)
+
+    Returns:
+        (time, lateral_distance, height) of best intercept point, or (inf, inf, 0) if no catch possible
+    """
+    best_time = float('inf')
+    best_lateral = float('inf')
+    best_height = 0.0
+
+    # Sample trajectory at small time intervals
+    time_step = 0.05  # 50ms steps
+    t = 0.1  # Skip very start
+
+    while t < trajectory['time_of_flight']:
+        x, y, z = _get_ball_position_at_time(trajectory, t)
+
+        # Check if ball is at catchable height
+        if CATCH_HEIGHT_MIN <= z <= CATCH_HEIGHT_MAX:
+            # Calculate lateral distance from fielder to this point
+            dx = x - fielder_x
+            dy = y - fielder_y
+            lateral_dist = math.sqrt(dx * dx + dy * dy)
+
+            # Calculate if fielder could reach this point
+            movement_time = max(0, t - FIELDER_REACTION_TIME)
+            movement_possible = movement_time * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+
+            if lateral_dist <= movement_possible:
+                # This is a valid catch point - prefer earlier ones with less movement
+                score = t + lateral_dist * 0.1  # Slight preference for less movement
+                best_score = best_time + best_lateral * 0.1 if best_time < float('inf') else float('inf')
+
+                if score < best_score:
+                    best_time = t
+                    best_lateral = lateral_dist
+                    best_height = z
+
+        t += time_step
+
+    return best_time, best_lateral, best_height
+
+
+def _analyze_catch_difficulty(
+    fielder_x: float,
+    fielder_y: float,
+    trajectory: dict,
+    intercept_distance: float,
+    lateral_distance: float
+) -> dict:
+    """
+    Calculate detailed catch difficulty based on trajectory, fielder position, and timing.
+
+    Returns dict with:
+        can_catch: bool
+        difficulty: float (0-1, higher = harder)
+        catch_type: 'regulation', 'hard', 'spectacular', or None
+        reaction_time: float (seconds available to react)
+        movement_required: float (metres fielder must move)
+        movement_possible: float (metres fielder can move given time)
+        ball_speed_at_fielder: float (km/h)
+        height_at_intercept: float (metres)
+        time_to_intercept: float (seconds until ball reaches fielder)
+    """
+    # Find the best catchable intercept point along the trajectory
+    time_to_intercept, lateral_dist_actual, height_at_intercept = _find_catchable_intercept(
+        fielder_x, fielder_y, trajectory
+    )
+
+    # If no catchable point found, return impossible
+    if time_to_intercept == float('inf'):
+        # Fall back to original calculation for the 'impossible' return
+        orig_time = _get_time_at_distance(trajectory, intercept_distance)
+        _, _, orig_height = _get_ball_position_at_time(trajectory, orig_time)
+        return {
+            'can_catch': False,
+            'difficulty': 1.0,
+            'catch_type': None,
+            'reaction_time': orig_time,
+            'movement_required': lateral_distance,
+            'movement_possible': 0.0,
+            'ball_speed_at_fielder': trajectory['horizontal_speed'] * 3.6,
+            'height_at_intercept': orig_height,
+            'time_to_intercept': orig_time,
+        }
+
+    # Time available for fielder to move (after reaction)
+    movement_time = max(0, time_to_intercept - FIELDER_REACTION_TIME)
+
+    # How far fielder can move in available time
+    movement_possible = movement_time * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+
+    # === Calculate difficulty score (0 = easy, 1 = impossible) ===
+
+    # 1. Reaction score: less time = harder
+    # 0.5s or less = very hard (1.0), 2s+ = easy (0.0)
+    reaction_score = max(0, min(1, 1 - (time_to_intercept - 0.5) / 1.5))
+
+    # 2. Movement score: further movement = harder
+    if lateral_dist_actual <= FIELDER_STATIC_RANGE:
+        movement_score = 0  # No movement needed
+    elif lateral_dist_actual <= FIELDER_STATIC_RANGE + FIELDER_DIVE_RANGE:
+        # Diving catch without running
+        movement_score = 0.3 + 0.2 * ((lateral_dist_actual - FIELDER_STATIC_RANGE) / FIELDER_DIVE_RANGE)
+    else:
+        # Running catch
+        run_distance = lateral_dist_actual - FIELDER_STATIC_RANGE
+        max_run_distance = movement_possible - FIELDER_STATIC_RANGE
+        movement_score = 0.5 + 0.5 * (run_distance / max_run_distance) if max_run_distance > 0 else 1.0
+
+    # 3. Height score: very low or very high = harder
+    if 1.0 <= height_at_intercept <= 1.8:
+        height_score = 0  # Optimal
+    elif height_at_intercept < 1.0:
+        height_score = min(1, (1.0 - height_at_intercept) / 0.7)
+    else:
+        height_score = min(1, (height_at_intercept - 1.8) / 1.7)
+
+    # 4. Speed score: faster ball = harder
+    ball_speed_kmh = trajectory['horizontal_speed'] * 3.6
+    speed_score = max(0, min(1, (ball_speed_kmh - 60) / 60))
+
+    # Weighted difficulty
+    difficulty = (
+        WEIGHT_REACTION * reaction_score +
+        WEIGHT_MOVEMENT * movement_score +
+        WEIGHT_HEIGHT * height_score +
+        WEIGHT_SPEED * speed_score
+    )
+
+    # Classify catch type
+    if difficulty < 0.25:
+        catch_type = 'regulation'
+    elif difficulty < 0.6:
+        catch_type = 'hard'
+    else:
+        catch_type = 'spectacular'
+
+    return {
+        'can_catch': True,
+        'difficulty': difficulty,
+        'catch_type': catch_type,
+        'reaction_time': time_to_intercept,
+        'movement_required': lateral_dist_actual,
+        'movement_possible': movement_possible,
+        'ball_speed_at_fielder': ball_speed_kmh,
+        'height_at_intercept': height_at_intercept,
+        'time_to_intercept': time_to_intercept,
+    }
+
+
+def _roll_catch_outcome(
+    catch_analysis: dict,
+    difficulty: str
 ) -> str:
     """
-    Roll a random outcome based on difficulty probabilities.
-
-    Args:
-        outcome_type: 'regulation_catch', 'hard_catch', or 'ground_fielding'
-        probabilities: Dict with outcome probabilities
+    Roll catch outcome using continuous difficulty score.
+    Maps difficulty (0-1) to catch probability with difficulty setting modifier.
 
     Returns:
-        'caught', 'dropped', 'runs' for catches
-        'stopped', 'misfield_no_extra', 'misfield_extra' for ground fielding
+        'caught', 'dropped', or 'runs'
     """
-    probs = probabilities[outcome_type]
+    # Base catch probability curves based on difficulty score
+    # At difficulty=0: 98% catch, at difficulty=1: 10% catch
+    base_catch_prob = 0.98 - 0.88 * catch_analysis['difficulty']
+
+    # Difficulty setting modifiers
+    modifiers = {
+        'easy': {'catch_mod': 0.85, 'drop_mod': 1.3},    # Fielders worse
+        'medium': {'catch_mod': 1.0, 'drop_mod': 1.0},   # Baseline
+        'hard': {'catch_mod': 1.15, 'drop_mod': 0.7},    # Fielders better
+    }
+
+    mod = modifiers.get(difficulty, modifiers['medium'])
+    catch_prob = min(0.99, base_catch_prob * mod['catch_mod'])
+
+    # Drop probability scales with difficulty
+    base_drop_prob = 0.05 + 0.25 * catch_analysis['difficulty']
+    drop_prob = min(0.5, base_drop_prob * mod['drop_mod'])
+
+    roll = random.random()
+    if roll < catch_prob:
+        return 'caught'
+    elif roll < catch_prob + drop_prob:
+        return 'dropped'
+    else:
+        return 'runs'
+
+
+def _roll_ground_fielding_outcome(probabilities: dict) -> str:
+    """
+    Roll a random ground fielding outcome.
+
+    Returns:
+        'stopped', 'misfield_no_extra', 'misfield_extra'
+    """
+    probs = probabilities['ground_fielding']
     roll = random.random()
 
-    if outcome_type in ('regulation_catch', 'hard_catch'):
-        if roll < probs['caught']:
-            return 'caught'
-        elif roll < probs['caught'] + probs['dropped']:
-            return 'dropped'
-        else:
-            return 'runs'
-    else:  # ground_fielding
-        if roll < probs['stopped']:
-            return 'stopped'
-        elif roll < probs['stopped'] + probs['misfield_no_extra']:
-            return 'misfield_no_extra'
-        else:
-            return 'misfield_extra'
+    if roll < probs['stopped']:
+        return 'stopped'
+    elif roll < probs['stopped'] + probs['misfield_no_extra']:
+        return 'misfield_no_extra'
+    else:
+        return 'misfield_extra'
 
 
 def _calculate_runs_for_distance(
@@ -446,6 +660,9 @@ def simulate_delivery(
             # But first check if a fielder near the boundary could catch/stop it
             pass  # Continue to fielder checks
 
+    # Build full trajectory data for catch analysis
+    trajectory = _calculate_full_trajectory(exit_speed, horizontal_angle, vertical_angle)
+
     # ---------------------------------------------------------------------
     # Check 2: Catching chances (aerial balls only)
     # ---------------------------------------------------------------------
@@ -457,14 +674,14 @@ def simulate_delivery(
             fname = fielder['name']
 
             # Check if fielder is in the ball's path direction
-            if not _is_fielder_in_ball_path(fx, fy, landing_x, landing_y, CATCH_LATERAL_MAX):
+            if not _is_fielder_in_ball_path(fx, fy, landing_x, landing_y, GROUND_FIELDING_RANGE + 5):
                 continue
 
             # Distance from batter to this fielder
             fielder_distance = _distance_from_batter(fx, fy)
 
-            # Only consider if fielder is between batter and landing point
-            if fielder_distance > projected_distance + 5:
+            # Only consider if fielder is between batter and landing point (extended for running catches)
+            if fielder_distance > projected_distance + 10:
                 continue
 
             # Find closest point on ball trajectory to fielder
@@ -481,20 +698,18 @@ def simulate_delivery(
             # Distance along trajectory where ball is closest to fielder
             intercept_distance = _distance_from_batter(closest_x, closest_y)
 
-            # Height of ball at that point
-            ball_height = _get_ball_height_at_distance(
-                intercept_distance, projected_distance, max_height, vertical_angle
+            # Analyze catch difficulty with full trajectory data
+            analysis = _analyze_catch_difficulty(
+                fx, fy,
+                trajectory,
+                intercept_distance,
+                lateral_dist
             )
 
-            # Classify catch difficulty
-            catch_type = _classify_catch_difficulty(lateral_dist, ball_height, exit_speed)
-
-            if catch_type:
+            if analysis['can_catch']:
                 catching_chances.append({
                     'fielder': fname,
-                    'lateral_distance': lateral_dist,
-                    'height': ball_height,
-                    'catch_type': catch_type,
+                    'analysis': analysis,
                     'intercept_distance': intercept_distance
                 })
 
@@ -503,24 +718,35 @@ def simulate_delivery(
 
         # Evaluate each catching chance
         for chance in catching_chances:
-            outcome = _roll_fielding_outcome(
-                f"{chance['catch_type']}_catch",
-                probs
-            )
+            analysis = chance['analysis']
+            outcome = _roll_catch_outcome(analysis, difficulty)
 
             if outcome == 'caught':
-                catch_desc = "Caught" if chance['catch_type'] == 'regulation' else "Great catch"
+                # Determine catch description based on difficulty and movement
+                if analysis['catch_type'] == 'spectacular':
+                    catch_desc = "Spectacular catch"
+                elif analysis['catch_type'] == 'hard':
+                    catch_desc = "Great catch"
+                else:
+                    catch_desc = "Caught"
+
+                # Add detail about running catches
+                if analysis['movement_required'] > FIELDER_STATIC_RANGE + 1:
+                    catch_desc += f" (running {analysis['movement_required']:.1f}m)"
+                elif analysis['movement_required'] > FIELDER_STATIC_RANGE:
+                    catch_desc += " (diving)"
+
                 return {
                     'outcome': 'caught',
                     'runs': 0,
                     'is_boundary': False,
                     'is_aerial': True,
                     'fielder_involved': chance['fielder'],
-                    'description': f"{catch_desc} at {chance['fielder']}!"
+                    'description': f"{catch_desc} at {chance['fielder']}!",
+                    'catch_analysis': analysis
                 }
             elif outcome == 'dropped':
                 # Dropped - but ball might still be fielded
-                # Continue to check if boundary is reached or runs scored
                 dropped_fielder = chance['fielder']
 
                 # After a drop, check if ball still reaches boundary
@@ -531,7 +757,8 @@ def simulate_delivery(
                         'is_boundary': True,
                         'is_aerial': True,
                         'fielder_involved': dropped_fielder,
-                        'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, four!"
+                        'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, four!",
+                        'catch_analysis': analysis
                     }
 
                 # Otherwise, runs off the drop
@@ -542,7 +769,8 @@ def simulate_delivery(
                     'is_boundary': False,
                     'is_aerial': True,
                     'fielder_involved': dropped_fielder,
-                    'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, runs {runs}"
+                    'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, runs {runs}",
+                    'catch_analysis': analysis
                 }
             # If 'runs' outcome, continue to next fielder or ground fielding
 
@@ -603,7 +831,7 @@ def simulate_delivery(
     hit_firmly = exit_speed > 80
 
     for chance in ground_fielding_chances:
-        outcome = _roll_fielding_outcome('ground_fielding', probs)
+        outcome = _roll_ground_fielding_outcome(probs)
 
         # Ball hit straight to fielder vs into gap
         hit_to_fielder = chance['lateral_distance'] < 1.5

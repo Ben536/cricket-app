@@ -19,12 +19,8 @@ export interface SimulationResult {
   is_aerial: boolean
   fielder_involved: string | null
   description: string
-  trajectory: {
-    projected_distance: number
-    max_height: number
-    landing_x: number
-    landing_y: number
-  }
+  trajectory: TrajectoryData
+  catch_analysis?: CatchAnalysis  // Detailed catch difficulty breakdown
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -49,27 +45,45 @@ const DIFFICULTY_SETTINGS = {
 }
 
 // Thresholds
-const CATCH_LATERAL_EASY = 1.0
-const CATCH_LATERAL_HARD = 2.5
-const CATCH_LATERAL_MAX = 3.0
 const CATCH_HEIGHT_MIN = 0.3
-const CATCH_HEIGHT_EASY_MIN = 0.5
-const CATCH_HEIGHT_EASY_MAX = 2.2
 const CATCH_HEIGHT_MAX = 3.5
-const CATCH_SPEED_EASY = 80
-const CATCH_SPEED_HARD = 120
 const GROUND_FIELDING_RANGE = 4.0
 const INNER_RING_RADIUS = 15.0
 const MID_FIELD_RADIUS = 30.0
 
+// Fielder movement constants
+const FIELDER_REACTION_TIME = 0.25  // seconds to react and start moving
+const FIELDER_RUN_SPEED = 6.5       // m/s - professional fielder sprint speed
+const FIELDER_DIVE_RANGE = 2.0      // metres - diving catch extension
+const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving
+
+// Difficulty weights for catch scoring
+const WEIGHT_REACTION = 0.25        // How much time pressure matters
+const WEIGHT_MOVEMENT = 0.35        // How far fielder must move
+const WEIGHT_HEIGHT = 0.20          // Awkwardness of catch height
+const WEIGHT_SPEED = 0.20           // Ball speed at fielder
+
+export interface TrajectoryData {
+  projected_distance: number
+  max_height: number
+  landing_x: number
+  landing_y: number
+  time_of_flight: number
+  horizontal_speed: number  // m/s along ground
+  vertical_speed: number    // m/s initial vertical component
+  direction_x: number       // unit vector x component
+  direction_y: number       // unit vector y component
+}
+
 /**
  * Calculate ball trajectory from speed and angles
+ * Returns full trajectory data including timing for fielder calculations
  */
 export function calculateTrajectory(
   speedKmh: number,
   hAngle: number,
   vAngle: number
-): { projected_distance: number; max_height: number; landing_x: number; landing_y: number } {
+): TrajectoryData {
   const speedMs = speedKmh / 3.6
   const hRad = (hAngle * Math.PI) / 180
   const vRad = (vAngle * Math.PI) / 180
@@ -97,12 +111,47 @@ export function calculateTrajectory(
   const landingX = -distance * Math.sin(hRad)
   const landingY = -distance * Math.cos(hRad)
 
+  // Calculate direction unit vector
+  const dirMag = Math.sqrt(landingX * landingX + landingY * landingY)
+  const dirX = dirMag > 0 ? landingX / dirMag : 0
+  const dirY = dirMag > 0 ? landingY / dirMag : -1
+
   return {
     projected_distance: distance,
     max_height: maxHeight,
     landing_x: landingX,
     landing_y: landingY,
+    time_of_flight: tFlight,
+    horizontal_speed: vHorizontal,
+    vertical_speed: vVertical,
+    direction_x: dirX,
+    direction_y: dirY,
   }
+}
+
+/**
+ * Get ball position at a specific time along trajectory
+ */
+function getBallPositionAtTime(
+  trajectory: TrajectoryData,
+  time: number
+): { x: number; y: number; z: number } {
+  const g = 9.81
+  // Horizontal position: constant velocity
+  const horizontalDist = trajectory.horizontal_speed * time
+  const x = horizontalDist * trajectory.direction_x
+  const y = horizontalDist * trajectory.direction_y
+  // Vertical position: projectile motion from height 1m
+  const z = 1 + trajectory.vertical_speed * time - 0.5 * g * time * time
+  return { x, y, z: Math.max(0, z) }
+}
+
+/**
+ * Calculate time when ball reaches a given horizontal distance
+ */
+function getTimeAtDistance(trajectory: TrajectoryData, distance: number): number {
+  if (trajectory.horizontal_speed <= 0) return Infinity
+  return distance / trajectory.horizontal_speed
 }
 
 function getShotDirectionName(horizontalAngle: number, isAerial: boolean): string {
@@ -212,44 +261,214 @@ function isFielderInBallPath(
   return dot > 0
 }
 
-function classifyCatchDifficulty(
-  lateralDistance: number,
-  height: number,
-  ballSpeed: number
-): 'regulation' | 'hard' | null {
-  if (lateralDistance > CATCH_LATERAL_MAX) return null
-  if (height < CATCH_HEIGHT_MIN || height > CATCH_HEIGHT_MAX) return null
-
-  let difficultyScore = 0
-
-  if (lateralDistance > CATCH_LATERAL_EASY) difficultyScore++
-  if (lateralDistance > CATCH_LATERAL_HARD) difficultyScore++
-  if (height < CATCH_HEIGHT_EASY_MIN || height > CATCH_HEIGHT_EASY_MAX) difficultyScore++
-  if (height < CATCH_HEIGHT_MIN + 0.1 || height > CATCH_HEIGHT_MAX - 0.3) difficultyScore++
-  if (ballSpeed > CATCH_SPEED_EASY) difficultyScore++
-  if (ballSpeed > CATCH_SPEED_HARD) difficultyScore++
-
-  return difficultyScore >= 2 ? 'hard' : 'regulation'
+export interface CatchAnalysis {
+  canCatch: boolean
+  difficulty: number          // 0-1, higher = harder
+  catchType: 'regulation' | 'hard' | 'spectacular' | null
+  reactionTime: number        // seconds available to react
+  movementRequired: number    // metres fielder must move
+  movementPossible: number    // metres fielder can move given time
+  ballSpeedAtFielder: number  // km/h
+  heightAtIntercept: number   // metres
+  timeToIntercept: number     // seconds until ball reaches fielder
 }
 
-function rollFieldingOutcome(
-  outcomeType: 'regulation_catch' | 'hard_catch' | 'ground_fielding',
+/**
+ * Find the best point along the trajectory where a fielder could catch the ball.
+ * Scans the trajectory to find points where:
+ * 1. Ball is at a catchable height (CATCH_HEIGHT_MIN to CATCH_HEIGHT_MAX)
+ * 2. Fielder could potentially reach (within movement range given time)
+ */
+function findCatchableIntercept(
+  fielderX: number,
+  fielderY: number,
+  trajectory: TrajectoryData
+): { time: number; lateralDistance: number; height: number } {
+  let bestTime = Infinity
+  let bestLateral = Infinity
+  let bestHeight = 0
+
+  // Sample trajectory at small time intervals
+  const timeStep = 0.05  // 50ms steps
+  let t = 0.1  // Skip very start
+
+  while (t < trajectory.time_of_flight) {
+    const pos = getBallPositionAtTime(trajectory, t)
+
+    // Check if ball is at catchable height
+    if (pos.z >= CATCH_HEIGHT_MIN && pos.z <= CATCH_HEIGHT_MAX) {
+      // Calculate lateral distance from fielder to this point
+      const dx = pos.x - fielderX
+      const dy = pos.y - fielderY
+      const lateralDist = Math.sqrt(dx * dx + dy * dy)
+
+      // Calculate if fielder could reach this point
+      const movementTime = Math.max(0, t - FIELDER_REACTION_TIME)
+      const movementPossible = movementTime * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+
+      if (lateralDist <= movementPossible) {
+        // This is a valid catch point - prefer earlier ones with less movement
+        const score = t + lateralDist * 0.1  // Slight preference for less movement
+        const bestScore = bestTime < Infinity ? bestTime + bestLateral * 0.1 : Infinity
+
+        if (score < bestScore) {
+          bestTime = t
+          bestLateral = lateralDist
+          bestHeight = pos.z
+        }
+      }
+    }
+
+    t += timeStep
+  }
+
+  return { time: bestTime, lateralDistance: bestLateral, height: bestHeight }
+}
+
+/**
+ * Calculate detailed catch difficulty based on trajectory, fielder position, and timing
+ */
+function analyzeCatchDifficulty(
+  fielderX: number,
+  fielderY: number,
+  trajectory: TrajectoryData,
+  interceptDistance: number,
+  lateralDistance: number
+): CatchAnalysis {
+  // Find the best catchable intercept point along the trajectory
+  const intercept = findCatchableIntercept(fielderX, fielderY, trajectory)
+
+  // If no catchable point found, return impossible
+  if (intercept.time === Infinity) {
+    const origTime = getTimeAtDistance(trajectory, interceptDistance)
+    const origPos = getBallPositionAtTime(trajectory, origTime)
+    return {
+      canCatch: false,
+      difficulty: 1,
+      catchType: null,
+      reactionTime: origTime,
+      movementRequired: lateralDistance,
+      movementPossible: 0,
+      ballSpeedAtFielder: trajectory.horizontal_speed * 3.6,
+      heightAtIntercept: origPos.z,
+      timeToIntercept: origTime,
+    }
+  }
+
+  const timeToIntercept = intercept.time
+  const lateralDistActual = intercept.lateralDistance
+  const heightAtIntercept = intercept.height
+
+  // Time available for fielder to move (after reaction)
+  const movementTime = Math.max(0, timeToIntercept - FIELDER_REACTION_TIME)
+
+  // How far fielder can move in available time
+  const movementPossible = movementTime * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+
+  // === Calculate difficulty score (0 = easy, 1 = impossible) ===
+
+  // 1. Reaction score: less time = harder
+  // 0.5s or less = very hard (1.0), 2s+ = easy (0.0)
+  const reactionScore = Math.max(0, Math.min(1, 1 - (timeToIntercept - 0.5) / 1.5))
+
+  // 2. Movement score: further movement = harder
+  let movementScore: number
+  if (lateralDistActual <= FIELDER_STATIC_RANGE) {
+    movementScore = 0  // No movement needed
+  } else if (lateralDistActual <= FIELDER_STATIC_RANGE + FIELDER_DIVE_RANGE) {
+    // Diving catch without running
+    movementScore = 0.3 + 0.2 * ((lateralDistActual - FIELDER_STATIC_RANGE) / FIELDER_DIVE_RANGE)
+  } else {
+    // Running catch
+    const runDistance = lateralDistActual - FIELDER_STATIC_RANGE
+    const maxRunDistance = movementPossible - FIELDER_STATIC_RANGE
+    movementScore = maxRunDistance > 0 ? 0.5 + 0.5 * (runDistance / maxRunDistance) : 1
+  }
+
+  // 3. Height score: very low or very high = harder
+  let heightScore: number
+  if (heightAtIntercept >= 1.0 && heightAtIntercept <= 1.8) {
+    heightScore = 0  // Optimal
+  } else if (heightAtIntercept < 1.0) {
+    heightScore = Math.min(1, (1.0 - heightAtIntercept) / 0.7)
+  } else {
+    heightScore = Math.min(1, (heightAtIntercept - 1.8) / 1.7)
+  }
+
+  // 4. Speed score: faster ball = harder
+  const ballSpeedKmh = trajectory.horizontal_speed * 3.6
+  const speedScore = Math.max(0, Math.min(1, (ballSpeedKmh - 60) / 60))
+
+  // Weighted difficulty
+  const difficulty =
+    WEIGHT_REACTION * reactionScore +
+    WEIGHT_MOVEMENT * movementScore +
+    WEIGHT_HEIGHT * heightScore +
+    WEIGHT_SPEED * speedScore
+
+  // Classify catch type
+  let catchType: 'regulation' | 'hard' | 'spectacular'
+  if (difficulty < 0.25) {
+    catchType = 'regulation'
+  } else if (difficulty < 0.6) {
+    catchType = 'hard'
+  } else {
+    catchType = 'spectacular'
+  }
+
+  return {
+    canCatch: true,
+    difficulty,
+    catchType,
+    reactionTime: timeToIntercept,
+    movementRequired: lateralDistActual,
+    movementPossible,
+    ballSpeedAtFielder: ballSpeedKmh,
+    heightAtIntercept,
+    timeToIntercept,
+  }
+}
+
+/**
+ * Roll catch outcome using continuous difficulty score
+ * Maps difficulty (0-1) to catch probability with difficulty setting modifier
+ */
+function rollCatchOutcome(
+  catchAnalysis: CatchAnalysis,
   difficulty: Difficulty
-): string {
+): 'caught' | 'dropped' | 'runs' {
+  // Base catch probability curves based on difficulty score
+  // At difficulty=0: 98% catch, at difficulty=1: 10% catch
+  const baseCatchProb = 0.98 - 0.88 * catchAnalysis.difficulty
+
+  // Difficulty setting modifiers
+  const modifiers = {
+    easy: { catchMod: 0.85, dropMod: 1.3 },    // Fielders worse
+    medium: { catchMod: 1.0, dropMod: 1.0 },   // Baseline
+    hard: { catchMod: 1.15, dropMod: 0.7 },    // Fielders better
+  }
+
+  const mod = modifiers[difficulty]
+  const catchProb = Math.min(0.99, baseCatchProb * mod.catchMod)
+
+  // Drop probability scales with difficulty
+  const baseDropProb = 0.05 + 0.25 * catchAnalysis.difficulty
+  const dropProb = Math.min(0.5, baseDropProb * mod.dropMod)
+
+  const roll = Math.random()
+  if (roll < catchProb) return 'caught'
+  if (roll < catchProb + dropProb) return 'dropped'
+  return 'runs'
+}
+
+function rollGroundFieldingOutcome(difficulty: Difficulty): string {
   const settings = DIFFICULTY_SETTINGS[difficulty]
+  const probs = settings.ground_fielding
   const roll = Math.random()
 
-  if (outcomeType === 'regulation_catch' || outcomeType === 'hard_catch') {
-    const probs = settings[outcomeType]
-    if (roll < probs.caught) return 'caught'
-    if (roll < probs.caught + probs.dropped) return 'dropped'
-    return 'runs'
-  } else {
-    const probs = settings.ground_fielding
-    if (roll < probs.stopped) return 'stopped'
-    if (roll < probs.stopped + probs.misfield_no_extra) return 'misfield_no_extra'
-    return 'misfield_extra'
-  }
+  if (roll < probs.stopped) return 'stopped'
+  if (roll < probs.stopped + probs.misfield_no_extra) return 'misfield_no_extra'
+  return 'misfield_extra'
 }
 
 function calculateRunsForDistance(
@@ -283,7 +502,7 @@ export function simulateDelivery(
   fieldConfig: FielderConfig[],
   boundaryDistance: number = 65.0,
   difficulty: Difficulty = 'medium'
-): Omit<SimulationResult, 'trajectory'> {
+): Omit<SimulationResult, 'trajectory'> & { catch_analysis?: CatchAnalysis } {
   const isAerial = maxHeight > 1.5 || verticalAngle > 10
   const shotName = getShotDirectionName(horizontalAngle, isAerial)
   const batterX = 0
@@ -306,13 +525,14 @@ export function simulateDelivery(
     }
   }
 
+  // Build trajectory data for catch analysis
+  const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
+
   // Check 2: Catching chances
   if (isAerial) {
     const catchingChances: Array<{
       fielder: string
-      lateralDistance: number
-      height: number
-      catchType: 'regulation' | 'hard'
+      analysis: CatchAnalysis
       interceptDistance: number
     }> = []
 
@@ -320,7 +540,7 @@ export function simulateDelivery(
       if (!isFielderInBallPath(fielder.x, fielder.y, landingX, landingY)) continue
 
       const fielderDist = distanceFromBatter(fielder.x, fielder.y)
-      if (fielderDist > projectedDistance + 5) continue
+      if (fielderDist > projectedDistance + 10) continue  // Slightly extended range for running catches
 
       const { distance: lateralDist, closestX, closestY, t } = distancePointToLineSegment(
         fielder.x, fielder.y, batterX, batterY, landingX, landingY
@@ -328,29 +548,47 @@ export function simulateDelivery(
       if (t < 0.05) continue
 
       const interceptDistance = distanceFromBatter(closestX, closestY)
-      const ballHeight = getBallHeightAtDistance(
-        interceptDistance, projectedDistance, maxHeight, verticalAngle
+
+      // Analyze catch difficulty with full trajectory data
+      const analysis = analyzeCatchDifficulty(
+        fielder.x, fielder.y,
+        trajectory,
+        interceptDistance,
+        lateralDist
       )
 
-      const catchType = classifyCatchDifficulty(lateralDist, ballHeight, exitSpeed)
-      if (catchType) {
+      if (analysis.canCatch) {
         catchingChances.push({
           fielder: fielder.name,
-          lateralDistance: lateralDist,
-          height: ballHeight,
-          catchType,
+          analysis,
           interceptDistance,
         })
       }
     }
 
+    // Sort by intercept distance (closest fielder to batter gets first chance)
     catchingChances.sort((a, b) => a.interceptDistance - b.interceptDistance)
 
     for (const chance of catchingChances) {
-      const outcome = rollFieldingOutcome(`${chance.catchType}_catch` as 'regulation_catch' | 'hard_catch', difficulty)
+      const outcome = rollCatchOutcome(chance.analysis, difficulty)
 
       if (outcome === 'caught') {
-        const catchDesc = chance.catchType === 'regulation' ? 'Caught' : 'Great catch'
+        let catchDesc: string
+        if (chance.analysis.catchType === 'spectacular') {
+          catchDesc = 'Spectacular catch'
+        } else if (chance.analysis.catchType === 'hard') {
+          catchDesc = 'Great catch'
+        } else {
+          catchDesc = 'Caught'
+        }
+
+        // Add detail about running catches
+        if (chance.analysis.movementRequired > FIELDER_STATIC_RANGE + 1) {
+          catchDesc += ` (running ${chance.analysis.movementRequired.toFixed(1)}m)`
+        } else if (chance.analysis.movementRequired > FIELDER_STATIC_RANGE) {
+          catchDesc += ' (diving)'
+        }
+
         return {
           outcome: 'caught',
           runs: 0,
@@ -358,6 +596,7 @@ export function simulateDelivery(
           is_aerial: true,
           fielder_involved: chance.fielder,
           description: `${catchDesc} at ${chance.fielder}!`,
+          catch_analysis: chance.analysis,
         }
       } else if (outcome === 'dropped') {
         if (projectedDistance >= boundaryDistance) {
@@ -368,6 +607,7 @@ export function simulateDelivery(
             is_aerial: true,
             fielder_involved: chance.fielder,
             description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, four!`,
+            catch_analysis: chance.analysis,
           }
         }
         const runs = calculateRunsForDistance(projectedDistance, false, exitSpeed > 80)
@@ -378,6 +618,7 @@ export function simulateDelivery(
           is_aerial: true,
           fielder_involved: chance.fielder,
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, runs ${runs}`,
+          catch_analysis: chance.analysis,
         }
       }
     }
@@ -429,7 +670,7 @@ export function simulateDelivery(
   const hitFirmly = exitSpeed > 80
 
   for (const chance of groundChances) {
-    const outcome = rollFieldingOutcome('ground_fielding', difficulty)
+    const outcome = rollGroundFieldingOutcome(difficulty)
     const hitToFielder = chance.lateralDistance < 1.5
 
     if (outcome === 'stopped') {
