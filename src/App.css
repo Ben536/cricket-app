@@ -1263,6 +1263,12 @@
   z-index: 100;
 }
 
+.fielder.catching {
+  background: var(--sky-gold);
+  box-shadow: 0 0 16px var(--sky-gold), 0 0 32px rgba(255, 215, 0, 0.5);
+  z-index: 99;
+}
+
 .cricket-field {
   touch-action: none;
   -webkit-user-select: none;

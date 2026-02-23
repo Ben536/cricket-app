@@ -610,7 +610,7 @@ def simulate_delivery(
     projected_distance: float,
     max_height: float,
     field_config: list[dict],
-    boundary_distance: float = 65.0,
+    boundary_distance: float = 70.0,
     difficulty: str = 'medium'
 ) -> dict:
     """
@@ -757,6 +757,8 @@ def simulate_delivery(
                     catch_desc += " (diving)"
 
                 fielder_pos = {'x': chance['fielder_x'], 'y': chance['fielder_y']}
+                # Calculate where the ball was when caught (intercept point)
+                catch_x, catch_y, _ = _get_ball_position_at_time(trajectory, analysis['time_to_intercept'])
                 return {
                     'outcome': 'caught',
                     'runs': 0,
@@ -764,7 +766,7 @@ def simulate_delivery(
                     'is_aerial': True,
                     'fielder_involved': chance['fielder'],
                     'fielder_position': fielder_pos,
-                    'end_position': fielder_pos,
+                    'end_position': {'x': catch_x, 'y': catch_y},  # Where ball was caught
                     'description': f"{catch_desc} at {chance['fielder']}!",
                     'catch_analysis': analysis
                 }

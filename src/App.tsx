@@ -171,6 +171,13 @@ function App() {
   } | null>(null)
   const [simError, setSimError] = useState<string | null>(null)
 
+  // Track fielder catch position (fielder ID -> screen position where they caught it)
+  const [catchDisplayPosition, setCatchDisplayPosition] = useState<{
+    fielderId: string
+    screenX: number
+    screenY: number
+  } | null>(null)
+
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
   const currentOver = currentSession.overs[currentSession.overs.length - 1]
@@ -262,6 +269,8 @@ function App() {
   // Simulate a shot using the TypeScript game engine
   const simulateShot = () => {
     setSimError(null)
+    // Reset any previous catch display position
+    setCatchDisplayPosition(null)
 
     try {
       const speed = parseFloat(simSpeed)
@@ -272,14 +281,18 @@ function App() {
       const trajectory = calculateTrajectory(speed, angle, elevation)
 
       // Convert current fielder positions to game engine format (screen % -> metres)
+      // Also track fielder ID -> zone name mapping for catch display
+      const fielderIdToZone: Record<string, string> = {}
       const fieldConfig = fielderPositions.map(f => {
         const field = screenToField(f.x, f.y)
         // Find zone name for this fielder
         const zones = calculateFielderZones([f], batterHand === 'left')
+        const zoneName = zones[0]?.zoneName || 'fielder'
+        fielderIdToZone[f.id] = zoneName
         return {
           x: field.x,
           y: field.y,
-          name: zones[0]?.zoneName || 'fielder',
+          name: zoneName,
         }
       })
 
@@ -293,7 +306,7 @@ function App() {
         trajectory.projected_distance,
         trajectory.max_height,
         fieldConfig,
-        65.0,
+        70.0,  // Match visual field radius
         difficulty
       )
 
@@ -317,6 +330,21 @@ function App() {
         distance: Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y),
       }
       setWagonWheelShots(prev => [...prev, shotLine])
+
+      // If caught, show fielder at catch position
+      if (result.outcome === 'caught' && result.fielder_involved) {
+        // Find the fielder ID that matches the zone name
+        const catchingFielderId = Object.entries(fielderIdToZone)
+          .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
+
+        if (catchingFielderId) {
+          setCatchDisplayPosition({
+            fielderId: catchingFielderId,
+            screenX: screen.x,
+            screenY: screen.y,
+          })
+        }
+      }
 
       // Update score if not caught (skipWagonWheel=true since we already added it above)
       if (result.outcome !== 'caught') {
@@ -1156,18 +1184,29 @@ function FieldView({
       >
         BAT
       </div>
-      {fieldersWithZones.map(fielder => (
-        <div
-          key={fielder.id}
-          className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''}`}
-          style={{ left: `${fielder.x}%`, top: `${fielder.y}%` }}
-          onMouseDown={(e) => handleMouseDown(e, fielder.id)}
-          onTouchStart={(e) => handleTouchStart(e, fielder.id)}
-          title={fielder.zoneName}
-        >
-          {fielder.shortName}
-        </div>
-      ))}
+      {fieldersWithZones.map(fielder => {
+        // Check if this fielder just took a catch - show them at catch position
+        const isCatching = catchDisplayPosition?.fielderId === fielder.id
+        const displayX = isCatching ? catchDisplayPosition.screenX : fielder.x
+        const displayY = isCatching ? catchDisplayPosition.screenY : fielder.y
+
+        return (
+          <div
+            key={fielder.id}
+            className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''} ${isCatching ? 'catching' : ''}`}
+            style={{
+              left: `${displayX}%`,
+              top: `${displayY}%`,
+              transition: isCatching ? 'left 0.3s ease-out, top 0.3s ease-out' : undefined,
+            }}
+            onMouseDown={(e) => handleMouseDown(e, fielder.id)}
+            onTouchStart={(e) => handleTouchStart(e, fielder.id)}
+            title={fielder.zoneName}
+          >
+            {fielder.shortName}
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -522,7 +522,7 @@ export function simulateDelivery(
   projectedDistance: number,
   maxHeight: number,
   fieldConfig: FielderConfig[],
-  boundaryDistance: number = 65.0,
+  boundaryDistance: number = 70.0,
   difficulty: Difficulty = 'medium'
 ): Omit<SimulationResult, 'trajectory'> & { catch_analysis?: CatchAnalysis } {
   const isAerial = maxHeight > 1.5 || verticalAngle > 10
@@ -617,6 +617,8 @@ export function simulateDelivery(
           catchDesc += ' (diving)'
         }
 
+        // Calculate where the ball was when caught (intercept point)
+        const catchPos = getBallPositionAtTime(trajectory, chance.analysis.timeToIntercept)
         return {
           outcome: 'caught',
           runs: 0,
@@ -624,7 +626,7 @@ export function simulateDelivery(
           is_aerial: true,
           fielder_involved: chance.fielder,
           fielder_position: { x: chance.fielderX, y: chance.fielderY },
-          end_position: { x: chance.fielderX, y: chance.fielderY },
+          end_position: { x: catchPos.x, y: catchPos.y },  // Where ball was caught
           description: `${catchDesc} at ${chance.fielder}!`,
           catch_analysis: chance.analysis,
         }
