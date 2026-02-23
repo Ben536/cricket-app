@@ -107,9 +107,11 @@ def calculate_trajectory(speed_kmh: float, h_angle: float, v_angle: float) -> di
     # Horizontal distance traveled
     distance = v_horizontal * t_flight
 
-    # Landing coordinates (y negative = toward bowler in our convention)
-    landing_x = distance * math.sin(h_rad)
-    landing_y = -distance * math.cos(h_rad)  # Negative because toward bowler
+    # Landing coordinates
+    # x: negate because +angle = off side, but field coords have +x = leg side
+    # y: negative because toward bowler
+    landing_x = -distance * math.sin(h_rad)
+    landing_y = -distance * math.cos(h_rad)
 
     return {
         'projected_distance': distance,

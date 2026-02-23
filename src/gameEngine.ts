@@ -93,7 +93,8 @@ export function calculateTrajectory(
   }
 
   const distance = vHorizontal * tFlight
-  const landingX = distance * Math.sin(hRad)
+  // Negate X because: +angle = off side, but field coords have +x = leg side
+  const landingX = -distance * Math.sin(hRad)
   const landingY = -distance * Math.cos(hRad)
 
   return {

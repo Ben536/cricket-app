@@ -33,7 +33,8 @@ def calculate_trajectory(speed_kmh: float, h_angle: float, v_angle: float) -> di
         max_height = 1.0
 
     distance = v_horizontal * t_flight
-    landing_x = distance * math.sin(h_rad)
+    # Negate X: +angle = off side, but field coords have +x = leg side
+    landing_x = -distance * math.sin(h_rad)
     landing_y = -distance * math.cos(h_rad)
 
     return {
