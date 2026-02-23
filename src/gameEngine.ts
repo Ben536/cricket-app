@@ -59,6 +59,17 @@ const FIELDER_RUN_SPEED = 6.5       // m/s - professional fielder sprint speed
 const FIELDER_DIVE_RANGE = 2.0      // metres - diving catch extension
 const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving
 
+// Ground fielding time constants
+const PITCH_LENGTH = 20.12          // metres between stumps (22 yards)
+const TIME_PER_RUN = 3.0            // seconds for batsmen to complete one run
+const THROW_SPEED = 28.0            // m/s - average professional throw speed
+const COLLECTION_TIME_DIRECT = 0.7  // seconds - ball straight to fielder, clean pickup
+const COLLECTION_TIME_MOVING = 1.2  // seconds - fielder moves to collect while ball moving
+const COLLECTION_TIME_DIVING = 1.8  // seconds - diving stop, recover, throw
+const PICKUP_TIME_STOPPED = 0.5     // seconds - picking up a stationary ball
+const GROUND_FRICTION = 0.08        // deceleration factor per metre (ball slows on grass)
+const RUN_MARGIN = 0.7              // batsmen need 70% buffer to attempt run (risk assessment)
+
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
 const WEIGHT_MOVEMENT = 0.35        // How far fielder must move
@@ -109,9 +120,9 @@ export function calculateTrajectory(
   }
 
   const distance = vHorizontal * tFlight
-  // Negate X because: +angle = off side, but field coords have +x = leg side
+  // +angle = off side, field coords: +x = leg side, +y = toward bowler (down screen)
   const landingX = -distance * Math.sin(hRad)
-  const landingY = -distance * Math.cos(hRad)
+  const landingY = distance * Math.cos(hRad)  // Positive = toward bowler
 
   // Calculate direction unit vector
   const dirMag = Math.sqrt(landingX * landingX + landingY * landingY)
@@ -548,6 +559,116 @@ function rollGroundFieldingOutcome(difficulty: Difficulty): string {
   return 'misfield_extra'
 }
 
+/**
+ * Calculate average ground ball speed accounting for friction/deceleration.
+ * Ball slows down as it travels along the grass.
+ */
+function getGroundBallSpeed(exitSpeedKmh: number, distance: number): number {
+  const exitSpeedMs = exitSpeedKmh / 3.6
+  // Ball loses speed due to friction - exponential decay model
+  // Average speed over the distance is less than initial speed
+  const frictionFactor = Math.exp(-GROUND_FRICTION * distance * 0.5)
+  return Math.max(3.0, exitSpeedMs * frictionFactor)  // minimum 3 m/s (ball always rolls somewhat)
+}
+
+/**
+ * Calculate time for ball to travel along ground to fielder position.
+ */
+function getBallTravelTime(exitSpeedKmh: number, distance: number): number {
+  const avgSpeed = getGroundBallSpeed(exitSpeedKmh, distance)
+  return distance / avgSpeed
+}
+
+/**
+ * Calculate collection time based on how far fielder must move.
+ */
+function getCollectionTime(lateralDistance: number): number {
+  if (lateralDistance < 0.5) {
+    return COLLECTION_TIME_DIRECT  // Ball straight to them
+  } else if (lateralDistance < 2.0) {
+    return COLLECTION_TIME_MOVING  // Quick sidestep
+  } else {
+    return COLLECTION_TIME_DIVING  // Diving/stretching stop
+  }
+}
+
+/**
+ * Calculate distance from fielder to the relevant stumps.
+ * For first run, batsman runs to bowler's end (0, -PITCH_LENGTH).
+ * For second run, back to batting end (0, 0).
+ * We use the shorter throw distance since fielder chooses which end.
+ */
+function getThrowDistance(fielderX: number, fielderY: number): number {
+  // Batting end stumps at (0, 0), bowler's end at (0, -PITCH_LENGTH)
+  const distToBattingEnd = Math.sqrt(fielderX * fielderX + fielderY * fielderY)
+  const distToBowlerEnd = Math.sqrt(fielderX * fielderX + (fielderY + PITCH_LENGTH) * (fielderY + PITCH_LENGTH))
+  return Math.min(distToBattingEnd, distToBowlerEnd)
+}
+
+/**
+ * Calculate total fielding time from ball leaving bat to ball reaching stumps.
+ */
+function calculateFieldingTime(
+  exitSpeedKmh: number,
+  interceptDistance: number,
+  lateralDistance: number,
+  fielderX: number,
+  fielderY: number
+): number {
+  const ballTravelTime = getBallTravelTime(exitSpeedKmh, interceptDistance)
+  const collectionTime = getCollectionTime(lateralDistance)
+  const throwDistance = getThrowDistance(fielderX, fielderY)
+  const throwTime = throwDistance / THROW_SPEED
+
+  return ballTravelTime + collectionTime + throwTime
+}
+
+/**
+ * Calculate runs based on fielding time.
+ * Batsmen assess if they can complete a run with comfortable margin.
+ */
+function calculateRunsFromFieldingTime(
+  fieldingTime: number,
+  isMisfield: boolean
+): number {
+  // Add buffer time on misfields (ball goes past, fielder chases)
+  const effectiveTime = isMisfield ? fieldingTime + 1.5 : fieldingTime
+
+  // Batsmen need margin to safely complete run (won't attempt if too risky)
+  const safeRunTime = TIME_PER_RUN * RUN_MARGIN
+
+  if (effectiveTime < safeRunTime) {
+    return 0  // Dot ball - not enough time for even one run
+  }
+
+  // Calculate max runs possible with decreasing margin for each additional run
+  // Second run needs more buffer (fatigue, turn time)
+  let runs = 0
+  let timeRemaining = effectiveTime
+
+  // First run
+  if (timeRemaining >= safeRunTime) {
+    runs = 1
+    timeRemaining -= TIME_PER_RUN
+  }
+
+  // Second run (needs slightly more time - turn at crease)
+  if (timeRemaining >= TIME_PER_RUN * 0.85) {
+    runs = 2
+    timeRemaining -= TIME_PER_RUN
+  }
+
+  // Third run (rare, batsmen tired, need good margin)
+  if (timeRemaining >= TIME_PER_RUN * 0.9) {
+    runs = 3
+  }
+
+  return Math.min(runs, 3)
+}
+
+/**
+ * Legacy function - kept for cases where time-based calc isn't applicable
+ */
 function calculateRunsForDistance(
   distance: number,
   isStopped: boolean,
@@ -607,8 +728,9 @@ export function simulateDelivery(
   // Build trajectory data for catch analysis
   const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
 
-  // Check 2: Catching chances
-  if (isAerial) {
+  // Check 2: Catching chances - any ball at catchable height (0.3m+) can be caught
+  const isCatchable = maxHeight >= CATCH_HEIGHT_MIN
+  if (isCatchable) {
     const catchingChances: Array<{
       fielder: string
       fielderX: number
@@ -765,14 +887,24 @@ export function simulateDelivery(
   }
 
   groundChances.sort((a, b) => a.lateralDistance - b.lateralDistance)
-  const hitFirmly = exitSpeed > 80
 
   for (const chance of groundChances) {
     const outcome = rollGroundFieldingOutcome(difficulty)
-    const hitToFielder = chance.lateralDistance < 1.5
+
+    // Calculate time-based runs using physics model
+    const fieldingTime = calculateFieldingTime(
+      exitSpeed,
+      chance.interceptDistance,
+      chance.lateralDistance,
+      chance.fielderX,
+      chance.fielderY
+    )
 
     if (outcome === 'stopped') {
-      if (hitToFielder && !hitFirmly) {
+      // Clean fielding - calculate runs based on fielding time
+      const runs = calculateRunsFromFieldingTime(fieldingTime, false)
+
+      if (runs === 0) {
         return {
           outcome: 'dot',
           runs: 0,
@@ -781,21 +913,22 @@ export function simulateDelivery(
           fielder_involved: chance.fielder,
           fielder_position: { x: chance.fielderX, y: chance.fielderY },
           end_position: { x: chance.fielderX, y: chance.fielderY },
-          description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} straight to ${chance.fielder}`,
+          description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} fielded by ${chance.fielder}, no run`,
         }
       }
       return {
-        outcome: '1',
-        runs: 1,
+        outcome: String(runs),
+        runs,
         is_boundary: false,
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
         end_position: { x: chance.fielderX, y: chance.fielderY },
-        description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, 1 run`,
+        description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     } else if (outcome === 'misfield_no_extra') {
-      const runs = Math.max(1, calculateRunsForDistance(chance.fielderDistance, true, hitFirmly))
+      // Fumbled but recovered - slight delay, ball stays near fielder
+      const runs = Math.max(1, calculateRunsFromFieldingTime(fieldingTime + 0.8, false))
       return {
         outcome: 'misfield',
         runs,
@@ -803,12 +936,12 @@ export function simulateDelivery(
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
-        end_position: { x: chance.fielderX, y: chance.fielderY },  // Ball stopped near fielder
+        end_position: { x: chance.fielderX, y: chance.fielderY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     } else {
-      const baseRuns = calculateRunsForDistance(chance.fielderDistance, false, hitFirmly)
-      const runs = Math.min(baseRuns + 1, 3)
+      // Ball gets past fielder - they must chase and throw from further back
+      const runs = calculateRunsFromFieldingTime(fieldingTime, true)
       return {
         outcome: 'misfield',
         runs,
@@ -816,24 +949,62 @@ export function simulateDelivery(
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
-        end_position: { x: landingX, y: landingY },  // Ball got past the fielder
-        description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} runs`,
+        end_position: { x: landingX, y: landingY },
+        description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     }
   }
 
-  // No fielder involved - ball ends at landing point
-  const runs = calculateRunsForDistance(projectedDistance, false, hitFirmly)
+  // No fielder directly in ball path - find nearest fielder to landing point
+  let nearestFielder: { name: string; x: number; y: number; distance: number } | null = null
+  for (const fielder of fieldConfig) {
+    const dx = fielder.x - landingX
+    const dy = fielder.y - landingY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (!nearestFielder || dist < nearestFielder.distance) {
+      nearestFielder = { name: fielder.name, x: fielder.x, y: fielder.y, distance: dist }
+    }
+  }
+
+  if (nearestFielder) {
+    // Fielder can move while ball is in flight (after reaction time)
+    const ballTravelTime = getBallTravelTime(exitSpeed, projectedDistance)
+    const fielderAvailableRunTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
+    const distanceCoveredDuringFlight = fielderAvailableRunTime * FIELDER_RUN_SPEED
+    const remainingDistance = Math.max(0, nearestFielder.distance - distanceCoveredDuringFlight)
+    const additionalRunTime = remainingDistance / FIELDER_RUN_SPEED
+
+    // Ball has landed and stopped - just need to pick it up
+    const collectionTime = PICKUP_TIME_STOPPED
+    const throwDistance = getThrowDistance(landingX, landingY)
+    const throwTime = throwDistance / THROW_SPEED
+
+    const totalTime = ballTravelTime + additionalRunTime + collectionTime + throwTime
+    const runs = calculateRunsFromFieldingTime(totalTime, false)
+
+    return {
+      outcome: runs > 0 ? String(runs) : 'dot',
+      runs,
+      is_boundary: false,
+      is_aerial: isAerial,
+      fielder_involved: nearestFielder.name,
+      fielder_position: { x: nearestFielder.x, y: nearestFielder.y },
+      end_position: { x: landingX, y: landingY },
+      description: runs > 0
+        ? `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${nearestFielder.name} retrieves, ${runs} run${runs > 1 ? 's' : ''}`
+        : `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${nearestFielder.name} collects, no run`,
+    }
+  }
+
+  // Fallback (no fielders at all - shouldn't happen)
   return {
-    outcome: runs > 0 ? String(runs) : 'dot',
-    runs,
-    is_boundary: false,
+    outcome: '4',
+    runs: 4,
+    is_boundary: true,
     is_aerial: isAerial,
     fielder_involved: null,
     end_position: { x: landingX, y: landingY },
-    description: runs > 0
-      ? `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} into the gap for ${runs}`
-      : `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, no run`,
+    description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} to the boundary`,
   }
 }
 

@@ -33,9 +33,9 @@ def calculate_trajectory(speed_kmh: float, h_angle: float, v_angle: float) -> di
         max_height = 1.0
 
     distance = v_horizontal * t_flight
-    # Negate X: +angle = off side, but field coords have +x = leg side
+    # +angle = off side, field coords: +x = leg side, +y = toward bowler
     landing_x = -distance * math.sin(h_rad)
-    landing_y = -distance * math.cos(h_rad)
+    landing_y = distance * math.cos(h_rad)  # Positive = toward bowler
 
     return {
         'projected_distance': distance,

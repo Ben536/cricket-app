@@ -68,6 +68,17 @@ FIELDER_RUN_SPEED = 6.5       # m/s - professional fielder sprint speed
 FIELDER_DIVE_RANGE = 2.0      # metres - diving catch extension
 FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving
 
+# Ground fielding time constants
+PITCH_LENGTH = 20.12          # metres between stumps (22 yards)
+TIME_PER_RUN = 3.0            # seconds for batsmen to complete one run
+THROW_SPEED = 28.0            # m/s - average professional throw speed
+COLLECTION_TIME_DIRECT = 0.7  # seconds - ball straight to fielder, clean pickup
+COLLECTION_TIME_MOVING = 1.2  # seconds - fielder moves to collect while ball moving
+COLLECTION_TIME_DIVING = 1.8  # seconds - diving stop, recover, throw
+PICKUP_TIME_STOPPED = 0.5     # seconds - picking up a stationary ball
+GROUND_FRICTION = 0.08        # deceleration factor per metre
+RUN_MARGIN = 0.7              # batsmen need 70% buffer to attempt run
+
 # Difficulty weights for catch scoring
 WEIGHT_REACTION = 0.25        # How much time pressure matters
 WEIGHT_MOVEMENT = 0.35        # How far fielder must move
@@ -577,6 +588,96 @@ def _roll_ground_fielding_outcome(probabilities: dict) -> str:
         return 'misfield_extra'
 
 
+def _get_ground_ball_speed(exit_speed_kmh: float, distance: float) -> float:
+    """
+    Calculate average ground ball speed accounting for friction/deceleration.
+    Ball slows down as it travels along the grass.
+    """
+    exit_speed_ms = exit_speed_kmh / 3.6
+    # Ball loses speed due to friction - exponential decay model
+    friction_factor = math.exp(-GROUND_FRICTION * distance * 0.5)
+    return max(3.0, exit_speed_ms * friction_factor)  # minimum 3 m/s
+
+
+def _get_ball_travel_time(exit_speed_kmh: float, distance: float) -> float:
+    """Calculate time for ball to travel along ground to fielder position."""
+    avg_speed = _get_ground_ball_speed(exit_speed_kmh, distance)
+    return distance / avg_speed
+
+
+def _get_collection_time(lateral_distance: float) -> float:
+    """Calculate collection time based on how far fielder must move."""
+    if lateral_distance < 0.5:
+        return COLLECTION_TIME_DIRECT  # Ball straight to them
+    elif lateral_distance < 2.0:
+        return COLLECTION_TIME_MOVING  # Quick sidestep
+    else:
+        return COLLECTION_TIME_DIVING  # Diving/stretching stop
+
+
+def _get_throw_distance(fielder_x: float, fielder_y: float) -> float:
+    """
+    Calculate distance from fielder to the relevant stumps.
+    Returns distance to whichever end is closer.
+    """
+    dist_to_batting_end = math.sqrt(fielder_x ** 2 + fielder_y ** 2)
+    dist_to_bowler_end = math.sqrt(fielder_x ** 2 + (fielder_y + PITCH_LENGTH) ** 2)
+    return min(dist_to_batting_end, dist_to_bowler_end)
+
+
+def _calculate_fielding_time(
+    exit_speed_kmh: float,
+    intercept_distance: float,
+    lateral_distance: float,
+    fielder_x: float,
+    fielder_y: float
+) -> float:
+    """Calculate total fielding time from ball leaving bat to ball reaching stumps."""
+    ball_travel_time = _get_ball_travel_time(exit_speed_kmh, intercept_distance)
+    collection_time = _get_collection_time(lateral_distance)
+    throw_distance = _get_throw_distance(fielder_x, fielder_y)
+    throw_time = throw_distance / THROW_SPEED
+
+    return ball_travel_time + collection_time + throw_time
+
+
+def _calculate_runs_from_fielding_time(
+    fielding_time: float,
+    is_misfield: bool
+) -> int:
+    """
+    Calculate runs based on fielding time.
+    Batsmen assess if they can complete a run with comfortable margin.
+    """
+    # Add buffer time on misfields (ball goes past, fielder chases)
+    effective_time = fielding_time + 1.5 if is_misfield else fielding_time
+
+    # Batsmen need margin to safely complete run
+    safe_run_time = TIME_PER_RUN * RUN_MARGIN
+
+    if effective_time < safe_run_time:
+        return 0  # Dot ball
+
+    runs = 0
+    time_remaining = effective_time
+
+    # First run
+    if time_remaining >= safe_run_time:
+        runs = 1
+        time_remaining -= TIME_PER_RUN
+
+    # Second run (needs slightly more time - turn at crease)
+    if time_remaining >= TIME_PER_RUN * 0.85:
+        runs = 2
+        time_remaining -= TIME_PER_RUN
+
+    # Third run (rare, batsmen tired)
+    if time_remaining >= TIME_PER_RUN * 0.9:
+        runs = 3
+
+    return min(runs, 3)
+
+
 def _calculate_runs_for_distance(
     distance: float,
     is_stopped: bool,
@@ -695,9 +796,10 @@ def simulate_delivery(
     trajectory = _calculate_full_trajectory(exit_speed, horizontal_angle, vertical_angle)
 
     # ---------------------------------------------------------------------
-    # Check 2: Catching chances (aerial balls only)
+    # Check 2: Catching chances - any ball at catchable height (0.3m+) can be caught
     # ---------------------------------------------------------------------
-    if is_aerial:
+    is_catchable = max_height >= CATCH_HEIGHT_MIN
+    if is_catchable:
         catching_chances = []
 
         for fielder in field_config:
@@ -876,19 +978,25 @@ def simulate_delivery(
     # Sort by how directly the ball goes to the fielder
     ground_fielding_chances.sort(key=lambda x: x['lateral_distance'])
 
-    hit_firmly = exit_speed > 80
-
     for chance in ground_fielding_chances:
         outcome = _roll_ground_fielding_outcome(probs)
 
-        # Ball hit straight to fielder vs into gap
-        hit_to_fielder = chance['lateral_distance'] < 1.5
-
         fielder_pos = {'x': chance['fielder_x'], 'y': chance['fielder_y']}
 
+        # Calculate time-based runs using physics model
+        fielding_time = _calculate_fielding_time(
+            exit_speed,
+            chance['intercept_distance'],
+            chance['lateral_distance'],
+            chance['fielder_x'],
+            chance['fielder_y']
+        )
+
         if outcome == 'stopped':
-            if hit_to_fielder and not hit_firmly:
-                # Clean stop, dot ball
+            # Clean fielding - calculate runs based on fielding time
+            runs = _calculate_runs_from_fielding_time(fielding_time, False)
+
+            if runs == 0:
                 return {
                     'outcome': 'dot',
                     'runs': 0,
@@ -897,27 +1005,22 @@ def simulate_delivery(
                     'fielder_involved': chance['fielder'],
                     'fielder_position': fielder_pos,
                     'end_position': fielder_pos,
-                    'description': f"{shot_name.capitalize()} straight to {chance['fielder']}"
+                    'description': f"{shot_name.capitalize()} fielded by {chance['fielder']}, no run"
                 }
-            else:
-                # Fielder stops it but batters can run
-                runs = 1
-                return {
-                    'outcome': '1',
-                    'runs': runs,
-                    'is_boundary': False,
-                    'is_aerial': is_aerial,
-                    'fielder_involved': chance['fielder'],
-                    'fielder_position': fielder_pos,
-                    'end_position': fielder_pos,
-                    'description': f"{shot_name.capitalize()}, {chance['fielder']} fields, {runs} run"
-                }
+            return {
+                'outcome': str(runs),
+                'runs': runs,
+                'is_boundary': False,
+                'is_aerial': is_aerial,
+                'fielder_involved': chance['fielder'],
+                'fielder_position': fielder_pos,
+                'end_position': fielder_pos,
+                'description': f"{shot_name.capitalize()}, {chance['fielder']} fields, {runs} run{'s' if runs > 1 else ''}"
+            }
 
         elif outcome == 'misfield_no_extra':
-            # Misfield but no extra runs - always at least 1 run on a misfield
-            runs = max(1, _calculate_runs_for_distance(
-                chance['fielder_distance'], True, hit_firmly
-            ))
+            # Fumbled but recovered - slight delay, ball stays near fielder
+            runs = max(1, _calculate_runs_from_fielding_time(fielding_time + 0.8, False))
             return {
                 'outcome': 'misfield',
                 'runs': runs,
@@ -925,14 +1028,13 @@ def simulate_delivery(
                 'is_aerial': is_aerial,
                 'fielder_involved': chance['fielder'],
                 'fielder_position': fielder_pos,
-                'end_position': fielder_pos,  # Ball stopped near fielder
+                'end_position': fielder_pos,
                 'description': f"{shot_name.capitalize()}, misfield by {chance['fielder']}, {runs} run{'s' if runs > 1 else ''}"
             }
 
         elif outcome == 'misfield_extra':
-            # Misfield with extra runs - ball got past the fielder
-            base_runs = _calculate_runs_for_distance(chance['fielder_distance'], False, hit_firmly)
-            runs = min(base_runs + 1, 3)  # Misfield adds a run, max 3
+            # Ball gets past fielder - they must chase and throw from further back
+            runs = _calculate_runs_from_fielding_time(fielding_time, True)
             return {
                 'outcome': 'misfield',
                 'runs': runs,
@@ -940,21 +1042,57 @@ def simulate_delivery(
                 'is_aerial': is_aerial,
                 'fielder_involved': chance['fielder'],
                 'fielder_position': fielder_pos,
-                'end_position': {'x': landing_x, 'y': landing_y},  # Ball got past fielder
-                'description': f"{shot_name.capitalize()}, misfield by {chance['fielder']}, {runs} runs"
+                'end_position': {'x': landing_x, 'y': landing_y},
+                'description': f"{shot_name.capitalize()}, misfield by {chance['fielder']}, {runs} run{'s' if runs > 1 else ''}"
             }
 
     # ---------------------------------------------------------------------
-    # No fielder involved - runs based on distance
+    # No fielder directly in ball path - find nearest fielder to landing point
     # ---------------------------------------------------------------------
-    runs = _calculate_runs_for_distance(projected_distance, False, hit_firmly)
+    nearest_fielder = None
+    nearest_dist = float('inf')
+    for fielder in field_config:
+        dx = fielder['x'] - landing_x
+        dy = fielder['y'] - landing_y
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < nearest_dist:
+            nearest_dist = dist
+            nearest_fielder = fielder
 
+    if nearest_fielder:
+        # Fielder can move while ball is in flight (after reaction time)
+        ball_travel_time = _get_ball_travel_time(exit_speed, projected_distance)
+        fielder_available_run_time = max(0, ball_travel_time - FIELDER_REACTION_TIME)
+        distance_covered_during_flight = fielder_available_run_time * FIELDER_RUN_SPEED
+        remaining_distance = max(0, nearest_dist - distance_covered_during_flight)
+        additional_run_time = remaining_distance / FIELDER_RUN_SPEED
+
+        # Ball has landed and stopped - just need to pick it up
+        collection_time = PICKUP_TIME_STOPPED
+        throw_distance = _get_throw_distance(landing_x, landing_y)
+        throw_time = throw_distance / THROW_SPEED
+
+        total_time = ball_travel_time + additional_run_time + collection_time + throw_time
+        runs = _calculate_runs_from_fielding_time(total_time, False)
+
+        return {
+            'outcome': str(runs) if runs > 0 else 'dot',
+            'runs': runs,
+            'is_boundary': False,
+            'is_aerial': is_aerial,
+            'fielder_involved': nearest_fielder['name'],
+            'fielder_position': {'x': nearest_fielder['x'], 'y': nearest_fielder['y']},
+            'end_position': {'x': landing_x, 'y': landing_y},
+            'description': f"{shot_name.capitalize()}, {nearest_fielder['name']} retrieves, {runs} run{'s' if runs > 1 else ''}" if runs > 0 else f"{shot_name.capitalize()}, {nearest_fielder['name']} collects, no run"
+        }
+
+    # Fallback (no fielders at all - shouldn't happen)
     return {
-        'outcome': str(runs) if runs > 0 else 'dot',
-        'runs': runs,
-        'is_boundary': False,
+        'outcome': '4',
+        'runs': 4,
+        'is_boundary': True,
         'is_aerial': is_aerial,
         'fielder_involved': None,
         'end_position': {'x': landing_x, 'y': landing_y},
-        'description': f"{shot_name.capitalize()} into the gap for {runs}" if runs > 0 else f"{shot_name.capitalize()}, no run"
+        'description': f"{shot_name.capitalize()} to the boundary"
     }
