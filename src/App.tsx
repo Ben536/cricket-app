@@ -317,14 +317,11 @@ function App() {
       }
       setWagonWheelShots(prev => [...prev, shotLine])
 
-      // Update score if not caught
+      // Update score if not caught (skipWagonWheel=true since we already added it above)
       if (result.outcome !== 'caught') {
-        const isWicket = false
-        const isBoundary = result.is_boundary
-        const runs = result.runs
-        addRuns(runs, isBoundary, isWicket)
+        addRuns(result.runs, result.is_boundary, false, false, false, true)
       } else {
-        addRuns(0, false, true)  // Wicket
+        addRuns(0, false, true, false, false, true)  // Wicket
       }
 
     } catch (err) {
@@ -341,7 +338,7 @@ function App() {
     }))
   }
 
-  const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false) => {
+  const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false, skipWagonWheel: boolean = false) => {
     // Save current state for undo (push to history stack)
     setSessionHistory(prev => [...prev, { ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) }])
 
@@ -395,10 +392,13 @@ function App() {
     setIsFlashing(true)
     setTimeout(() => setIsFlashing(false), 500)
 
-    // Add shot to wagon wheel (for testing - generates random position based on outcome)
-    const shotLine = generateShotLine(ballResult)
-    if (shotLine) {
-      setWagonWheelShots(prev => [...prev, shotLine])
+    // Add shot to wagon wheel (for manual input - generates random position)
+    // Skip if called from simulateShot which adds its own precise trajectory
+    if (!skipWagonWheel) {
+      const shotLine = generateShotLine(ballResult)
+      if (shotLine) {
+        setWagonWheelShots(prev => [...prev, shotLine])
+      }
     }
   }
 
