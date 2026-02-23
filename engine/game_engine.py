@@ -16,7 +16,7 @@ Usage:
         projected_distance=67.0,
         max_height=2.5,
         field_config=[{'x': 25, 'y': -30, 'name': 'cover'}, ...],
-        boundary_distance=65.0,
+        boundary_distance=70.0,
         difficulty='medium'
     )
 """
@@ -352,52 +352,71 @@ def _find_catchable_intercept(
     fielder_x: float,
     fielder_y: float,
     trajectory: dict
-) -> tuple[float, float, float]:
+) -> tuple[float, float, float, bool]:
     """
     Find the best point along the trajectory where a fielder could catch the ball.
 
-    Scans the trajectory to find points where:
-    1. Ball is at a catchable height (CATCH_HEIGHT_MIN to CATCH_HEIGHT_MAX)
-    2. Fielder could potentially reach (within movement range given time)
+    A real fielder will run to where they can make the most comfortable catch.
+    Priority:
+    1. Can they reach ANY catchable point? If not, no catch.
+    2. Among reachable points, prefer optimal height (1.0-1.8m chest height)
+    3. If they can reach optimal height with time to spare, minimal difficulty
+    4. If they're rushed and must catch at awkward height, higher difficulty
 
     Returns:
-        (time, lateral_distance, height) of best intercept point, or (inf, inf, 0) if no catch possible
+        (time, lateral_distance, height, had_time_for_optimal)
     """
-    best_time = float('inf')
-    best_lateral = float('inf')
-    best_height = 0.0
+    OPTIMAL_HEIGHT_MIN = 1.0
+    OPTIMAL_HEIGHT_MAX = 1.8
 
-    # Sample trajectory at small time intervals
-    time_step = 0.05  # 50ms steps
-    t = 0.1  # Skip very start
+    # Collect ALL reachable catch points
+    reachable_points = []
+
+    time_step = 0.05
+    t = 0.1
 
     while t < trajectory['time_of_flight']:
         x, y, z = _get_ball_position_at_time(trajectory, t)
 
-        # Check if ball is at catchable height
         if CATCH_HEIGHT_MIN <= z <= CATCH_HEIGHT_MAX:
-            # Calculate lateral distance from fielder to this point
             dx = x - fielder_x
             dy = y - fielder_y
             lateral_dist = math.sqrt(dx * dx + dy * dy)
 
-            # Calculate if fielder could reach this point
             movement_time = max(0, t - FIELDER_REACTION_TIME)
             movement_possible = movement_time * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
 
             if lateral_dist <= movement_possible:
-                # This is a valid catch point - prefer earlier ones with less movement
-                score = t + lateral_dist * 0.1  # Slight preference for less movement
-                best_score = best_time + best_lateral * 0.1 if best_time < float('inf') else float('inf')
-
-                if score < best_score:
-                    best_time = t
-                    best_lateral = lateral_dist
-                    best_height = z
+                reachable_points.append({
+                    'time': t,
+                    'lateral_dist': lateral_dist,
+                    'height': z,
+                    'is_optimal_height': OPTIMAL_HEIGHT_MIN <= z <= OPTIMAL_HEIGHT_MAX,
+                    'movement_margin': movement_possible - lateral_dist,
+                })
 
         t += time_step
 
-    return best_time, best_lateral, best_height
+    if not reachable_points:
+        return float('inf'), float('inf'), 0.0, False
+
+    # Check if ANY optimal height catch is reachable
+    optimal_points = [p for p in reachable_points if p['is_optimal_height']]
+    had_time_for_optimal = len(optimal_points) > 0
+
+    # Pick the best point
+    if optimal_points:
+        # Pick optimal point with most margin (fielder arrives comfortably)
+        best = max(optimal_points, key=lambda p: p['movement_margin'])
+    else:
+        # No optimal height reachable - pick closest to optimal range
+        def height_distance(p):
+            if p['height'] < OPTIMAL_HEIGHT_MIN:
+                return OPTIMAL_HEIGHT_MIN - p['height']
+            return p['height'] - OPTIMAL_HEIGHT_MAX
+        best = min(reachable_points, key=height_distance)
+
+    return best['time'], best['lateral_dist'], best['height'], had_time_for_optimal
 
 
 def _analyze_catch_difficulty(
@@ -409,6 +428,11 @@ def _analyze_catch_difficulty(
 ) -> dict:
     """
     Calculate detailed catch difficulty based on trajectory, fielder position, and timing.
+
+    Key insight: A fielder runs to the BEST catch position they can reach.
+    - If they have time to reach optimal height (1.0-1.8m), height penalty is 0
+    - If they're rushed and must catch at awkward height, height penalty applies
+    - Movement penalty based on how much running/diving required
 
     Returns dict with:
         can_catch: bool
@@ -422,13 +446,12 @@ def _analyze_catch_difficulty(
         time_to_intercept: float (seconds until ball reaches fielder)
     """
     # Find the best catchable intercept point along the trajectory
-    time_to_intercept, lateral_dist_actual, height_at_intercept = _find_catchable_intercept(
+    time_to_intercept, lateral_dist_actual, height_at_intercept, had_time_for_optimal = _find_catchable_intercept(
         fielder_x, fielder_y, trajectory
     )
 
     # If no catchable point found, return impossible
     if time_to_intercept == float('inf'):
-        # Fall back to original calculation for the 'impossible' return
         orig_time = _get_time_at_distance(trajectory, intercept_distance)
         _, _, orig_height = _get_ball_position_at_time(trajectory, orig_time)
         return {
@@ -452,30 +475,30 @@ def _analyze_catch_difficulty(
     # === Calculate difficulty score (0 = easy, 1 = impossible) ===
 
     # 1. Reaction score: less time = harder
-    # 0.5s or less = very hard (1.0), 2s+ = easy (0.0)
     reaction_score = max(0, min(1, 1 - (time_to_intercept - 0.5) / 1.5))
 
-    # 2. Movement score: further movement = harder
+    # 2. Movement score: how much running/diving needed
     if lateral_dist_actual <= FIELDER_STATIC_RANGE:
-        movement_score = 0  # No movement needed
+        movement_score = 0  # Standing catch
     elif lateral_dist_actual <= FIELDER_STATIC_RANGE + FIELDER_DIVE_RANGE:
-        # Diving catch without running
         movement_score = 0.3 + 0.2 * ((lateral_dist_actual - FIELDER_STATIC_RANGE) / FIELDER_DIVE_RANGE)
     else:
-        # Running catch
         run_distance = lateral_dist_actual - FIELDER_STATIC_RANGE
         max_run_distance = movement_possible - FIELDER_STATIC_RANGE
         movement_score = 0.5 + 0.5 * (run_distance / max_run_distance) if max_run_distance > 0 else 1.0
 
-    # 3. Height score: very low or very high = harder
-    if 1.0 <= height_at_intercept <= 1.8:
-        height_score = 0  # Optimal
-    elif height_at_intercept < 1.0:
-        height_score = min(1, (1.0 - height_at_intercept) / 0.7)
+    # 3. Height score: ONLY penalize if fielder couldn't reach optimal height
+    if had_time_for_optimal:
+        height_score = 0  # Fielder reached optimal position
     else:
-        height_score = min(1, (height_at_intercept - 1.8) / 1.7)
+        if 1.0 <= height_at_intercept <= 1.8:
+            height_score = 0
+        elif height_at_intercept < 1.0:
+            height_score = min(1, (1.0 - height_at_intercept) / 0.7)
+        else:
+            height_score = min(1, (height_at_intercept - 1.8) / 1.7)
 
-    # 4. Speed score: faster ball = harder
+    # 4. Speed score: faster ball = harder to judge and hold onto
     ball_speed_kmh = trajectory['horizontal_speed'] * 3.6
     speed_score = max(0, min(1, (ball_speed_kmh - 60) / 60))
 
@@ -517,33 +540,23 @@ def _roll_catch_outcome(
     Maps difficulty (0-1) to catch probability with difficulty setting modifier.
 
     Returns:
-        'caught', 'dropped', or 'runs'
+        'caught' or 'dropped'
     """
     # Base catch probability curves based on difficulty score
-    # At difficulty=0: 98% catch, at difficulty=1: 10% catch
-    base_catch_prob = 0.98 - 0.88 * catch_analysis['difficulty']
+    # At difficulty=0: 98% catch, at difficulty=1: 46% catch
+    base_catch_prob = 0.98 - 0.52 * catch_analysis['difficulty']
 
-    # Difficulty setting modifiers
+    # Difficulty setting modifiers (affect fielder skill)
     modifiers = {
-        'easy': {'catch_mod': 0.85, 'drop_mod': 1.3},    # Fielders worse
-        'medium': {'catch_mod': 1.0, 'drop_mod': 1.0},   # Baseline
-        'hard': {'catch_mod': 1.15, 'drop_mod': 0.7},    # Fielders better
+        'easy': 0.85,     # Fielders worse - easier for batter
+        'medium': 1.0,    # Baseline
+        'hard': 1.10,     # Fielders better - harder for batter
     }
 
-    mod = modifiers.get(difficulty, modifiers['medium'])
-    catch_prob = min(0.99, base_catch_prob * mod['catch_mod'])
+    mod = modifiers.get(difficulty, 1.0)
+    catch_prob = min(0.99, base_catch_prob * mod)
 
-    # Drop probability scales with difficulty
-    base_drop_prob = 0.05 + 0.25 * catch_analysis['difficulty']
-    drop_prob = min(0.5, base_drop_prob * mod['drop_mod'])
-
-    roll = random.random()
-    if roll < catch_prob:
-        return 'caught'
-    elif roll < catch_prob + drop_prob:
-        return 'dropped'
-    else:
-        return 'runs'
+    return 'caught' if random.random() < catch_prob else 'dropped'
 
 
 def _roll_ground_fielding_outcome(probabilities: dict) -> str:
@@ -625,7 +638,7 @@ def simulate_delivery(
         projected_distance: Total distance from batter in metres
         max_height: Peak height of trajectory in metres
         field_config: List of fielder dicts with 'x', 'y', 'name' keys
-        boundary_distance: Boundary radius in metres (default 65)
+        boundary_distance: Boundary radius in metres (default 70)
         difficulty: 'easy', 'medium', or 'hard'
 
     Returns:

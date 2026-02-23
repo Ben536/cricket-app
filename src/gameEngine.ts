@@ -297,58 +297,107 @@ export interface CatchAnalysis {
 
 /**
  * Find the best point along the trajectory where a fielder could catch the ball.
- * Scans the trajectory to find points where:
- * 1. Ball is at a catchable height (CATCH_HEIGHT_MIN to CATCH_HEIGHT_MAX)
- * 2. Fielder could potentially reach (within movement range given time)
+ *
+ * A real fielder will run to where they can make the most comfortable catch.
+ * Priority:
+ * 1. Can they reach ANY catchable point? If not, no catch.
+ * 2. Among reachable points, prefer optimal height (1.0-1.8m chest height)
+ * 3. If they can reach optimal height with time to spare, minimal difficulty
+ * 4. If they're rushed or must catch at awkward height, higher difficulty
  */
 function findCatchableIntercept(
   fielderX: number,
   fielderY: number,
   trajectory: TrajectoryData
-): { time: number; lateralDistance: number; height: number } {
-  let bestTime = Infinity
-  let bestLateral = Infinity
-  let bestHeight = 0
+): {
+  time: number
+  lateralDistance: number
+  height: number
+  hadTimeForOptimal: boolean  // Could they get to a comfortable catch position?
+} {
+  const OPTIMAL_HEIGHT_MIN = 1.0
+  const OPTIMAL_HEIGHT_MAX = 1.8
 
-  // Sample trajectory at small time intervals
-  const timeStep = 0.05  // 50ms steps
-  let t = 0.1  // Skip very start
+  // Collect ALL reachable catch points
+  const reachablePoints: Array<{
+    time: number
+    lateralDist: number
+    height: number
+    isOptimalHeight: boolean
+    movementMargin: number  // How much spare movement capacity
+  }> = []
+
+  const timeStep = 0.05
+  let t = 0.1
 
   while (t < trajectory.time_of_flight) {
     const pos = getBallPositionAtTime(trajectory, t)
 
-    // Check if ball is at catchable height
     if (pos.z >= CATCH_HEIGHT_MIN && pos.z <= CATCH_HEIGHT_MAX) {
-      // Calculate lateral distance from fielder to this point
       const dx = pos.x - fielderX
       const dy = pos.y - fielderY
       const lateralDist = Math.sqrt(dx * dx + dy * dy)
 
-      // Calculate if fielder could reach this point
       const movementTime = Math.max(0, t - FIELDER_REACTION_TIME)
       const movementPossible = movementTime * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
 
       if (lateralDist <= movementPossible) {
-        // This is a valid catch point - prefer earlier ones with less movement
-        const score = t + lateralDist * 0.1  // Slight preference for less movement
-        const bestScore = bestTime < Infinity ? bestTime + bestLateral * 0.1 : Infinity
-
-        if (score < bestScore) {
-          bestTime = t
-          bestLateral = lateralDist
-          bestHeight = pos.z
-        }
+        reachablePoints.push({
+          time: t,
+          lateralDist,
+          height: pos.z,
+          isOptimalHeight: pos.z >= OPTIMAL_HEIGHT_MIN && pos.z <= OPTIMAL_HEIGHT_MAX,
+          movementMargin: movementPossible - lateralDist,
+        })
       }
     }
-
     t += timeStep
   }
 
-  return { time: bestTime, lateralDistance: bestLateral, height: bestHeight }
+  if (reachablePoints.length === 0) {
+    return { time: Infinity, lateralDistance: Infinity, height: 0, hadTimeForOptimal: false }
+  }
+
+  // Check if ANY optimal height catch is reachable
+  const optimalPoints = reachablePoints.filter(p => p.isOptimalHeight)
+  const hadTimeForOptimal = optimalPoints.length > 0
+
+  // Pick the best point:
+  // - If optimal height available, pick the one with most movement margin (easiest)
+  // - Otherwise pick the one closest to optimal height
+  let best: typeof reachablePoints[0]
+
+  if (optimalPoints.length > 0) {
+    // Pick optimal point with most margin (fielder arrives comfortably)
+    best = optimalPoints.reduce((a, b) => a.movementMargin > b.movementMargin ? a : b)
+  } else {
+    // No optimal height reachable - pick the closest to optimal range
+    best = reachablePoints.reduce((a, b) => {
+      const aDist = a.height < OPTIMAL_HEIGHT_MIN
+        ? OPTIMAL_HEIGHT_MIN - a.height
+        : a.height - OPTIMAL_HEIGHT_MAX
+      const bDist = b.height < OPTIMAL_HEIGHT_MIN
+        ? OPTIMAL_HEIGHT_MIN - b.height
+        : b.height - OPTIMAL_HEIGHT_MAX
+      return aDist < bDist ? a : b
+    })
+  }
+
+  return {
+    time: best.time,
+    lateralDistance: best.lateralDist,
+    height: best.height,
+    hadTimeForOptimal,
+  }
 }
 
 /**
  * Calculate detailed catch difficulty based on trajectory, fielder position, and timing
+ *
+ * Key insight: A fielder runs to the BEST catch position they can reach.
+ * - If they have time to reach optimal height (1.0-1.8m), height penalty is 0
+ * - If they're rushed and must catch at awkward height, height penalty applies
+ * - Movement penalty based on how much running/diving required
  */
 function analyzeCatchDifficulty(
   fielderX: number,
@@ -393,31 +442,38 @@ function analyzeCatchDifficulty(
   // 0.5s or less = very hard (1.0), 2s+ = easy (0.0)
   const reactionScore = Math.max(0, Math.min(1, 1 - (timeToIntercept - 0.5) / 1.5))
 
-  // 2. Movement score: further movement = harder
+  // 2. Movement score: how much running/diving needed
   let movementScore: number
   if (lateralDistActual <= FIELDER_STATIC_RANGE) {
-    movementScore = 0  // No movement needed
+    movementScore = 0  // Standing catch
   } else if (lateralDistActual <= FIELDER_STATIC_RANGE + FIELDER_DIVE_RANGE) {
-    // Diving catch without running
+    // Diving catch
     movementScore = 0.3 + 0.2 * ((lateralDistActual - FIELDER_STATIC_RANGE) / FIELDER_DIVE_RANGE)
   } else {
-    // Running catch
+    // Running catch - score based on how close to max range
     const runDistance = lateralDistActual - FIELDER_STATIC_RANGE
     const maxRunDistance = movementPossible - FIELDER_STATIC_RANGE
     movementScore = maxRunDistance > 0 ? 0.5 + 0.5 * (runDistance / maxRunDistance) : 1
   }
 
-  // 3. Height score: very low or very high = harder
+  // 3. Height score: ONLY penalize if fielder couldn't reach optimal height
+  // If they had time to get to a comfortable position, no penalty
   let heightScore: number
-  if (heightAtIntercept >= 1.0 && heightAtIntercept <= 1.8) {
-    heightScore = 0  // Optimal
-  } else if (heightAtIntercept < 1.0) {
-    heightScore = Math.min(1, (1.0 - heightAtIntercept) / 0.7)
+  if (intercept.hadTimeForOptimal) {
+    // Fielder reached optimal position - easy catch height
+    heightScore = 0
   } else {
-    heightScore = Math.min(1, (heightAtIntercept - 1.8) / 1.7)
+    // Fielder was rushed - penalty based on how far from optimal
+    if (heightAtIntercept >= 1.0 && heightAtIntercept <= 1.8) {
+      heightScore = 0
+    } else if (heightAtIntercept < 1.0) {
+      heightScore = Math.min(1, (1.0 - heightAtIntercept) / 0.7)
+    } else {
+      heightScore = Math.min(1, (heightAtIntercept - 1.8) / 1.7)
+    }
   }
 
-  // 4. Speed score: faster ball = harder
+  // 4. Speed score: faster ball = harder to judge and hold onto
   const ballSpeedKmh = trajectory.horizontal_speed * 3.6
   const speedScore = Math.max(0, Math.min(1, (ballSpeedKmh - 60) / 60))
 
@@ -454,33 +510,32 @@ function analyzeCatchDifficulty(
 /**
  * Roll catch outcome using continuous difficulty score
  * Maps difficulty (0-1) to catch probability with difficulty setting modifier
+ *
+ * If a catch is possible (fielder can reach it), outcome is ALWAYS caught or dropped.
+ * No silent fallthrough to ground fielding - if they got there, they either take it or shell it.
  */
 function rollCatchOutcome(
   catchAnalysis: CatchAnalysis,
   difficulty: Difficulty
-): 'caught' | 'dropped' | 'runs' {
-  // Base catch probability curves based on difficulty score
-  // At difficulty=0: 98% catch, at difficulty=1: 10% catch
-  const baseCatchProb = 0.98 - 0.88 * catchAnalysis.difficulty
+): 'caught' | 'dropped' {
+  // Base catch probability based on difficulty score
+  // difficulty=0.00 → 98% catch
+  // difficulty=0.25 → 85% catch
+  // difficulty=0.50 → 72% catch
+  // difficulty=0.75 → 59% catch
+  // difficulty=1.00 → 46% catch (even hardest catches have decent chance)
+  const baseCatchProb = 0.98 - 0.52 * catchAnalysis.difficulty
 
   // Difficulty setting modifiers
   const modifiers = {
-    easy: { catchMod: 0.85, dropMod: 1.3 },    // Fielders worse
-    medium: { catchMod: 1.0, dropMod: 1.0 },   // Baseline
-    hard: { catchMod: 1.15, dropMod: 0.7 },    // Fielders better
+    easy: 0.85,    // Fielders 15% worse
+    medium: 1.0,   // Baseline
+    hard: 1.10,    // Fielders 10% better
   }
 
-  const mod = modifiers[difficulty]
-  const catchProb = Math.min(0.99, baseCatchProb * mod.catchMod)
+  const catchProb = Math.min(0.99, baseCatchProb * modifiers[difficulty])
 
-  // Drop probability scales with difficulty
-  const baseDropProb = 0.05 + 0.25 * catchAnalysis.difficulty
-  const dropProb = Math.min(0.5, baseDropProb * mod.dropMod)
-
-  const roll = Math.random()
-  if (roll < catchProb) return 'caught'
-  if (roll < catchProb + dropProb) return 'dropped'
-  return 'runs'
+  return Math.random() < catchProb ? 'caught' : 'dropped'
 }
 
 function rollGroundFieldingOutcome(difficulty: Difficulty): string {

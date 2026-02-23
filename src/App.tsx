@@ -800,6 +800,7 @@ function App() {
                 setFielderPositions={setFielderPositions}
                 batterHand={batterHand}
                 wagonWheelShots={wagonWheelShots}
+                catchDisplayPosition={catchDisplayPosition}
               />
               <div className="field-controls">
                 <div className="batter-hand-toggle">
@@ -1053,11 +1054,13 @@ function FieldView({
   setFielderPositions,
   batterHand,
   wagonWheelShots = [],
+  catchDisplayPosition,
 }: {
   fielderPositions: FielderPosition[]
   setFielderPositions: React.Dispatch<React.SetStateAction<FielderPosition[]>>
   batterHand: BattingHand
   wagonWheelShots?: ShotLine[]
+  catchDisplayPosition: { fielderId: string; screenX: number; screenY: number } | null
 }) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<string | null>(null)

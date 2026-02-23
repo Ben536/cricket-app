@@ -100,7 +100,7 @@ class GameEngineHandler(BaseHTTPRequestHandler):
                     projected_distance=traj['projected_distance'],
                     max_height=traj['max_height'],
                     field_config=field_config,
-                    boundary_distance=65.0,
+                    boundary_distance=70.0,
                     difficulty=difficulty,
                 )
 
