@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
-import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, type FielderWithZone } from './fieldZones'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
+import { simulateDelivery, calculateTrajectory, type SimulationResult } from './gameEngine'
 
 // Types
+interface ShotLine {
+  id: string
+  endX: number      // Screen % (0-100)
+  endY: number      // Screen % (0-100)
+  outcome: BallResult
+  distance: number  // metres from batter
+}
+
 interface Session {
   id: string
   date: string
@@ -146,6 +155,21 @@ function App() {
   const [isSavingField, setIsSavingField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false)
+  const [wagonWheelShots, setWagonWheelShots] = useState<ShotLine[]>([])
+
+  // Shot simulator state
+  const [simAngle, setSimAngle] = useState('30')
+  const [simElevation, setSimElevation] = useState('10')
+  const [simSpeed, setSimSpeed] = useState('80')
+  const [simResult, setSimResult] = useState<{
+    outcome: string
+    runs: number
+    description: string
+    fielder_involved: string | null
+    is_boundary: boolean
+    trajectory: { landing_x: number; landing_y: number; projected_distance: number }
+  } | null>(null)
+  const [simError, setSimError] = useState<string | null>(null)
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -191,6 +215,121 @@ function App() {
   const calculateStrikeRate = (runs: number, balls: number): number => {
     if (balls === 0) return 0
     return (runs / balls) * 100
+  }
+
+  // Generate a random shot for wagon wheel based on outcome
+  const generateShotLine = (outcome: BallResult): ShotLine | null => {
+    // Don't generate shots for extras
+    if (outcome === 'wd' || outcome === 'nb') return null
+
+    // Distance ranges based on outcome (in metres)
+    let minDist: number, maxDist: number
+    switch (outcome) {
+      case 'dot': minDist = 5; maxDist = 25; break
+      case '1': minDist = 10; maxDist = 35; break
+      case '2': minDist = 25; maxDist = 50; break
+      case '3': minDist = 35; maxDist = 55; break
+      case '4': minDist = 55; maxDist = 68; break  // Boundary
+      case '6': minDist = 70; maxDist = 85; break  // Over boundary
+      case 'W': minDist = 5; maxDist = 40; break   // Caught anywhere
+      default: return null
+    }
+
+    // Random angle (0-360 degrees, 0 = toward bowler)
+    const angle = Math.random() * 360
+    const angleRad = (angle * Math.PI) / 180
+
+    // Random distance within range
+    const distance = minDist + Math.random() * (maxDist - minDist)
+
+    // Convert to field coordinates (x, y in metres from batter)
+    // y positive = toward bowler, x positive = leg side
+    const fieldX = distance * Math.sin(angleRad)
+    const fieldY = distance * Math.cos(angleRad)
+
+    // Convert to screen coordinates
+    const screen = fieldToScreen(fieldX, fieldY)
+
+    return {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      endX: screen.x,
+      endY: screen.y,
+      outcome,
+      distance
+    }
+  }
+
+  // Simulate a shot using the TypeScript game engine
+  const simulateShot = () => {
+    setSimError(null)
+
+    try {
+      const speed = parseFloat(simSpeed)
+      const angle = parseFloat(simAngle)
+      const elevation = parseFloat(simElevation)
+
+      // Calculate trajectory
+      const trajectory = calculateTrajectory(speed, angle, elevation)
+
+      // Convert current fielder positions to game engine format (screen % -> metres)
+      const fieldConfig = fielderPositions.map(f => {
+        const field = screenToField(f.x, f.y)
+        // Find zone name for this fielder
+        const zones = calculateFielderZones([f], batterHand === 'left')
+        return {
+          x: field.x,
+          y: field.y,
+          name: zones[0]?.zoneName || 'fielder',
+        }
+      })
+
+      // Run simulation
+      const result = simulateDelivery(
+        speed,
+        angle,
+        elevation,
+        trajectory.landing_x,
+        trajectory.landing_y,
+        trajectory.projected_distance,
+        trajectory.max_height,
+        fieldConfig,
+        65.0,
+        difficulty
+      )
+
+      // Combine result with trajectory
+      const fullResult: SimulationResult = {
+        ...result,
+        trajectory,
+      }
+      setSimResult(fullResult)
+
+      // Add to wagon wheel
+      const screen = fieldToScreen(trajectory.landing_x, trajectory.landing_y)
+      const shotLine: ShotLine = {
+        id: Date.now().toString(),
+        endX: screen.x,
+        endY: screen.y,
+        outcome: result.outcome === 'caught' || result.outcome === 'dropped' ? 'W' :
+                 result.outcome === 'misfield' ? String(result.runs) as BallResult :
+                 result.outcome as BallResult,
+        distance: trajectory.projected_distance,
+      }
+      setWagonWheelShots(prev => [...prev, shotLine])
+
+      // Update score if not caught
+      if (result.outcome !== 'caught') {
+        const isWicket = false
+        const isBoundary = result.is_boundary
+        const runs = result.runs
+        addRuns(runs, isBoundary, isWicket)
+      } else {
+        addRuns(0, false, true)  // Wicket
+      }
+
+    } catch (err) {
+      setSimError('Simulation error: ' + (err as Error).message)
+    }
   }
 
   const updateCurrentSession = (updater: (session: Session) => Session) => {
@@ -255,6 +394,12 @@ function App() {
     setLastBall(ballResult)
     setIsFlashing(true)
     setTimeout(() => setIsFlashing(false), 500)
+
+    // Add shot to wagon wheel (for testing - generates random position based on outcome)
+    const shotLine = generateShotLine(ballResult)
+    if (shotLine) {
+      setWagonWheelShots(prev => [...prev, shotLine])
+    }
   }
 
   const undoLastBall = () => {
@@ -281,6 +426,9 @@ function App() {
 
     // Pop from history stack
     setSessionHistory(prev => prev.slice(0, -1))
+
+    // Remove last wagon wheel shot
+    setWagonWheelShots(prev => prev.slice(0, -1))
   }
 
   const addNewProfile = () => {
@@ -312,6 +460,7 @@ function App() {
     }))
     setLastBall(null)
     setSessionHistory([])
+    setWagonWheelShots([])
   }
 
   const openSessionHistory = (profileId: string) => {
@@ -364,6 +513,7 @@ function App() {
     setShowSessionHistory(false)
     setLastBall(null)
     setSessionHistory([])
+    setWagonWheelShots([])
   }
 
   const formatDate = (dateString: string): string => {
@@ -620,6 +770,7 @@ function App() {
                 fielderPositions={fielderPositions}
                 setFielderPositions={setFielderPositions}
                 batterHand={batterHand}
+                wagonWheelShots={wagonWheelShots}
               />
               <div className="field-controls">
                 <div className="batter-hand-toggle">
@@ -742,6 +893,71 @@ function App() {
                     </button>
                   )}
                 </div>
+
+                {/* Shot Simulator */}
+                <div className="shot-simulator">
+                  <h3>Shot Simulator</h3>
+                  <div className="sim-inputs">
+                    <div className="sim-input-group">
+                      <label>Angle (°)</label>
+                      <input
+                        type="number"
+                        value={simAngle}
+                        onChange={(e) => setSimAngle(e.target.value)}
+                        placeholder="0"
+                      />
+                      <span className="sim-hint">0=straight, +off, -leg</span>
+                    </div>
+                    <div className="sim-input-group">
+                      <label>Elevation (°)</label>
+                      <input
+                        type="number"
+                        value={simElevation}
+                        onChange={(e) => setSimElevation(e.target.value)}
+                        placeholder="10"
+                      />
+                      <span className="sim-hint">0=ground, 45=lofted</span>
+                    </div>
+                    <div className="sim-input-group">
+                      <label>Speed (km/h)</label>
+                      <input
+                        type="number"
+                        value={simSpeed}
+                        onChange={(e) => setSimSpeed(e.target.value)}
+                        placeholder="80"
+                      />
+                      <span className="sim-hint">25=soft, 110=power</span>
+                    </div>
+                  </div>
+                  <button
+                    className="sim-button"
+                    onClick={simulateShot}
+                  >
+                    Simulate Shot
+                  </button>
+                  {simError && (
+                    <div className="sim-error">{simError}</div>
+                  )}
+                  {simResult && (
+                    <div className="sim-result" data-outcome={simResult.outcome}>
+                      <div className="sim-outcome">{simResult.outcome.toUpperCase()}</div>
+                      <div className="sim-runs">{simResult.runs} run{simResult.runs !== 1 ? 's' : ''}</div>
+                      <div className="sim-description">{simResult.description}</div>
+                      {simResult.fielder_involved && (
+                        <div className="sim-fielder">Fielder: {simResult.fielder_involved}</div>
+                      )}
+                      <div className="sim-distance">
+                        Distance: {simResult.trajectory.projected_distance.toFixed(1)}m
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    className="sim-clear-btn"
+                    onClick={() => setWagonWheelShots([])}
+                  >
+                    Clear Wagon Wheel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -802,15 +1018,17 @@ function App() {
   )
 }
 
-// Field View Component with dynamic zone labels
+// Field View Component with dynamic zone labels and wagon wheel
 function FieldView({
   fielderPositions,
   setFielderPositions,
   batterHand,
+  wagonWheelShots = [],
 }: {
   fielderPositions: FielderPosition[]
   setFielderPositions: React.Dispatch<React.SetStateAction<FielderPosition[]>>
   batterHand: BattingHand
+  wagonWheelShots?: ShotLine[]
 }) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -910,6 +1128,27 @@ function FieldView({
       onTouchEnd={handleTouchEnd}
     >
       <div style={pitchStyle} />
+
+      {/* Wagon Wheel - shot lines (rendered below fielders) */}
+      {wagonWheelShots.length > 0 && (
+        <svg className="wagon-wheel" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {wagonWheelShots.map((shot, index) => {
+            const isLatest = index === wagonWheelShots.length - 1
+            return (
+              <line
+                key={shot.id}
+                x1={SCREEN_GEOMETRY.batterX}
+                y1={SCREEN_GEOMETRY.batterY}
+                x2={shot.endX}
+                y2={shot.endY}
+                className={`wagon-wheel-line ${isLatest ? 'latest' : 'old'}`}
+                data-outcome={shot.outcome}
+              />
+            )
+          })}
+        </svg>
+      )}
+
       <div
         className="fielder batsman"
         style={{ left: `${SCREEN_GEOMETRY.batterX}%`, top: `${SCREEN_GEOMETRY.batterY}%` }}

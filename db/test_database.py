@@ -336,8 +336,9 @@ def main():
     zones = get_scoring_breakdown_by_zone(session_id, TEST_DB_PATH)
     print("Scoring by Zone:")
     for z in zones:
+        avg_speed = z['avg_exit_speed'] or 0
         print(f"  {z['zone']:12} | Runs: {z['total_runs']:3} | "
-              f"Shots: {z['shot_count']:2} | Boundaries: {z['boundaries']}")
+              f"Balls: {z['balls']:2} | Avg Exit Speed: {avg_speed:.1f} km/h")
 
     print_section("Testing get_deliveries_by_over (Manhattan Chart Data)")
     overs = get_deliveries_by_over(session_id, TEST_DB_PATH)

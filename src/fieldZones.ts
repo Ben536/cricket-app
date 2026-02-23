@@ -170,7 +170,7 @@ const SHORT_NAMES: Record<string, string> = {
  * Screen: Y increases downward (0% = top of screen)
  * Field: Y increases toward bowler (positive Y = toward bowler)
  */
-function screenToField(screenX: number, screenY: number): { x: number; y: number } {
+export function screenToField(screenX: number, screenY: number): { x: number; y: number } {
   return {
     x: (screenX - BATTER_SCREEN_X) * METERS_PER_PERCENT,
     y: (screenY - BATTER_SCREEN_Y) * METERS_PER_PERCENT

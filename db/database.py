@@ -326,34 +326,34 @@ def get_scoring_breakdown_by_zone(session_id: int, db_path: Path = DEFAULT_DB_PA
     """
     Get scoring breakdown by zone (bucketed by horizontal angle).
 
-    Zones (for right-hander, looking from bowler's end):
-    - fine_leg: -90 to -60 degrees
-    - square_leg: -60 to -30 degrees
-    - midwicket: -30 to -10 degrees
-    - straight: -10 to 10 degrees
-    - cover: 10 to 40 degrees
-    - point: 40 to 70 degrees
-    - third_man: 70 to 90 degrees
+    Zones (for right-hander, 0° = straight down the ground):
+    - fine_leg: -180° to -100° (behind square, leg side)
+    - square_leg: -100° to -50°
+    - midwicket: -50° to -15°
+    - straight: -15° to 15°
+    - cover: 15° to 50°
+    - point: 50° to 100°
+    - third_man: 100° to 180° (behind square, off side)
 
     Returns:
-        List of dicts with zone, total_runs, shot_count, boundaries
+        List of dicts with zone, balls, total_runs, avg_exit_speed
     """
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT
                 CASE
-                    WHEN horizontal_angle < -60 THEN 'fine_leg'
-                    WHEN horizontal_angle < -30 THEN 'square_leg'
-                    WHEN horizontal_angle < -10 THEN 'midwicket'
-                    WHEN horizontal_angle <= 10 THEN 'straight'
-                    WHEN horizontal_angle <= 40 THEN 'cover'
-                    WHEN horizontal_angle <= 70 THEN 'point'
-                    ELSE 'third_man'
+                    WHEN horizontal_angle >= 100 THEN 'third_man'
+                    WHEN horizontal_angle >= 50 THEN 'point'
+                    WHEN horizontal_angle >= 15 THEN 'cover'
+                    WHEN horizontal_angle >= -15 THEN 'straight'
+                    WHEN horizontal_angle >= -50 THEN 'midwicket'
+                    WHEN horizontal_angle >= -100 THEN 'square_leg'
+                    ELSE 'fine_leg'
                 END as zone,
+                COUNT(*) as balls,
                 COALESCE(SUM(runs), 0) as total_runs,
-                COUNT(*) as shot_count,
-                SUM(CASE WHEN is_boundary = 1 THEN 1 ELSE 0 END) as boundaries
+                ROUND(AVG(exit_speed), 1) as avg_exit_speed
             FROM deliveries
             WHERE session_id = ? AND horizontal_angle IS NOT NULL
             GROUP BY zone
