@@ -143,8 +143,9 @@ function App() {
   const [editingName, setEditingName] = useState('')
   const [sessionHistory, setSessionHistory] = useState<Session[]>([])
   const [customFields, setCustomFields] = useState<CustomFieldPreset[]>(loadCustomFields)
-  const [isNamingField, setIsNamingField] = useState(false)
+  const [isSavingField, setIsSavingField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
+  const [isEditingCustomFields, setIsEditingCustomFields] = useState(false)
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -162,7 +163,7 @@ function App() {
     saveCustomFields(customFields)
   }, [customFields])
 
-  const handleSaveCustomField = () => {
+  const handleSaveNewCustomField = () => {
     if (newFieldName.trim()) {
       const newField: CustomFieldPreset = {
         name: newFieldName.trim(),
@@ -170,8 +171,17 @@ function App() {
       }
       setCustomFields(prev => [...prev, newField])
       setNewFieldName('')
-      setIsNamingField(false)
+      setIsSavingField(false)
     }
+  }
+
+  const handleSaveOverCustomField = (name: string) => {
+    setCustomFields(prev => prev.map(f =>
+      f.name === name
+        ? { ...f, positions: fielderPositions.map(p => ({ id: p.id, x: p.x, y: p.y })) }
+        : f
+    ))
+    setIsSavingField(false)
   }
 
   const handleDeleteCustomField = (name: string) => {
@@ -642,7 +652,17 @@ function App() {
                   </div>
                 </div>
                 <div className="field-presets">
-                  <h3>Custom</h3>
+                  <div className="custom-header">
+                    <h3>Custom</h3>
+                    {customFields.length > 0 && (
+                      <button
+                        className="edit-custom-btn"
+                        onClick={() => setIsEditingCustomFields(!isEditingCustomFields)}
+                      >
+                        {isEditingCustomFields ? 'Done' : 'Edit'}
+                      </button>
+                    )}
+                  </div>
                   <div className="preset-buttons">
                     {customFields.map(field => (
                       <div key={field.name} className="custom-field-btn-wrapper">
@@ -652,40 +672,61 @@ function App() {
                         >
                           {field.name}
                         </button>
-                        <button
-                          className="delete-field-btn"
-                          onClick={() => handleDeleteCustomField(field.name)}
-                          title="Delete"
-                        >
-                          ×
-                        </button>
+                        {isEditingCustomFields && (
+                          <button
+                            className="delete-field-btn"
+                            onClick={() => handleDeleteCustomField(field.name)}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
-                  {isNamingField ? (
-                    <div className="save-field-form">
-                      <input
-                        type="text"
-                        className="field-name-input"
-                        placeholder="Field name..."
-                        value={newFieldName}
-                        onChange={(e) => setNewFieldName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveCustomField()
-                          if (e.key === 'Escape') {
-                            setIsNamingField(false)
-                            setNewFieldName('')
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <button className="preset-btn save-btn" onClick={handleSaveCustomField}>
-                        Save
-                      </button>
+                  {isSavingField ? (
+                    <div className="save-field-options">
+                      {customFields.length > 0 && (
+                        <>
+                          <p className="save-option-label">Save over existing:</p>
+                          <div className="preset-buttons">
+                            {customFields.map(field => (
+                              <button
+                                key={field.name}
+                                className="preset-btn overwrite-btn"
+                                onClick={() => handleSaveOverCustomField(field.name)}
+                              >
+                                {field.name}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="save-option-label">Or create new:</p>
+                        </>
+                      )}
+                      <div className="save-field-form">
+                        <input
+                          type="text"
+                          className="field-name-input"
+                          placeholder="New field name..."
+                          value={newFieldName}
+                          onChange={(e) => setNewFieldName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveNewCustomField()
+                            if (e.key === 'Escape') {
+                              setIsSavingField(false)
+                              setNewFieldName('')
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button className="preset-btn save-btn" onClick={handleSaveNewCustomField}>
+                          Save
+                        </button>
+                      </div>
                       <button
                         className="preset-btn cancel-btn"
                         onClick={() => {
-                          setIsNamingField(false)
+                          setIsSavingField(false)
                           setNewFieldName('')
                         }}
                       >
@@ -695,7 +736,7 @@ function App() {
                   ) : (
                     <button
                       className="preset-btn save-current-btn"
-                      onClick={() => setIsNamingField(true)}
+                      onClick={() => setIsSavingField(true)}
                     >
                       Save Current Field
                     </button>
