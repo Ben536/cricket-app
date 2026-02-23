@@ -70,14 +70,14 @@ FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving
 
 # Ground fielding time constants
 PITCH_LENGTH = 20.12          # metres between stumps (22 yards)
-TIME_PER_RUN = 3.0            # seconds for batsmen to complete one run
+TIME_FOR_FIRST_RUN = 5.0      # seconds - includes reaction, call, start from stationary
+TIME_FOR_EXTRA_RUN = 4.0      # seconds - already moving, just turn and run
 THROW_SPEED = 28.0            # m/s - average professional throw speed
 COLLECTION_TIME_DIRECT = 0.7  # seconds - ball straight to fielder, clean pickup
 COLLECTION_TIME_MOVING = 1.2  # seconds - fielder moves to collect while ball moving
 COLLECTION_TIME_DIVING = 1.8  # seconds - diving stop, recover, throw
 PICKUP_TIME_STOPPED = 0.5     # seconds - picking up a stationary ball
 GROUND_FRICTION = 0.08        # deceleration factor per metre
-RUN_MARGIN = 0.7              # batsmen need 70% buffer to attempt run
 
 # Difficulty weights for catch scoring
 WEIGHT_REACTION = 0.25        # How much time pressure matters
@@ -647,35 +647,29 @@ def _calculate_runs_from_fielding_time(
 ) -> int:
     """
     Calculate runs based on fielding time.
-    Batsmen assess if they can complete a run with comfortable margin.
+    First run takes longer (reaction, call, start from stationary).
+    Subsequent runs are faster (already moving, just turn and go).
     """
     # Add buffer time on misfields (ball goes past, fielder chases)
-    effective_time = fielding_time + 1.5 if is_misfield else fielding_time
+    effective_time = fielding_time + 2.0 if is_misfield else fielding_time
 
-    # Batsmen need margin to safely complete run
-    safe_run_time = TIME_PER_RUN * RUN_MARGIN
-
-    if effective_time < safe_run_time:
+    # First run: need 5 seconds (reaction + call + run from standing)
+    if effective_time < TIME_FOR_FIRST_RUN:
         return 0  # Dot ball
 
-    runs = 0
-    time_remaining = effective_time
+    runs = 1
+    time_remaining = effective_time - TIME_FOR_FIRST_RUN
 
-    # First run
-    if time_remaining >= safe_run_time:
-        runs = 1
-        time_remaining -= TIME_PER_RUN
-
-    # Second run (needs slightly more time - turn at crease)
-    if time_remaining >= TIME_PER_RUN * 0.85:
+    # Second run: need 4 more seconds (already moving)
+    if time_remaining >= TIME_FOR_EXTRA_RUN:
         runs = 2
-        time_remaining -= TIME_PER_RUN
+        time_remaining -= TIME_FOR_EXTRA_RUN
 
-    # Third run (rare, batsmen tired)
-    if time_remaining >= TIME_PER_RUN * 0.9:
+    # Third run: need another 4 seconds
+    if time_remaining >= TIME_FOR_EXTRA_RUN:
         runs = 3
 
-    return min(runs, 3)
+    return runs
 
 
 def _calculate_runs_for_distance(

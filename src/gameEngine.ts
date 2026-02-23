@@ -61,14 +61,14 @@ const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving
 
 // Ground fielding time constants
 const PITCH_LENGTH = 20.12          // metres between stumps (22 yards)
-const TIME_PER_RUN = 3.0            // seconds for batsmen to complete one run
+const TIME_FOR_FIRST_RUN = 5.0      // seconds - includes reaction, call, start from stationary
+const TIME_FOR_EXTRA_RUN = 4.0      // seconds - already moving, just turn and run
 const THROW_SPEED = 28.0            // m/s - average professional throw speed
 const COLLECTION_TIME_DIRECT = 0.7  // seconds - ball straight to fielder, clean pickup
 const COLLECTION_TIME_MOVING = 1.2  // seconds - fielder moves to collect while ball moving
 const COLLECTION_TIME_DIVING = 1.8  // seconds - diving stop, recover, throw
 const PICKUP_TIME_STOPPED = 0.5     // seconds - picking up a stationary ball
 const GROUND_FRICTION = 0.08        // deceleration factor per metre (ball slows on grass)
-const RUN_MARGIN = 0.7              // batsmen need 70% buffer to attempt run (risk assessment)
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
@@ -625,45 +625,36 @@ function calculateFieldingTime(
 
 /**
  * Calculate runs based on fielding time.
- * Batsmen assess if they can complete a run with comfortable margin.
+ * First run takes longer (reaction, call, start from stationary).
+ * Subsequent runs are faster (already moving, just turn and go).
  */
 function calculateRunsFromFieldingTime(
   fieldingTime: number,
   isMisfield: boolean
 ): number {
   // Add buffer time on misfields (ball goes past, fielder chases)
-  const effectiveTime = isMisfield ? fieldingTime + 1.5 : fieldingTime
+  const effectiveTime = isMisfield ? fieldingTime + 2.0 : fieldingTime
 
-  // Batsmen need margin to safely complete run (won't attempt if too risky)
-  const safeRunTime = TIME_PER_RUN * RUN_MARGIN
-
-  if (effectiveTime < safeRunTime) {
-    return 0  // Dot ball - not enough time for even one run
+  // First run: need 5 seconds (reaction + call + run from standing)
+  if (effectiveTime < TIME_FOR_FIRST_RUN) {
+    return 0  // Dot ball
   }
 
-  // Calculate max runs possible with decreasing margin for each additional run
-  // Second run needs more buffer (fatigue, turn time)
-  let runs = 0
-  let timeRemaining = effectiveTime
+  let runs = 1
+  let timeRemaining = effectiveTime - TIME_FOR_FIRST_RUN
 
-  // First run
-  if (timeRemaining >= safeRunTime) {
-    runs = 1
-    timeRemaining -= TIME_PER_RUN
-  }
-
-  // Second run (needs slightly more time - turn at crease)
-  if (timeRemaining >= TIME_PER_RUN * 0.85) {
+  // Second run: need 4 more seconds (already moving)
+  if (timeRemaining >= TIME_FOR_EXTRA_RUN) {
     runs = 2
-    timeRemaining -= TIME_PER_RUN
+    timeRemaining -= TIME_FOR_EXTRA_RUN
   }
 
-  // Third run (rare, batsmen tired, need good margin)
-  if (timeRemaining >= TIME_PER_RUN * 0.9) {
+  // Third run: need another 4 seconds
+  if (timeRemaining >= TIME_FOR_EXTRA_RUN) {
     runs = 3
   }
 
-  return Math.min(runs, 3)
+  return runs
 }
 
 /**
