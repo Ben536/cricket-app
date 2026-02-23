@@ -304,8 +304,9 @@ function App() {
       }
       setSimResult(fullResult)
 
-      // Add to wagon wheel
-      const screen = fieldToScreen(trajectory.landing_x, trajectory.landing_y)
+      // Add to wagon wheel - use end_position (where ball ended up)
+      const endPos = result.end_position
+      const screen = fieldToScreen(endPos.x, endPos.y)
       const shotLine: ShotLine = {
         id: Date.now().toString(),
         endX: screen.x,
@@ -313,7 +314,7 @@ function App() {
         outcome: result.outcome === 'caught' || result.outcome === 'dropped' ? 'W' :
                  result.outcome === 'misfield' ? String(result.runs) as BallResult :
                  result.outcome as BallResult,
-        distance: trajectory.projected_distance,
+        distance: Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y),
       }
       setWagonWheelShots(prev => [...prev, shotLine])
 

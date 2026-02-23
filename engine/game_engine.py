@@ -260,6 +260,22 @@ def _distance_from_batter(x: float, y: float) -> float:
     return math.sqrt(x * x + y * y)
 
 
+def _get_boundary_intersection(
+    landing_x: float,
+    landing_y: float,
+    boundary_distance: float
+) -> dict:
+    """Calculate the point where the ball path intersects the boundary circle."""
+    distance = math.sqrt(landing_x ** 2 + landing_y ** 2)
+    if distance == 0:
+        return {'x': 0, 'y': -boundary_distance}  # Default: straight back
+    scale = boundary_distance / distance
+    return {
+        'x': landing_x * scale,
+        'y': landing_y * scale,
+    }
+
+
 def _calculate_full_trajectory(
     speed_kmh: float,
     horizontal_angle: float,
@@ -647,12 +663,14 @@ def simulate_delivery(
 
         if is_aerial and height_at_boundary > 0.5:
             # Six - cleared the boundary in the air
+            boundary_point = _get_boundary_intersection(landing_x, landing_y, boundary_distance)
             return {
                 'outcome': '6',
                 'runs': 6,
                 'is_boundary': True,
                 'is_aerial': True,
                 'fielder_involved': None,
+                'end_position': boundary_point,
                 'description': f"{shot_name.capitalize()} for six!"
             }
         else:
@@ -709,6 +727,8 @@ def simulate_delivery(
             if analysis['can_catch']:
                 catching_chances.append({
                     'fielder': fname,
+                    'fielder_x': fx,
+                    'fielder_y': fy,
                     'analysis': analysis,
                     'intercept_distance': intercept_distance
                 })
@@ -736,27 +756,34 @@ def simulate_delivery(
                 elif analysis['movement_required'] > FIELDER_STATIC_RANGE:
                     catch_desc += " (diving)"
 
+                fielder_pos = {'x': chance['fielder_x'], 'y': chance['fielder_y']}
                 return {
                     'outcome': 'caught',
                     'runs': 0,
                     'is_boundary': False,
                     'is_aerial': True,
                     'fielder_involved': chance['fielder'],
+                    'fielder_position': fielder_pos,
+                    'end_position': fielder_pos,
                     'description': f"{catch_desc} at {chance['fielder']}!",
                     'catch_analysis': analysis
                 }
             elif outcome == 'dropped':
                 # Dropped - but ball might still be fielded
                 dropped_fielder = chance['fielder']
+                fielder_pos = {'x': chance['fielder_x'], 'y': chance['fielder_y']}
 
                 # After a drop, check if ball still reaches boundary
                 if projected_distance >= boundary_distance:
+                    boundary_point = _get_boundary_intersection(landing_x, landing_y, boundary_distance)
                     return {
                         'outcome': '4',
                         'runs': 4,
                         'is_boundary': True,
                         'is_aerial': True,
                         'fielder_involved': dropped_fielder,
+                        'fielder_position': fielder_pos,
+                        'end_position': boundary_point,
                         'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, four!",
                         'catch_analysis': analysis
                     }
@@ -769,6 +796,8 @@ def simulate_delivery(
                     'is_boundary': False,
                     'is_aerial': True,
                     'fielder_involved': dropped_fielder,
+                    'fielder_position': fielder_pos,
+                    'end_position': {'x': landing_x, 'y': landing_y},
                     'description': f"{shot_name.capitalize()}, dropped at {dropped_fielder}, runs {runs}",
                     'catch_analysis': analysis
                 }
@@ -778,12 +807,14 @@ def simulate_delivery(
     # Check 3: Boundary reached (no catch taken)
     # ---------------------------------------------------------------------
     if projected_distance >= boundary_distance:
+        boundary_point = _get_boundary_intersection(landing_x, landing_y, boundary_distance)
         return {
             'outcome': '4',
             'runs': 4,
             'is_boundary': True,
             'is_aerial': is_aerial,
             'fielder_involved': None,
+            'end_position': boundary_point,
             'description': f"{shot_name.capitalize()} to the boundary for four!"
         }
 
@@ -820,6 +851,8 @@ def simulate_delivery(
             if fielder_distance <= projected_distance + GROUND_FIELDING_RANGE:
                 ground_fielding_chances.append({
                     'fielder': fname,
+                    'fielder_x': fx,
+                    'fielder_y': fy,
                     'lateral_distance': lateral_dist,
                     'intercept_distance': intercept_distance,
                     'fielder_distance': fielder_distance
@@ -836,6 +869,8 @@ def simulate_delivery(
         # Ball hit straight to fielder vs into gap
         hit_to_fielder = chance['lateral_distance'] < 1.5
 
+        fielder_pos = {'x': chance['fielder_x'], 'y': chance['fielder_y']}
+
         if outcome == 'stopped':
             if hit_to_fielder and not hit_firmly:
                 # Clean stop, dot ball
@@ -845,6 +880,8 @@ def simulate_delivery(
                     'is_boundary': False,
                     'is_aerial': is_aerial,
                     'fielder_involved': chance['fielder'],
+                    'fielder_position': fielder_pos,
+                    'end_position': fielder_pos,
                     'description': f"{shot_name.capitalize()} straight to {chance['fielder']}"
                 }
             else:
@@ -856,6 +893,8 @@ def simulate_delivery(
                     'is_boundary': False,
                     'is_aerial': is_aerial,
                     'fielder_involved': chance['fielder'],
+                    'fielder_position': fielder_pos,
+                    'end_position': fielder_pos,
                     'description': f"{shot_name.capitalize()}, {chance['fielder']} fields, {runs} run"
                 }
 
@@ -870,11 +909,13 @@ def simulate_delivery(
                 'is_boundary': False,
                 'is_aerial': is_aerial,
                 'fielder_involved': chance['fielder'],
+                'fielder_position': fielder_pos,
+                'end_position': fielder_pos,  # Ball stopped near fielder
                 'description': f"{shot_name.capitalize()}, misfield by {chance['fielder']}, {runs} run{'s' if runs > 1 else ''}"
             }
 
         elif outcome == 'misfield_extra':
-            # Misfield with extra runs
+            # Misfield with extra runs - ball got past the fielder
             base_runs = _calculate_runs_for_distance(chance['fielder_distance'], False, hit_firmly)
             runs = min(base_runs + 1, 3)  # Misfield adds a run, max 3
             return {
@@ -883,6 +924,8 @@ def simulate_delivery(
                 'is_boundary': False,
                 'is_aerial': is_aerial,
                 'fielder_involved': chance['fielder'],
+                'fielder_position': fielder_pos,
+                'end_position': {'x': landing_x, 'y': landing_y},  # Ball got past fielder
                 'description': f"{shot_name.capitalize()}, misfield by {chance['fielder']}, {runs} runs"
             }
 
@@ -897,5 +940,6 @@ def simulate_delivery(
         'is_boundary': False,
         'is_aerial': is_aerial,
         'fielder_involved': None,
+        'end_position': {'x': landing_x, 'y': landing_y},
         'description': f"{shot_name.capitalize()} into the gap for {runs}" if runs > 0 else f"{shot_name.capitalize()}, no run"
     }

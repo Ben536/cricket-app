@@ -18,6 +18,8 @@ export interface SimulationResult {
   is_boundary: boolean
   is_aerial: boolean
   fielder_involved: string | null
+  fielder_position?: { x: number; y: number }  // Field coordinates of involved fielder
+  end_position: { x: number; y: number }        // Where ball ended up (fielder, boundary, or landing)
   description: string
   trajectory: TrajectoryData
   catch_analysis?: CatchAnalysis  // Detailed catch difficulty breakdown
@@ -241,6 +243,26 @@ function distancePointToLineSegment(
 
 function distanceFromBatter(x: number, y: number): number {
   return Math.sqrt(x * x + y * y)
+}
+
+/**
+ * Calculate the point where the ball path intersects the boundary circle
+ */
+function getBoundaryIntersection(
+  landingX: number,
+  landingY: number,
+  boundaryDistance: number
+): { x: number; y: number } {
+  const distance = Math.sqrt(landingX * landingX + landingY * landingY)
+  if (distance === 0) {
+    return { x: 0, y: -boundaryDistance }  // Default: straight back
+  }
+  // Scale the landing point to the boundary distance
+  const scale = boundaryDistance / distance
+  return {
+    x: landingX * scale,
+    y: landingY * scale,
+  }
 }
 
 function isFielderInBallPath(
@@ -514,12 +536,14 @@ export function simulateDelivery(
       boundaryDistance, projectedDistance, maxHeight, verticalAngle
     )
     if (isAerial && heightAtBoundary > 0.5) {
+      const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
       return {
         outcome: '6',
         runs: 6,
         is_boundary: true,
         is_aerial: true,
         fielder_involved: null,
+        end_position: boundaryPoint,
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} for six!`,
       }
     }
@@ -532,6 +556,8 @@ export function simulateDelivery(
   if (isAerial) {
     const catchingChances: Array<{
       fielder: string
+      fielderX: number
+      fielderY: number
       analysis: CatchAnalysis
       interceptDistance: number
     }> = []
@@ -560,6 +586,8 @@ export function simulateDelivery(
       if (analysis.canCatch) {
         catchingChances.push({
           fielder: fielder.name,
+          fielderX: fielder.x,
+          fielderY: fielder.y,
           analysis,
           interceptDistance,
         })
@@ -595,17 +623,22 @@ export function simulateDelivery(
           is_boundary: false,
           is_aerial: true,
           fielder_involved: chance.fielder,
+          fielder_position: { x: chance.fielderX, y: chance.fielderY },
+          end_position: { x: chance.fielderX, y: chance.fielderY },
           description: `${catchDesc} at ${chance.fielder}!`,
           catch_analysis: chance.analysis,
         }
       } else if (outcome === 'dropped') {
         if (projectedDistance >= boundaryDistance) {
+          const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
           return {
             outcome: '4',
             runs: 4,
             is_boundary: true,
             is_aerial: true,
             fielder_involved: chance.fielder,
+            fielder_position: { x: chance.fielderX, y: chance.fielderY },
+            end_position: boundaryPoint,
             description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, four!`,
             catch_analysis: chance.analysis,
           }
@@ -617,6 +650,8 @@ export function simulateDelivery(
           is_boundary: false,
           is_aerial: true,
           fielder_involved: chance.fielder,
+          fielder_position: { x: chance.fielderX, y: chance.fielderY },
+          end_position: { x: landingX, y: landingY },  // Lands where it would have
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, runs ${runs}`,
           catch_analysis: chance.analysis,
         }
@@ -626,12 +661,14 @@ export function simulateDelivery(
 
   // Check 3: Boundary (four)
   if (projectedDistance >= boundaryDistance) {
+    const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
     return {
       outcome: '4',
       runs: 4,
       is_boundary: true,
       is_aerial: isAerial,
       fielder_involved: null,
+      end_position: boundaryPoint,
       description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} to the boundary for four!`,
     }
   }
@@ -639,6 +676,8 @@ export function simulateDelivery(
   // Check 4: Ground fielding
   const groundChances: Array<{
     fielder: string
+    fielderX: number
+    fielderY: number
     lateralDistance: number
     interceptDistance: number
     fielderDistance: number
@@ -658,6 +697,8 @@ export function simulateDelivery(
       if (fielderDist <= projectedDistance + GROUND_FIELDING_RANGE) {
         groundChances.push({
           fielder: fielder.name,
+          fielderX: fielder.x,
+          fielderY: fielder.y,
           lateralDistance: lateralDist,
           interceptDistance,
           fielderDistance: fielderDist,
@@ -681,6 +722,8 @@ export function simulateDelivery(
           is_boundary: false,
           is_aerial: isAerial,
           fielder_involved: chance.fielder,
+          fielder_position: { x: chance.fielderX, y: chance.fielderY },
+          end_position: { x: chance.fielderX, y: chance.fielderY },
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} straight to ${chance.fielder}`,
         }
       }
@@ -690,6 +733,8 @@ export function simulateDelivery(
         is_boundary: false,
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
+        fielder_position: { x: chance.fielderX, y: chance.fielderY },
+        end_position: { x: chance.fielderX, y: chance.fielderY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, 1 run`,
       }
     } else if (outcome === 'misfield_no_extra') {
@@ -700,6 +745,8 @@ export function simulateDelivery(
         is_boundary: false,
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
+        fielder_position: { x: chance.fielderX, y: chance.fielderY },
+        end_position: { x: chance.fielderX, y: chance.fielderY },  // Ball stopped near fielder
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     } else {
@@ -711,12 +758,14 @@ export function simulateDelivery(
         is_boundary: false,
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
+        fielder_position: { x: chance.fielderX, y: chance.fielderY },
+        end_position: { x: landingX, y: landingY },  // Ball got past the fielder
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} runs`,
       }
     }
   }
 
-  // No fielder involved
+  // No fielder involved - ball ends at landing point
   const runs = calculateRunsForDistance(projectedDistance, false, hitFirmly)
   return {
     outcome: runs > 0 ? String(runs) : 'dot',
@@ -724,6 +773,7 @@ export function simulateDelivery(
     is_boundary: false,
     is_aerial: isAerial,
     fielder_involved: null,
+    end_position: { x: landingX, y: landingY },
     description: runs > 0
       ? `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} into the gap for ${runs}`
       : `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, no run`,
