@@ -1133,8 +1133,9 @@ export function simulateDelivery(
     }
   }
 
-  // Sort by intercept distance - fielder who can cut off ball earliest gets priority
-  groundChances.sort((a, b) => a.interceptDistance - b.interceptDistance)
+  // Sort by collection difficulty - fielder who can most easily collect the ball gets priority
+  // This prevents a distant fielder sprinting across when another is right next to the path
+  groundChances.sort((a, b) => a.collectionDifficulty - b.collectionDifficulty)
 
   for (const chance of groundChances) {
     const outcome = rollGroundFieldingOutcome(difficulty, chance.collectionDifficulty)
