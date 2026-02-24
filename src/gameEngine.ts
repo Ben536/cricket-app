@@ -55,8 +55,8 @@ const INNER_RING_RADIUS = 15.0
 const MID_FIELD_RADIUS = 30.0
 
 // Fielder movement constants - matched to Python engine
-const FIELDER_REACTION_TIME = 0.20  // seconds - elite fielders react in 0.15-0.25s
-const FIELDER_RUN_SPEED = 7.0       // m/s - 25 km/h, professional fielder sprint
+const FIELDER_REACTION_TIME = 0.25  // seconds - reaction time before moving
+const FIELDER_RUN_SPEED = 6.0       // m/s - 21.6 km/h, realistic sprint while watching ball
 const FIELDER_DIVE_RANGE = 2.5      // metres - full-length diving catch
 const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach + step)
 
@@ -602,13 +602,29 @@ function rollCatchOutcome(
   return Math.random() < catchProb ? 'caught' : 'dropped'
 }
 
-function rollGroundFieldingOutcome(difficulty: Difficulty): string {
+function rollGroundFieldingOutcome(difficulty: Difficulty, lateralDistance: number): string {
   const settings = DIFFICULTY_SETTINGS[difficulty]
   const probs = settings.ground_fielding
-  const roll = Math.random()
 
-  if (roll < probs.stopped) return 'stopped'
-  if (roll < probs.stopped + probs.misfield_no_extra) return 'misfield_no_extra'
+  // Diving stops (lateral > 2m) are much harder to control
+  // Reduce clean stop probability significantly for diving attempts
+  let stoppedProb = probs.stopped
+  let misfieldNoExtraProb = probs.misfield_no_extra
+
+  if (lateralDistance > 2.0) {
+    // Diving stop - high chance of misfield
+    // On medium: 85% stopped → 45% stopped, 35% misfield_no_extra, 20% misfield_extra
+    stoppedProb = probs.stopped * 0.5
+    misfieldNoExtraProb = 0.35
+  } else if (lateralDistance > 1.0) {
+    // Stretching/moving stop - moderate penalty
+    stoppedProb = probs.stopped * 0.8
+    misfieldNoExtraProb = probs.misfield_no_extra + 0.1
+  }
+
+  const roll = Math.random()
+  if (roll < stoppedProb) return 'stopped'
+  if (roll < stoppedProb + misfieldNoExtraProb) return 'misfield_no_extra'
   return 'misfield_extra'
 }
 
@@ -973,7 +989,7 @@ export function simulateDelivery(
   groundChances.sort((a, b) => a.lateralDistance - b.lateralDistance)
 
   for (const chance of groundChances) {
-    const outcome = rollGroundFieldingOutcome(difficulty)
+    const outcome = rollGroundFieldingOutcome(difficulty, chance.lateralDistance)
 
     // Calculate time-based runs using physics model
     const fieldingTime = calculateFieldingTime(
