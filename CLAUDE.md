@@ -35,10 +35,10 @@ git add -A && git commit -m "description" && git push origin master
 
 ```typescript
 // Timing
-TIME_FOR_FIRST_RUN = 4.0      // seconds for first run
-TIME_FOR_EXTRA_RUN = 3.0      // seconds for each additional run
+TIME_FOR_FIRST_RUN = 3.5      // seconds for first run
+TIME_FOR_EXTRA_RUN = 2.5      // seconds for each additional run
 FIELDER_REACTION_TIME = 0.25  // seconds before fielder starts moving
-FIELDER_ACCEL_TIME = 1.0      // seconds to reach max speed
+FIELDER_ACCEL_TIME = 0.0      // instant max speed
 
 // Physics
 GROUND_FRICTION = 0.05        // exponential decay factor for rolling
@@ -99,20 +99,12 @@ rollingDistance = ln(landingSpeed / 1.5) / GROUND_FRICTION
 
 ## Fielder Movement Model
 
-Fielders use linear acceleration (not instant max speed):
-
-**During acceleration (t ≤ 1.0s):**
+Fielders move at instant max speed (no acceleration ramp):
 ```
-velocity = (FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME) * t
-distance = 0.5 * acceleration * t²
+distance = FIELDER_RUN_SPEED * time
 ```
 
-**At max speed (t > 1.0s):**
-```
-distance = accelDistance + FIELDER_RUN_SPEED * (t - FIELDER_ACCEL_TIME)
-```
-
-Where `accelDistance = 0.5 * maxSpeed * accelTime = 3m`
+After 0.25s reaction time, fielders sprint at 6 m/s.
 
 ---
 
@@ -199,9 +191,9 @@ throwTime = throwDistance / 30 m/s
 
 ### Runs Awarded
 ```
-If fieldingTime < 4.0s → 0 runs (dot ball)
-If fieldingTime ≥ 4.0s → 1 run
-Each additional 3.0s → +1 run
+If fieldingTime < 3.5s → 0 runs (dot ball)
+If fieldingTime ≥ 3.5s → 1 run
+Each additional 2.5s → +1 run
 Max 3 runs (then boundary)
 ```
 

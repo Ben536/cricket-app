@@ -66,15 +66,15 @@ const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach 
 
 // Ground fielding time constants - matched to Python engine
 const PITCH_LENGTH = 20.12          // metres between stumps (22 yards)
-const TIME_FOR_FIRST_RUN = 4.0      // seconds - quick single takes 2.5-3s + reaction/call
-const TIME_FOR_EXTRA_RUN = 3.0      // seconds - already running, turn and sprint
+const TIME_FOR_FIRST_RUN = 3.5      // seconds - quick single takes 2.5-3s + reaction/call
+const TIME_FOR_EXTRA_RUN = 2.5      // seconds - already running, turn and sprint
 const THROW_SPEED = 30.0            // m/s - 108 km/h, professional throw speed
 const COLLECTION_TIME_DIRECT = 0.5  // seconds - ball straight to fielder, clean take
 const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
 const COLLECTION_TIME_DIVING = 1.5  // seconds - diving stop, recover, release
 const PICKUP_TIME_STOPPED = 0.4     // seconds - picking up a stationary ball
 const GROUND_FRICTION = 0.05        // deceleration factor per metre - cricket outfield
-const FIELDER_ACCEL_TIME = 1.0      // seconds to reach max speed from standstill
+const FIELDER_ACCEL_TIME = 0.0      // seconds to reach max speed (instant)
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
@@ -691,18 +691,17 @@ function getCollectionTime(lateralDistance: number): number {
 }
 
 /**
- * Calculate distance a fielder can cover with linear acceleration.
- * Fielder takes FIELDER_ACCEL_TIME seconds to reach max speed.
- *
- * During acceleration phase (t <= FIELDER_ACCEL_TIME):
- *   velocity = (FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME) * t
- *   distance = 0.5 * (FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME) * t²
- *
- * After acceleration (t > FIELDER_ACCEL_TIME):
- *   distance = accel_distance + FIELDER_RUN_SPEED * (t - FIELDER_ACCEL_TIME)
+ * Calculate distance a fielder can cover.
+ * If FIELDER_ACCEL_TIME > 0, uses linear acceleration model.
+ * If FIELDER_ACCEL_TIME = 0, instant max speed.
  */
 function getFielderMovementDistance(movementTime: number): number {
   if (movementTime <= 0) return 0
+
+  // Instant max speed when no acceleration time
+  if (FIELDER_ACCEL_TIME <= 0) {
+    return FIELDER_RUN_SPEED * movementTime
+  }
 
   const accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME  // acceleration in m/s²
 
@@ -711,9 +710,7 @@ function getFielderMovementDistance(movementTime: number): number {
     return 0.5 * accel * movementTime * movementTime
   } else {
     // Reached max speed
-    // Distance during acceleration phase
-    const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME  // = 0.5 * maxSpeed * accelTime = 3m at defaults
-    // Distance at max speed
+    const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
     const maxSpeedTime = movementTime - FIELDER_ACCEL_TIME
     return accelDist + FIELDER_RUN_SPEED * maxSpeedTime
   }
@@ -775,14 +772,17 @@ function findBestGroundIntercept(
     // (fielder can reach within GROUND_FIELDING_RANGE of the point)
     const distToTravel = Math.max(0, fielderDist - GROUND_FIELDING_RANGE)
 
-    // Calculate time for fielder to cover this distance (with acceleration)
+    // Calculate time for fielder to cover this distance
     let fielderTime: number
     if (distToTravel <= 0) {
       fielderTime = FIELDER_REACTION_TIME  // Already in range, just react
+    } else if (FIELDER_ACCEL_TIME <= 0) {
+      // Instant max speed: t = d / speed
+      fielderTime = FIELDER_REACTION_TIME + (distToTravel / FIELDER_RUN_SPEED)
     } else {
-      // Inverse of getFielderMovementDistance - find time to cover distance
+      // Inverse of getFielderMovementDistance with acceleration
       const accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME
-      const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME  // 3m at defaults
+      const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
 
       if (distToTravel <= accelDist) {
         // Still in acceleration phase: d = 0.5 * a * t², so t = sqrt(2d/a)
