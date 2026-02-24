@@ -642,14 +642,6 @@ function getGroundBallSpeed(exitSpeedKmh: number, distance: number): number {
 }
 
 /**
- * Calculate time for ball to travel along ground to fielder position.
- */
-function getBallTravelTime(exitSpeedKmh: number, distance: number): number {
-  const avgSpeed = getGroundBallSpeed(exitSpeedKmh, distance)
-  return distance / avgSpeed
-}
-
-/**
  * Calculate collection time based on how far fielder must move.
  */
 function getCollectionTime(lateralDistance: number): number {
@@ -689,6 +681,99 @@ function getFielderMovementDistance(movementTime: number): number {
     const maxSpeedTime = movementTime - FIELDER_ACCEL_TIME
     return accelDist + FIELDER_RUN_SPEED * maxSpeedTime
   }
+}
+
+/**
+ * Find the earliest point along the ball path where a fielder can intercept.
+ *
+ * Instead of finding the perpendicular closest point, this finds where
+ * the fielder can actually reach the ball by running toward it.
+ *
+ * For slow balls: fielder can cut off the ball early (closer to batter)
+ * For fast balls: limited time means ball may beat the fielder
+ *
+ * Returns null if fielder cannot intercept at any point.
+ */
+function findEarliestGroundIntercept(
+  fielderX: number,
+  fielderY: number,
+  finalX: number,
+  finalY: number,
+  exitSpeedKmh: number,
+  aerialDistance: number,
+  timeOfFlight: number,
+  projectedDistance: number
+): { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number } | null {
+  // Direction unit vector of ball path
+  const pathLength = Math.sqrt(finalX * finalX + finalY * finalY)
+  if (pathLength < 0.1) return null
+  const dirX = finalX / pathLength
+  const dirY = finalY / pathLength
+
+  // Sample points along the ball path, starting close to batter
+  // Check every 2 metres to find earliest intercept
+  const stepSize = 2.0
+  let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number } | null = null
+
+  for (let dist = 5; dist <= projectedDistance; dist += stepSize) {
+    const pointX = dirX * dist
+    const pointY = dirY * dist
+
+    // Calculate ball travel time to this point
+    let ballTime: number
+    if (dist <= aerialDistance) {
+      // Ball still in air
+      ballTime = timeOfFlight * (dist / aerialDistance)
+    } else {
+      // Ball has landed, rolling
+      const rollingDist = dist - aerialDistance
+      const rollingSpeed = getGroundBallSpeed(exitSpeedKmh, rollingDist)
+      ballTime = timeOfFlight + (rollingDist / rollingSpeed)
+    }
+
+    // Calculate fielder travel time to this point
+    const dx = pointX - fielderX
+    const dy = pointY - fielderY
+    const fielderDist = Math.sqrt(dx * dx + dy * dy)
+
+    // Fielder needs reaction time + movement time
+    // Solve: getFielderMovementDistance(t) = fielderDist - GROUND_FIELDING_RANGE
+    // (fielder can reach within GROUND_FIELDING_RANGE of the point)
+    const distToTravel = Math.max(0, fielderDist - GROUND_FIELDING_RANGE)
+
+    // Calculate time for fielder to cover this distance (with acceleration)
+    let fielderTime: number
+    if (distToTravel <= 0) {
+      fielderTime = FIELDER_REACTION_TIME  // Already in range, just react
+    } else {
+      // Inverse of getFielderMovementDistance - find time to cover distance
+      const accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME
+      const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME  // 3m at defaults
+
+      if (distToTravel <= accelDist) {
+        // Still in acceleration phase: d = 0.5 * a * t², so t = sqrt(2d/a)
+        fielderTime = FIELDER_REACTION_TIME + Math.sqrt(2 * distToTravel / accel)
+      } else {
+        // Past acceleration: d = accelDist + speed * (t - accelTime)
+        const remainingDist = distToTravel - accelDist
+        fielderTime = FIELDER_REACTION_TIME + FIELDER_ACCEL_TIME + (remainingDist / FIELDER_RUN_SPEED)
+      }
+    }
+
+    // Can fielder reach this point before or when ball arrives?
+    if (fielderTime <= ballTime + 0.1) {  // 0.1s grace for diving/stretching
+      // This is a valid intercept point
+      bestIntercept = {
+        interceptX: pointX,
+        interceptY: pointY,
+        interceptDistance: dist,
+        lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5)  // Cap for collection time calc
+      }
+      break  // Found earliest intercept, stop searching
+    }
+  }
+
+  return bestIntercept
 }
 
 /**
@@ -975,6 +1060,7 @@ export function simulateDelivery(
   }
 
   // Check 4: Ground fielding
+  // Find earliest intercept point for each fielder (fielders attack the ball)
   const groundChances: Array<{
     fielder: string
     fielderX: number
@@ -989,36 +1075,36 @@ export function simulateDelivery(
   for (const fielder of fieldConfig) {
     if (!isFielderInBallPath(fielder.x, fielder.y, landingX, landingY)) continue
 
-    const { distance: lateralDist, closestX, closestY, t } = distancePointToLineSegment(
-      fielder.x, fielder.y, batterX, batterY, landingX, landingY
-    )
-    if (t < 0.05) continue
-
-    const interceptDistance = distanceFromBatter(closestX, closestY)
     const fielderDist = distanceFromBatter(fielder.x, fielder.y)
 
-    // Calculate dynamic reach based on ball travel time
-    // Fielder can run toward the ball while it's traveling (with acceleration)
-    const ballTravelTime = getBallTravelTime(exitSpeed, interceptDistance)
-    const movementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
-    const dynamicMovement = getFielderMovementDistance(movementTime)
-    const maxReach = GROUND_FIELDING_RANGE + dynamicMovement
+    // Find earliest point where this fielder can intercept the ball
+    const intercept = findEarliestGroundIntercept(
+      fielder.x,
+      fielder.y,
+      landingX,
+      landingY,
+      exitSpeed,
+      trajectory.aerial_distance,
+      trajectory.time_of_flight,
+      projectedDistance
+    )
 
-    if (lateralDist <= maxReach && fielderDist <= projectedDistance + maxReach) {
+    if (intercept) {
       groundChances.push({
         fielder: fielder.name,
         fielderX: fielder.x,
         fielderY: fielder.y,
-        lateralDistance: lateralDist,
-        interceptDistance,
+        lateralDistance: intercept.lateralDistance,
+        interceptDistance: intercept.interceptDistance,
         fielderDistance: fielderDist,
-        interceptX: closestX,
-        interceptY: closestY,
+        interceptX: intercept.interceptX,
+        interceptY: intercept.interceptY,
       })
     }
   }
 
-  groundChances.sort((a, b) => a.lateralDistance - b.lateralDistance)
+  // Sort by intercept distance - fielder who can cut off ball earliest gets priority
+  groundChances.sort((a, b) => a.interceptDistance - b.interceptDistance)
 
   for (const chance of groundChances) {
     const outcome = rollGroundFieldingOutcome(difficulty, chance.lateralDistance)
