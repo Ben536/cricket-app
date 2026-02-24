@@ -344,6 +344,18 @@ function isFielderInBallPath(
   const dot = fielderX * shotDirX + fielderY * shotDirY
   const fielderDistance = Math.sqrt(fielderX ** 2 + fielderY ** 2)
 
+  // Calculate perpendicular distance from fielder to ball path line
+  // This prevents fielders on the opposite side of the field from being considered
+  // Cross product gives signed perpendicular distance
+  const crossProduct = fielderX * shotDirY - fielderY * shotDirX
+  const perpendicularDist = Math.abs(crossProduct)
+
+  // If fielder is more than 25m laterally from ball path, exclude them
+  // This prevents leg-side fielders from chasing off-side shots and vice versa
+  if (perpendicularDist > 25) {
+    return false
+  }
+
   if (fielderDistance < 10) {
     return dot > -5
   }
