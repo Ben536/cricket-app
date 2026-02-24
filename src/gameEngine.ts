@@ -339,20 +339,29 @@ function isFielderInBallPath(
   const shotLength = Math.sqrt(landingX ** 2 + landingY ** 2)
   if (shotLength < 0.1) return false
 
+  // Simple check: if ball is going to one side (off/leg) and fielder is
+  // clearly on the opposite side, exclude them
+  // Allow fielders within 8m of center line to field either side
+  const ballGoingOffSide = landingX < -5   // Ball going to off side (negative X)
+  const ballGoingLegSide = landingX > 5    // Ball going to leg side (positive X)
+  const fielderOnLegSide = fielderX > 8    // Fielder clearly on leg side
+  const fielderOnOffSide = fielderX < -8   // Fielder clearly on off side
+
+  // Exclude fielders on the wrong side of the field
+  if (ballGoingOffSide && fielderOnLegSide) return false
+  if (ballGoingLegSide && fielderOnOffSide) return false
+
   const shotDirX = landingX / shotLength
   const shotDirY = landingY / shotLength
   const dot = fielderX * shotDirX + fielderY * shotDirY
   const fielderDistance = Math.sqrt(fielderX ** 2 + fielderY ** 2)
 
   // Calculate perpendicular distance from fielder to ball path line
-  // This prevents fielders on the opposite side of the field from being considered
-  // Cross product gives signed perpendicular distance
   const crossProduct = fielderX * shotDirY - fielderY * shotDirX
   const perpendicularDist = Math.abs(crossProduct)
 
-  // If fielder is more than 25m laterally from ball path, exclude them
-  // This prevents leg-side fielders from chasing off-side shots and vice versa
-  if (perpendicularDist > 25) {
+  // If fielder is more than 20m laterally from ball path, exclude them
+  if (perpendicularDist > 20) {
     return false
   }
 
