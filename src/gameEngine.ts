@@ -74,7 +74,7 @@ const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
 const COLLECTION_TIME_DIVING = 1.5  // seconds - diving stop, recover, release
 const PICKUP_TIME_STOPPED = 0.4     // seconds - picking up a stationary ball
 const GROUND_FRICTION = 0.05        // deceleration factor per metre - cricket outfield
-const FIELDER_ACCEL_TIME = 0.0      // seconds to reach max speed (instant)
+const FIELDER_ACCEL_TIME = 0.5      // seconds to reach max speed
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
