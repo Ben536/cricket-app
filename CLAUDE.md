@@ -38,7 +38,7 @@ git add -A && git commit -m "description" && git push origin master
 TIME_FOR_FIRST_RUN = 3.5      // seconds for first run
 TIME_FOR_EXTRA_RUN = 2.5      // seconds for each additional run
 FIELDER_REACTION_TIME = 0.25  // seconds before fielder starts moving
-FIELDER_ACCEL_TIME = 0.0      // instant max speed
+FIELDER_ACCEL_TIME = 0.5      // seconds to reach max speed
 
 // Physics
 GROUND_FRICTION = 0.05        // exponential decay factor for rolling
@@ -99,12 +99,19 @@ rollingDistance = ln(landingSpeed / 1.5) / GROUND_FRICTION
 
 ## Fielder Movement Model
 
-Fielders move at instant max speed (no acceleration ramp):
+Fielders accelerate linearly over 0.5s to max speed:
+
+**During acceleration (t ≤ 0.5s):**
 ```
-distance = FIELDER_RUN_SPEED * time
+distance = 0.5 * (FIELDER_RUN_SPEED / 0.5) * t² = 6 * t²
 ```
 
-After 0.25s reaction time, fielders sprint at 6 m/s.
+**At max speed (t > 0.5s):**
+```
+distance = 1.5m + 6 m/s * (t - 0.5)
+```
+
+After 0.25s reaction time, fielders accelerate to 6 m/s over 0.5s.
 
 ---
 
