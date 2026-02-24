@@ -718,17 +718,15 @@ function getFielderMovementDistance(movementTime: number): number {
 }
 
 /**
- * Find the earliest point along the ball path where a fielder can intercept.
+ * Find the BEST (easiest) point along the ball path where a fielder can intercept.
  *
- * Instead of finding the perpendicular closest point, this finds where
- * the fielder can actually reach the ball by running toward it.
- *
- * For slow balls: fielder can cut off the ball early (closer to batter)
- * For fast balls: limited time means ball may beat the fielder
+ * Scans all reachable points and returns the one with lowest collection difficulty.
+ * This ensures fielders collect at their natural position rather than sprinting
+ * to cut off the ball early when they could collect more comfortably later.
  *
  * Returns null if fielder cannot intercept at any point.
  */
-function findEarliestGroundIntercept(
+function findBestGroundIntercept(
   fielderX: number,
   fielderY: number,
   finalX: number,
@@ -744,10 +742,10 @@ function findEarliestGroundIntercept(
   const dirX = finalX / pathLength
   const dirY = finalY / pathLength
 
-  // Sample points along the ball path, starting close to batter
-  // Check every 2 metres to find earliest intercept
+  // Sample ALL points along the ball path and find the one with lowest difficulty
   const stepSize = 2.0
   let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number } | null = null
+  let lowestDifficulty = Infinity
 
   for (let dist = 5; dist <= projectedDistance; dist += stepSize) {
     const pointX = dirX * dist
@@ -811,14 +809,19 @@ function findEarliestGroundIntercept(
         collectionDifficulty = 0.5 + (timeRatio - 0.9) / 0.2 * 0.5  // 0.5 to 1.0
       }
 
-      bestIntercept = {
-        interceptX: pointX,
-        interceptY: pointY,
-        interceptDistance: dist,
-        lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5),
-        collectionDifficulty: Math.min(1, collectionDifficulty)
+      collectionDifficulty = Math.min(1, collectionDifficulty)
+
+      // Keep track of the EASIEST intercept point (lowest difficulty)
+      if (collectionDifficulty < lowestDifficulty) {
+        lowestDifficulty = collectionDifficulty
+        bestIntercept = {
+          interceptX: pointX,
+          interceptY: pointY,
+          interceptDistance: dist,
+          lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5),
+          collectionDifficulty
+        }
       }
-      break  // Found earliest intercept, stop searching
     }
   }
 
@@ -1128,7 +1131,7 @@ export function simulateDelivery(
     const fielderDist = distanceFromBatter(fielder.x, fielder.y)
 
     // Find earliest point where this fielder can intercept the ball
-    const intercept = findEarliestGroundIntercept(
+    const intercept = findBestGroundIntercept(
       fielder.x,
       fielder.y,
       landingX,
