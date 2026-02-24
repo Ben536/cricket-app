@@ -863,6 +863,8 @@ export function simulateDelivery(
           catch_analysis: chance.analysis,
         }
       } else if (outcome === 'dropped') {
+        // Get position where the drop happened
+        const dropPos = getBallPositionAtTime(trajectory, chance.analysis.timeToIntercept)
         if (projectedDistance >= boundaryDistance) {
           const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
           return {
@@ -872,6 +874,7 @@ export function simulateDelivery(
             is_aerial: true,
             fielder_involved: chance.fielder,
             fielder_position: { x: chance.fielderX, y: chance.fielderY },
+            fielding_position: { x: dropPos.x, y: dropPos.y },  // Where the drop happened
             end_position: boundaryPoint,
             description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, four!`,
             catch_analysis: chance.analysis,
@@ -885,6 +888,7 @@ export function simulateDelivery(
           is_aerial: true,
           fielder_involved: chance.fielder,
           fielder_position: { x: chance.fielderX, y: chance.fielderY },
+          fielding_position: { x: dropPos.x, y: dropPos.y },  // Where the drop happened
           end_position: { x: landingX, y: landingY },  // Lands where it would have
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, dropped at ${chance.fielder}, runs ${runs}`,
           catch_analysis: chance.analysis,

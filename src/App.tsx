@@ -320,6 +320,9 @@ function App() {
       }
       setSimResult(fullResult)
 
+      // Debug: log the result to verify fielding is working
+      console.log('Shot result:', result.outcome, 'fielder:', result.fielder_involved, 'fielding_pos:', result.fielding_position)
+
       // Add to wagon wheel - use end_position (where ball ended up)
       const endPos = result.end_position
       const screen = fieldToScreen(endPos.x, endPos.y)
@@ -354,14 +357,19 @@ function App() {
         const fieldingFielderId = Object.entries(fielderIdToZone)
           .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
 
+        console.log('Fielding animation: fielder=', result.fielder_involved, 'id=', fieldingFielderId, 'pos=', result.fielding_position)
+
         if (fieldingFielderId) {
           const fieldingScreen = fieldToScreen(result.fielding_position.x, result.fielding_position.y)
+          console.log('Setting fieldingDisplayPosition:', fieldingFielderId, fieldingScreen)
           setFieldingDisplayPosition({
             fielderId: fieldingFielderId,
             screenX: fieldingScreen.x,
             screenY: fieldingScreen.y,
           })
         }
+      } else {
+        console.log('No fielding animation: hasPos=', !!result.fielding_position, 'fielder=', result.fielder_involved, 'outcome=', result.outcome)
       }
 
       // Update score if not caught (skipWagonWheel=true since we already added it above)
