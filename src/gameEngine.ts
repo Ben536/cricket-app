@@ -61,7 +61,7 @@ const MID_FIELD_RADIUS = 30.0
 // Fielder movement constants - matched to Python engine
 const FIELDER_REACTION_TIME = 0.25  // seconds - reaction time before moving
 const FIELDER_RUN_SPEED = 6.0       // m/s - 21.6 km/h, realistic sprint while watching ball
-const FIELDER_DIVE_RANGE = 2.5      // metres - full-length diving catch
+const FIELDER_DIVE_RANGE = 0.5      // metres - diving catch/stop reach
 const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach + step)
 
 // Ground fielding time constants - matched to Python engine
@@ -1099,21 +1099,11 @@ export function simulateDelivery(
     }
   }
 
-  // Check 3: Boundary (four)
-  if (projectedDistance >= boundaryDistance) {
-    const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
-    return {
-      outcome: '4',
-      runs: 4,
-      is_boundary: true,
-      is_aerial: isAerial,
-      fielder_involved: null,
-      end_position: boundaryPoint,
-      description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} to the boundary for four!`,
-    }
-  }
+  // Check 3: Ground fielding (including potential boundary balls)
+  // For boundary balls, fielders must intercept BEFORE the boundary
+  const isBoundaryBall = projectedDistance >= boundaryDistance
+  const maxInterceptDistance = isBoundaryBall ? boundaryDistance : projectedDistance
 
-  // Check 4: Ground fielding
   // Find best intercept point for each fielder
   const groundChances: Array<{
     fielder: string
@@ -1140,6 +1130,7 @@ export function simulateDelivery(
     const fielderDist = distanceFromBatter(fielder.x, fielder.y)
 
     // Find best point where this fielder can intercept the ball
+    // For boundary balls, only look for intercepts before the boundary
     const intercept = findBestGroundIntercept(
       fielder.x,
       fielder.y,
@@ -1148,7 +1139,7 @@ export function simulateDelivery(
       exitSpeed,
       trajectory.aerial_distance,
       trajectory.time_of_flight,
-      projectedDistance
+      maxInterceptDistance  // Use boundary as limit for potential fours
     )
 
     if (intercept) {
@@ -1258,7 +1249,27 @@ export function simulateDelivery(
         priority_score: chance.priorityScore,
       }
     } else {
-      // Ball gets past fielder - they must chase and throw from further back
+      // Ball gets past fielder
+      // If it was a boundary ball, misfield = four
+      if (isBoundaryBall) {
+        const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
+        return {
+          outcome: '4',
+          runs: 4,
+          is_boundary: true,
+          is_aerial: isAerial,
+          fielder_involved: chance.fielder,
+          fielder_position: { x: chance.fielderX, y: chance.fielderY },
+          fielding_position: { x: chance.interceptX, y: chance.interceptY },
+          end_position: boundaryPoint,
+          description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, four!`,
+          fielding_time: fieldingTime + 2.0,
+          collection_difficulty: chance.collectionDifficulty,
+          alignment_score: chance.alignmentScore,
+          priority_score: chance.priorityScore,
+        }
+      }
+      // Non-boundary ball - they must chase and throw from further back
       const runs = calculateRunsFromFieldingTime(fieldingTime, true)
       return {
         outcome: 'misfield',
@@ -1278,7 +1289,21 @@ export function simulateDelivery(
     }
   }
 
-  // No fielder directly in ball path - find nearest fielder to landing point
+  // No fielder intercepted - if it was a boundary ball, it's a four
+  if (isBoundaryBall) {
+    const boundaryPoint = getBoundaryIntersection(landingX, landingY, boundaryDistance)
+    return {
+      outcome: '4',
+      runs: 4,
+      is_boundary: true,
+      is_aerial: isAerial,
+      fielder_involved: null,
+      end_position: boundaryPoint,
+      description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} to the boundary for four!`,
+    }
+  }
+
+  // Non-boundary ball with no fielder in path - find nearest fielder to retrieve
   let nearestFielder: { name: string; x: number; y: number; distance: number } | null = null
   for (const fielder of fieldConfig) {
     const dx = fielder.x - landingX

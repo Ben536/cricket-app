@@ -48,7 +48,7 @@ FIELDER_RUN_SPEED = 6.0       // m/s (~21.6 km/h)
 // Fielding ranges
 GROUND_FIELDING_RANGE = 3.0   // metres static reach for ground balls
 FIELDER_STATIC_RANGE = 1.5    // metres catch without moving
-FIELDER_DIVE_RANGE = 2.5      // metres full-length diving catch
+FIELDER_DIVE_RANGE = 0.5      // metres diving catch/stop reach
 
 // Collection times
 COLLECTION_TIME_DIRECT = 0.5  // ball straight to fielder
@@ -242,7 +242,14 @@ Fielders run to the BEST catchable position along the trajectory:
 ## Boundary Logic
 
 - **Six**: Ball clears boundary while aerial (height > 0.5m at boundary)
-- **Four**: Ball reaches boundary along ground or drops before boundary
+- **Four**: Ball reaches boundary along ground (if no fielder intercepts)
+
+### Ground Fielding on Boundary Balls
+For shots projected to travel >= 70m:
+1. Fielders can intercept BEFORE the boundary (< 70m)
+2. If stopped cleanly → runs based on fielding time (usually 2-3)
+3. If misfield (ball gets past) → automatic four
+4. If no fielder can intercept → four
 
 Boundary intersection calculated by scaling landing point direction to 70m radius.
 
