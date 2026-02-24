@@ -668,10 +668,25 @@ function calculateFieldingTime(
   exitSpeedKmh: number,
   interceptDistance: number,
   lateralDistance: number,
-  fielderX: number,
-  fielderY: number
+  interceptX: number,
+  interceptY: number,
+  aerialDistance: number,
+  timeOfFlight: number
 ): number {
-  const ballTravelTime = getBallTravelTime(exitSpeedKmh, interceptDistance)
+  // Ball travel time = air time + rolling time
+  // If intercept is before landing, use trajectory time (not applicable for ground fielding)
+  // If intercept is after landing, add rolling time
+  let ballTravelTime: number
+  if (interceptDistance <= aerialDistance) {
+    // Ball still in air at intercept point - use trajectory time proportionally
+    ballTravelTime = timeOfFlight * (interceptDistance / aerialDistance)
+  } else {
+    // Ball has landed, need to roll to intercept
+    const rollingDistance = interceptDistance - aerialDistance
+    const rollingSpeed = getGroundBallSpeed(exitSpeedKmh, rollingDistance)
+    const rollingTime = rollingDistance / rollingSpeed
+    ballTravelTime = timeOfFlight + rollingTime
+  }
 
   // Fielder can move toward intercept point during ball flight
   const availableMovementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
@@ -681,7 +696,8 @@ function calculateFieldingTime(
   const effectiveLateral = Math.max(0, lateralDistance - distanceCovered)
 
   const collectionTime = getCollectionTime(effectiveLateral)
-  const throwDistance = getThrowDistance(fielderX, fielderY)
+  // Throw from where the ball is collected, not fielder's starting position
+  const throwDistance = getThrowDistance(interceptX, interceptY)
   const throwTime = throwDistance / THROW_SPEED
 
   return ballTravelTime + collectionTime + throwTime
@@ -964,8 +980,10 @@ export function simulateDelivery(
       exitSpeed,
       chance.interceptDistance,
       chance.lateralDistance,
-      chance.fielderX,
-      chance.fielderY
+      chance.interceptX,
+      chance.interceptY,
+      trajectory.aerial_distance,
+      trajectory.time_of_flight
     )
 
     if (outcome === 'stopped') {
