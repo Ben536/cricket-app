@@ -333,8 +333,28 @@ function App() {
       }
       setSimResult(fullResult)
 
-      // Debug: log the result to verify fielding is working
-      console.log('Shot result:', result.outcome, 'fielder:', result.fielder_involved, 'fielding_pos:', result.fielding_position)
+      // Debug: comprehensive shot analysis
+      console.log('SHOT DEBUG:', JSON.stringify({
+        input: { speed, angle, elevation },
+        trajectory: {
+          aerial_distance: trajectory.aerial_distance,
+          rolling_distance: trajectory.rolling_distance,
+          total_distance: trajectory.projected_distance,
+          flight_time: trajectory.time_of_flight,
+          max_height: trajectory.max_height,
+          landing: { x: trajectory.landing_x, y: trajectory.landing_y },
+          final: { x: trajectory.final_x, y: trajectory.final_y },
+        },
+        fielding: {
+          outcome: result.outcome,
+          runs: result.runs,
+          fielder: result.fielder_involved,
+          fielder_start: result.fielder_position,
+          intercept_pos: result.fielding_position,
+          is_boundary: result.is_boundary,
+        },
+        description: result.description,
+      }, null, 2))
 
       // Add to wagon wheel - use end_position (where ball ended up)
       const endPos = result.end_position
