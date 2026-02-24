@@ -24,6 +24,8 @@ export interface SimulationResult {
   description: string
   trajectory?: TrajectoryData
   catch_analysis?: CatchAnalysis  // Detailed catch difficulty breakdown
+  fielding_time?: number          // Total time from bat to stumps (seconds)
+  collection_difficulty?: number  // 0-1, how rushed was the fielder
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -608,9 +610,16 @@ function rollGroundFieldingOutcome(difficulty: Difficulty, collectionDifficulty:
   const probs = settings.ground_fielding
 
   // Collection difficulty is based on how rushed the fielder was:
-  // 0 = easy (arrived early, set for the ball)
+  // 0 = routine (arrived very early, walking to the ball)
+  // 0.3 = easy (arrived early, set for the ball)
   // 0.5 = moderate (had to hustle)
   // 1.0 = hard (barely made it, diving/stretching)
+
+  // Super easy - fielder arrived with plenty of time, routine collection
+  if (collectionDifficulty < 0.15) {
+    return 'stopped'  // 100% clean stop for routine collections
+  }
+
   let stoppedProb = probs.stopped
   let misfieldNoExtraProb = probs.misfield_no_extra
 
@@ -625,7 +634,7 @@ function rollGroundFieldingOutcome(difficulty: Difficulty, collectionDifficulty:
     stoppedProb = probs.stopped * 0.88
     misfieldNoExtraProb = probs.misfield_no_extra + 0.05
   }
-  // else: easy collection (arrived early) - use base probabilities (85% stopped on medium)
+  // else (0.15-0.3): easy collection - use base probabilities (85% stopped on medium)
 
   const roll = Math.random()
   if (roll < stoppedProb) return 'stopped'
@@ -1156,6 +1165,8 @@ export function simulateDelivery(
           fielding_position: { x: chance.interceptX, y: chance.interceptY },
           end_position: { x: chance.interceptX, y: chance.interceptY },
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} fielded by ${chance.fielder}, no run`,
+          fielding_time: fieldingTime,
+          collection_difficulty: chance.collectionDifficulty,
         }
       }
       return {
@@ -1168,6 +1179,8 @@ export function simulateDelivery(
         fielding_position: { x: chance.interceptX, y: chance.interceptY },
         end_position: { x: chance.interceptX, y: chance.interceptY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, ${runs} run${runs > 1 ? 's' : ''}`,
+        fielding_time: fieldingTime,
+        collection_difficulty: chance.collectionDifficulty,
       }
     } else if (outcome === 'misfield_no_extra') {
       // Fumbled but recovered - slight delay, ball stays near fielder
@@ -1182,6 +1195,8 @@ export function simulateDelivery(
         fielding_position: { x: chance.interceptX, y: chance.interceptY },
         end_position: { x: chance.interceptX, y: chance.interceptY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
+        fielding_time: fieldingTime + 1.0,
+        collection_difficulty: chance.collectionDifficulty,
       }
     } else {
       // Ball gets past fielder - they must chase and throw from further back
@@ -1196,6 +1211,8 @@ export function simulateDelivery(
         fielding_position: { x: chance.interceptX, y: chance.interceptY },
         end_position: { x: landingX, y: landingY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
+        fielding_time: fieldingTime + 2.0,  // Extra time for ball getting past
+        collection_difficulty: chance.collectionDifficulty,
       }
     }
   }

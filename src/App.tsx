@@ -352,6 +352,8 @@ function App() {
           fielder_start: result.fielder_position,
           intercept_pos: result.fielding_position,
           is_boundary: result.is_boundary,
+          fielding_time: result.fielding_time,
+          collection_difficulty: result.collection_difficulty,
         },
         description: result.description,
       }, null, 2))
