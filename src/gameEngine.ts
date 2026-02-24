@@ -70,6 +70,8 @@ const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
 const COLLECTION_TIME_DIVING = 1.5  // seconds - diving stop, recover, release
 const PICKUP_TIME_STOPPED = 0.4     // seconds - picking up a stationary ball
 const GROUND_FRICTION = 0.08        // deceleration factor per metre - cricket outfield
+const FIELDER_ACCEL_TIME = 1.0      // seconds to reach max speed from standstill
+const MAX_DYNAMIC_REACH = 2.0       // metres - maximum extra reach from running during ball flight
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
@@ -403,7 +405,7 @@ function findCatchableIntercept(
       const lateralDist = Math.sqrt(dx * dx + dy * dy)
 
       const movementTime = Math.max(0, t - FIELDER_REACTION_TIME)
-      const movementPossible = movementTime * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+      const movementPossible = getFielderMovementDistance(movementTime) + FIELDER_DIVE_RANGE
 
       if (lateralDist <= movementPossible) {
         reachablePoints.push({
@@ -497,8 +499,8 @@ function analyzeCatchDifficulty(
   // Time available for fielder to move (after reaction)
   const movementTime = Math.max(0, timeToIntercept - FIELDER_REACTION_TIME)
 
-  // How far fielder can move in available time
-  const movementPossible = movementTime * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+  // How far fielder can move in available time (with acceleration)
+  const movementPossible = getFielderMovementDistance(movementTime) + FIELDER_DIVE_RANGE
 
   // === Calculate difficulty score (0 = easy, 1 = impossible) ===
 
@@ -662,6 +664,35 @@ function getCollectionTime(lateralDistance: number): number {
 }
 
 /**
+ * Calculate distance a fielder can cover with linear acceleration.
+ * Fielder takes FIELDER_ACCEL_TIME seconds to reach max speed.
+ *
+ * During acceleration phase (t <= FIELDER_ACCEL_TIME):
+ *   velocity = (FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME) * t
+ *   distance = 0.5 * (FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME) * t²
+ *
+ * After acceleration (t > FIELDER_ACCEL_TIME):
+ *   distance = accel_distance + FIELDER_RUN_SPEED * (t - FIELDER_ACCEL_TIME)
+ */
+function getFielderMovementDistance(movementTime: number): number {
+  if (movementTime <= 0) return 0
+
+  const accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME  // acceleration in m/s²
+
+  if (movementTime <= FIELDER_ACCEL_TIME) {
+    // Still accelerating: d = 0.5 * a * t²
+    return 0.5 * accel * movementTime * movementTime
+  } else {
+    // Reached max speed
+    // Distance during acceleration phase
+    const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME  // = 0.5 * maxSpeed * accelTime = 3m at defaults
+    // Distance at max speed
+    const maxSpeedTime = movementTime - FIELDER_ACCEL_TIME
+    return accelDist + FIELDER_RUN_SPEED * maxSpeedTime
+  }
+}
+
+/**
  * Calculate distance from fielder to the relevant stumps.
  * Coordinate system: +Y = toward bowler
  * - Batting end stumps at (0, 0)
@@ -705,8 +736,9 @@ function calculateFieldingTime(
   }
 
   // Fielder can move toward intercept point during ball flight
+  // Uses linear acceleration model - takes 1s to reach max speed
   const availableMovementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
-  const distanceCovered = availableMovementTime * FIELDER_RUN_SPEED
+  const distanceCovered = getFielderMovementDistance(availableMovementTime)
 
   // Effective lateral distance after accounting for movement during flight
   const effectiveLateral = Math.max(0, lateralDistance - distanceCovered)
@@ -967,10 +999,12 @@ export function simulateDelivery(
     const fielderDist = distanceFromBatter(fielder.x, fielder.y)
 
     // Calculate dynamic reach based on ball travel time
-    // Fielder can run toward the ball while it's traveling
+    // Fielder can run toward the ball while it's traveling (with acceleration)
+    // Capped at MAX_DYNAMIC_REACH to prevent superhuman coverage
     const ballTravelTime = getBallTravelTime(exitSpeed, interceptDistance)
-    const availableMovement = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME) * FIELDER_RUN_SPEED
-    const maxReach = GROUND_FIELDING_RANGE + availableMovement
+    const movementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
+    const dynamicMovement = Math.min(MAX_DYNAMIC_REACH, getFielderMovementDistance(movementTime))
+    const maxReach = GROUND_FIELDING_RANGE + dynamicMovement
 
     if (lateralDist <= maxReach && fielderDist <= projectedDistance + maxReach) {
       groundChances.push({
@@ -1073,12 +1107,17 @@ export function simulateDelivery(
   }
 
   if (nearestFielder) {
-    // Fielder can move while ball is in flight (after reaction time)
+    // Fielder can move while ball is in flight (with acceleration)
     const ballTravelTime = getBallTravelTime(exitSpeed, projectedDistance)
     const fielderAvailableRunTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
-    const distanceCoveredDuringFlight = fielderAvailableRunTime * FIELDER_RUN_SPEED
+    const distanceCoveredDuringFlight = getFielderMovementDistance(fielderAvailableRunTime)
     const remainingDistance = Math.max(0, nearestFielder.distance - distanceCoveredDuringFlight)
-    const additionalRunTime = remainingDistance / FIELDER_RUN_SPEED
+    // For chase after ball stops, fielder may still be accelerating or at max speed
+    const additionalRunTime = remainingDistance > 0
+      ? (fielderAvailableRunTime >= FIELDER_ACCEL_TIME
+        ? remainingDistance / FIELDER_RUN_SPEED  // Already at max speed
+        : remainingDistance / (FIELDER_RUN_SPEED * 0.7))  // Still building speed, average ~70%
+      : 0
 
     // Ball has landed and stopped - just need to pick it up
     const collectionTime = PICKUP_TIME_STOPPED
