@@ -354,6 +354,8 @@ function App() {
           is_boundary: result.is_boundary,
           fielding_time: result.fielding_time,
           collection_difficulty: result.collection_difficulty,
+          alignment_score: result.alignment_score,
+          priority_score: result.priority_score,
         },
         description: result.description,
       }, null, 2))

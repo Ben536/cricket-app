@@ -26,6 +26,8 @@ export interface SimulationResult {
   catch_analysis?: CatchAnalysis  // Detailed catch difficulty breakdown
   fielding_time?: number          // Total time from bat to stumps (seconds)
   collection_difficulty?: number  // 0-1, how rushed was the fielder
+  alignment_score?: number        // 0-1, how directly ball was going at fielder (0 = direct)
+  priority_score?: number         // Combined weighted score used for fielder selection
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -1112,7 +1114,7 @@ export function simulateDelivery(
   }
 
   // Check 4: Ground fielding
-  // Find earliest intercept point for each fielder (fielders attack the ball)
+  // Find best intercept point for each fielder
   const groundChances: Array<{
     fielder: string
     fielderX: number
@@ -1123,14 +1125,21 @@ export function simulateDelivery(
     interceptX: number  // Where fielder collects the ball
     interceptY: number
     collectionDifficulty: number  // 0 = easy (arrived early), 1 = hard (barely made it)
+    alignmentScore: number  // 0 = ball going directly at fielder, 1 = far from ball path
+    priorityScore: number   // Combined weighted score (lower = higher priority)
   }> = []
+
+  // Calculate ball path direction for alignment scoring
+  const ballPathLength = Math.sqrt(landingX * landingX + landingY * landingY)
+  const ballDirX = ballPathLength > 0 ? landingX / ballPathLength : 0
+  const ballDirY = ballPathLength > 0 ? landingY / ballPathLength : 1
 
   for (const fielder of fieldConfig) {
     if (!isFielderInBallPath(fielder.x, fielder.y, landingX, landingY)) continue
 
     const fielderDist = distanceFromBatter(fielder.x, fielder.y)
 
-    // Find earliest point where this fielder can intercept the ball
+    // Find best point where this fielder can intercept the ball
     const intercept = findBestGroundIntercept(
       fielder.x,
       fielder.y,
@@ -1143,6 +1152,23 @@ export function simulateDelivery(
     )
 
     if (intercept) {
+      // Calculate alignment: perpendicular distance from fielder to ball path
+      // Cross product gives signed distance, we use absolute value
+      const crossProduct = fielder.x * ballDirY - fielder.y * ballDirX
+      const perpendicularDist = Math.abs(crossProduct)
+      // Normalize to 0-1 range (0 = directly on path, 1 = 30m+ away from path)
+      const alignmentScore = Math.min(1, perpendicularDist / 30)
+
+      // Weighted priority score:
+      // - 0.5: alignment (is ball going toward them?)
+      // - 0.25: collection difficulty (how easy is the stop?)
+      // - 0.25: normalized intercept distance (closer intercept = can return faster)
+      const normalizedIntercept = Math.min(1, intercept.interceptDistance / projectedDistance)
+      const priorityScore =
+        0.5 * alignmentScore +
+        0.25 * intercept.collectionDifficulty +
+        0.25 * normalizedIntercept
+
       groundChances.push({
         fielder: fielder.name,
         fielderX: fielder.x,
@@ -1153,13 +1179,15 @@ export function simulateDelivery(
         interceptX: intercept.interceptX,
         interceptY: intercept.interceptY,
         collectionDifficulty: intercept.collectionDifficulty,
+        alignmentScore,
+        priorityScore,
       })
     }
   }
 
-  // Sort by collection difficulty - fielder who can most easily collect the ball gets priority
-  // This prevents a distant fielder sprinting across when another is right next to the path
-  groundChances.sort((a, b) => a.collectionDifficulty - b.collectionDifficulty)
+  // Sort by priority score - weighted combination of alignment, difficulty, and speed
+  // Lower score = higher priority (ball going at them + easy collection + quick return)
+  groundChances.sort((a, b) => a.priorityScore - b.priorityScore)
 
   for (const chance of groundChances) {
     const outcome = rollGroundFieldingOutcome(difficulty, chance.collectionDifficulty)
@@ -1192,6 +1220,8 @@ export function simulateDelivery(
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} fielded by ${chance.fielder}, no run`,
           fielding_time: fieldingTime,
           collection_difficulty: chance.collectionDifficulty,
+          alignment_score: chance.alignmentScore,
+          priority_score: chance.priorityScore,
         }
       }
       return {
@@ -1206,6 +1236,8 @@ export function simulateDelivery(
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, ${runs} run${runs > 1 ? 's' : ''}`,
         fielding_time: fieldingTime,
         collection_difficulty: chance.collectionDifficulty,
+        alignment_score: chance.alignmentScore,
+        priority_score: chance.priorityScore,
       }
     } else if (outcome === 'misfield_no_extra') {
       // Fumbled but recovered - slight delay, ball stays near fielder
@@ -1222,6 +1254,8 @@ export function simulateDelivery(
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
         fielding_time: fieldingTime + 1.0,
         collection_difficulty: chance.collectionDifficulty,
+        alignment_score: chance.alignmentScore,
+        priority_score: chance.priorityScore,
       }
     } else {
       // Ball gets past fielder - they must chase and throw from further back
@@ -1238,6 +1272,8 @@ export function simulateDelivery(
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
         fielding_time: fieldingTime + 2.0,  // Extra time for ball getting past
         collection_difficulty: chance.collectionDifficulty,
+        alignment_score: chance.alignmentScore,
+        priority_score: chance.priorityScore,
       }
     }
   }
