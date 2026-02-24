@@ -161,18 +161,18 @@ function App() {
   const [simAngle, setSimAngle] = useState('30')
   const [simElevation, setSimElevation] = useState('10')
   const [simSpeed, setSimSpeed] = useState('80')
-  const [simResult, setSimResult] = useState<{
-    outcome: string
-    runs: number
-    description: string
-    fielder_involved: string | null
-    is_boundary: boolean
-    trajectory: { landing_x: number; landing_y: number; projected_distance: number }
-  } | null>(null)
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null)
   const [simError, setSimError] = useState<string | null>(null)
 
   // Track fielder catch position (fielder ID -> screen position where they caught it)
   const [catchDisplayPosition, setCatchDisplayPosition] = useState<{
+    fielderId: string
+    screenX: number
+    screenY: number
+  } | null>(null)
+
+  // Track fielder ground fielding position (fielder ID -> screen position where they fielded it)
+  const [fieldingDisplayPosition, setFieldingDisplayPosition] = useState<{
     fielderId: string
     screenX: number
     screenY: number
@@ -269,8 +269,9 @@ function App() {
   // Simulate a shot using the TypeScript game engine
   const simulateShot = () => {
     setSimError(null)
-    // Reset any previous catch display position
+    // Reset any previous catch/fielding display positions
     setCatchDisplayPosition(null)
+    setFieldingDisplayPosition(null)
 
     try {
       const speed = parseFloat(simSpeed)
@@ -297,12 +298,14 @@ function App() {
       })
 
       // Run simulation
+      // Use final_x/final_y (where ball stops after rolling) instead of landing point
+      // This ensures the ball path direction matches the total distance
       const result = simulateDelivery(
         speed,
         angle,
         elevation,
-        trajectory.landing_x,
-        trajectory.landing_y,
+        trajectory.final_x,
+        trajectory.final_y,
         trajectory.projected_distance,
         trajectory.max_height,
         fieldConfig,
@@ -342,6 +345,21 @@ function App() {
             fielderId: catchingFielderId,
             screenX: screen.x,
             screenY: screen.y,
+          })
+        }
+      }
+
+      // If ground fielding occurred, show fielder at fielding position
+      if (result.fielding_position && result.fielder_involved && result.outcome !== 'caught') {
+        const fieldingFielderId = Object.entries(fielderIdToZone)
+          .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
+
+        if (fieldingFielderId) {
+          const fieldingScreen = fieldToScreen(result.fielding_position.x, result.fielding_position.y)
+          setFieldingDisplayPosition({
+            fielderId: fieldingFielderId,
+            screenX: fieldingScreen.x,
+            screenY: fieldingScreen.y,
           })
         }
       }
@@ -801,6 +819,7 @@ function App() {
                 batterHand={batterHand}
                 wagonWheelShots={wagonWheelShots}
                 catchDisplayPosition={catchDisplayPosition}
+                fieldingDisplayPosition={fieldingDisplayPosition}
               />
               <div className="field-controls">
                 <div className="batter-hand-toggle">
@@ -976,9 +995,11 @@ function App() {
                       {simResult.fielder_involved && (
                         <div className="sim-fielder">Fielder: {simResult.fielder_involved}</div>
                       )}
-                      <div className="sim-distance">
-                        Distance: {simResult.trajectory.projected_distance.toFixed(1)}m
-                      </div>
+                      {simResult.trajectory && (
+                        <div className="sim-distance">
+                          Distance: {simResult.trajectory.projected_distance.toFixed(1)}m
+                        </div>
+                      )}
                     </div>
                   )}
                   <button
@@ -1055,12 +1076,14 @@ function FieldView({
   batterHand,
   wagonWheelShots = [],
   catchDisplayPosition,
+  fieldingDisplayPosition,
 }: {
   fielderPositions: FielderPosition[]
   setFielderPositions: React.Dispatch<React.SetStateAction<FielderPosition[]>>
   batterHand: BattingHand
   wagonWheelShots?: ShotLine[]
   catchDisplayPosition: { fielderId: string; screenX: number; screenY: number } | null
+  fieldingDisplayPosition: { fielderId: string; screenX: number; screenY: number } | null
 }) {
   const fieldRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -1190,17 +1213,27 @@ function FieldView({
       {fieldersWithZones.map(fielder => {
         // Check if this fielder just took a catch - show them at catch position
         const isCatching = catchDisplayPosition?.fielderId === fielder.id
-        const displayX = isCatching ? catchDisplayPosition.screenX : fielder.x
-        const displayY = isCatching ? catchDisplayPosition.screenY : fielder.y
+        // Check if this fielder just fielded the ball on the ground
+        const isFielding = fieldingDisplayPosition?.fielderId === fielder.id
+
+        let displayX = fielder.x
+        let displayY = fielder.y
+        if (isCatching) {
+          displayX = catchDisplayPosition.screenX
+          displayY = catchDisplayPosition.screenY
+        } else if (isFielding) {
+          displayX = fieldingDisplayPosition.screenX
+          displayY = fieldingDisplayPosition.screenY
+        }
 
         return (
           <div
             key={fielder.id}
-            className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''} ${isCatching ? 'catching' : ''}`}
+            className={`fielder ${fielder.isKeeper ? 'keeper' : ''} ${dragging === fielder.id ? 'dragging' : ''} ${isCatching ? 'catching' : ''} ${isFielding ? 'fielding' : ''}`}
             style={{
               left: `${displayX}%`,
               top: `${displayY}%`,
-              transition: isCatching ? 'left 0.3s ease-out, top 0.3s ease-out' : undefined,
+              transition: (isCatching || isFielding) ? 'left 0.3s ease-out, top 0.3s ease-out' : undefined,
             }}
             onMouseDown={(e) => handleMouseDown(e, fielder.id)}
             onTouchStart={(e) => handleTouchStart(e, fielder.id)}

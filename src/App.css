@@ -1269,6 +1269,13 @@
   z-index: 99;
 }
 
+.fielder.fielding {
+  background: #ff5722;  /* Orange - very distinct from white/gold */
+  box-shadow: 0 0 20px #ff5722, 0 0 40px rgba(255, 87, 34, 0.6);
+  transform: translate(-50%, -50%) scale(1.3);
+  z-index: 99;
+}
+
 .cricket-field {
   touch-action: none;
   -webkit-user-select: none;

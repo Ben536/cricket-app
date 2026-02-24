@@ -18,10 +18,11 @@ export interface SimulationResult {
   is_boundary: boolean
   is_aerial: boolean
   fielder_involved: string | null
-  fielder_position?: { x: number; y: number }  // Field coordinates of involved fielder
-  end_position: { x: number; y: number }        // Where ball ended up (fielder, boundary, or landing)
+  fielder_position?: { x: number; y: number }    // Field coordinates of involved fielder (start)
+  fielding_position?: { x: number; y: number }   // Where fielder collects the ball (for animation)
+  end_position: { x: number; y: number }         // Where ball ended up (fielder, boundary, or landing)
   description: string
-  trajectory: TrajectoryData
+  trajectory?: TrajectoryData
   catch_analysis?: CatchAnalysis  // Detailed catch difficulty breakdown
 }
 
@@ -46,29 +47,29 @@ const DIFFICULTY_SETTINGS = {
   },
 }
 
-// Thresholds
-const CATCH_HEIGHT_MIN = 0.3
-const CATCH_HEIGHT_MAX = 3.5
-const GROUND_FIELDING_RANGE = 4.0
+// Thresholds - matched to Python engine
+const CATCH_HEIGHT_MIN = 0.2        // metres - below this is half-volley/scoop
+const CATCH_HEIGHT_MAX = 4.0        // metres - above this is uncatchable (jumping catch limit)
+const GROUND_FIELDING_RANGE = 3.0   // metres - lateral reach for ground balls (static)
 const INNER_RING_RADIUS = 15.0
 const MID_FIELD_RADIUS = 30.0
 
-// Fielder movement constants
-const FIELDER_REACTION_TIME = 0.25  // seconds to react and start moving
-const FIELDER_RUN_SPEED = 6.5       // m/s - professional fielder sprint speed
-const FIELDER_DIVE_RANGE = 2.0      // metres - diving catch extension
-const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving
+// Fielder movement constants - matched to Python engine
+const FIELDER_REACTION_TIME = 0.20  // seconds - elite fielders react in 0.15-0.25s
+const FIELDER_RUN_SPEED = 7.0       // m/s - 25 km/h, professional fielder sprint
+const FIELDER_DIVE_RANGE = 2.5      // metres - full-length diving catch
+const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach + step)
 
-// Ground fielding time constants
+// Ground fielding time constants - matched to Python engine
 const PITCH_LENGTH = 20.12          // metres between stumps (22 yards)
-const TIME_FOR_FIRST_RUN = 4.0      // seconds - includes reaction, call, start from stationary
-const TIME_FOR_EXTRA_RUN = 3.0      // seconds - already moving, just turn and run
-const THROW_SPEED = 28.0            // m/s - average professional throw speed
-const COLLECTION_TIME_DIRECT = 0.7  // seconds - ball straight to fielder, clean pickup
-const COLLECTION_TIME_MOVING = 1.2  // seconds - fielder moves to collect while ball moving
-const COLLECTION_TIME_DIVING = 1.8  // seconds - diving stop, recover, throw
-const PICKUP_TIME_STOPPED = 0.5     // seconds - picking up a stationary ball
-const GROUND_FRICTION = 0.08        // deceleration factor per metre (ball slows on grass)
+const TIME_FOR_FIRST_RUN = 3.5      // seconds - quick single takes 2.5-3s + reaction/call
+const TIME_FOR_EXTRA_RUN = 2.5      // seconds - already running, turn and sprint
+const THROW_SPEED = 30.0            // m/s - 108 km/h, professional throw speed
+const COLLECTION_TIME_DIRECT = 0.5  // seconds - ball straight to fielder, clean take
+const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
+const COLLECTION_TIME_DIVING = 1.5  // seconds - diving stop, recover, release
+const PICKUP_TIME_STOPPED = 0.4     // seconds - picking up a stationary ball
+const GROUND_FRICTION = 0.08        // deceleration factor per metre - cricket outfield
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
@@ -77,15 +78,50 @@ const WEIGHT_HEIGHT = 0.20          // Awkwardness of catch height
 const WEIGHT_SPEED = 0.20           // Ball speed at fielder
 
 export interface TrajectoryData {
-  projected_distance: number
+  projected_distance: number  // Total distance including air + rolling
+  aerial_distance: number     // Distance traveled through air only
+  rolling_distance: number    // Distance ball rolls after landing
   max_height: number
-  landing_x: number
+  landing_x: number           // Where ball lands (after air travel)
   landing_y: number
+  final_x: number             // Where ball stops (after rolling)
+  final_y: number
   time_of_flight: number
-  horizontal_speed: number  // m/s along ground
-  vertical_speed: number    // m/s initial vertical component
-  direction_x: number       // unit vector x component
-  direction_y: number       // unit vector y component
+  horizontal_speed: number    // m/s along ground
+  vertical_speed: number      // m/s initial vertical component
+  direction_x: number         // unit vector x component
+  direction_y: number         // unit vector y component
+}
+
+/**
+ * Calculate how far the ball rolls after landing.
+ * Uses exponential decay model: v = v0 * e^(-k*d)
+ * Ball effectively stops when speed drops below threshold.
+ *
+ * Factors:
+ * - Landing speed (horizontal component)
+ * - Impact angle (steeper = more energy lost on bounce)
+ * - Ground friction coefficient
+ */
+function calculateRollingDistance(
+  horizontalSpeedMs: number,
+  verticalAngle: number
+): number {
+  // Energy retention on landing depends on impact angle
+  // Low flat shots retain more speed, high lofted shots bounce and slow more
+  // At 0 degrees: 85% retention, at 45 degrees: 40% retention, at 90 degrees: 5%
+  const impactRetention = 0.85 - 0.8 * Math.sin((verticalAngle * Math.PI) / 180)
+  const landingSpeed = horizontalSpeedMs * impactRetention
+
+  // Ball stops when it slows to ~1.5 m/s (typical stopping threshold)
+  const stopThreshold = 1.5
+  if (landingSpeed <= stopThreshold) return 0
+
+  // Exponential decay: v = v0 * e^(-k*d)
+  // Solving for d when v = threshold: d = ln(v0/threshold) / k
+  const rollingDistance = Math.log(landingSpeed / stopThreshold) / GROUND_FRICTION
+
+  return Math.max(0, rollingDistance)
 }
 
 /**
@@ -119,21 +155,38 @@ export function calculateTrajectory(
     maxHeight = 1.0
   }
 
-  const distance = vHorizontal * tFlight
+  // Aerial distance
+  const aerialDistance = vHorizontal * tFlight
+
+  // Rolling distance after landing
+  const rollingDist = calculateRollingDistance(vHorizontal, vAngle)
+
+  // Total distance = air + rolling
+  const totalDistance = aerialDistance + rollingDist
+
+  // Landing position (where ball hits ground after air travel)
   // +angle = off side, field coords: +x = leg side, +y = toward bowler (down screen)
-  const landingX = -distance * Math.sin(hRad)
-  const landingY = distance * Math.cos(hRad)  // Positive = toward bowler
+  const landingX = -aerialDistance * Math.sin(hRad)
+  const landingY = aerialDistance * Math.cos(hRad)
 
   // Calculate direction unit vector
   const dirMag = Math.sqrt(landingX * landingX + landingY * landingY)
   const dirX = dirMag > 0 ? landingX / dirMag : 0
   const dirY = dirMag > 0 ? landingY / dirMag : -1
 
+  // Final position (where ball stops after rolling)
+  const finalX = -totalDistance * Math.sin(hRad)
+  const finalY = totalDistance * Math.cos(hRad)
+
   return {
-    projected_distance: distance,
+    projected_distance: totalDistance,
+    aerial_distance: aerialDistance,
+    rolling_distance: rollingDist,
     max_height: maxHeight,
     landing_x: landingX,
     landing_y: landingY,
+    final_x: finalX,
+    final_y: finalY,
     time_of_flight: tFlight,
     horizontal_speed: vHorizontal,
     vertical_speed: vVertical,
@@ -607,6 +660,9 @@ function getThrowDistance(fielderX: number, fielderY: number): number {
 
 /**
  * Calculate total fielding time from ball leaving bat to ball reaching stumps.
+ *
+ * Accounts for fielder movement during ball flight - the fielder can
+ * cover ground while the ball is traveling, reducing effective lateral distance.
  */
 function calculateFieldingTime(
   exitSpeedKmh: number,
@@ -616,7 +672,15 @@ function calculateFieldingTime(
   fielderY: number
 ): number {
   const ballTravelTime = getBallTravelTime(exitSpeedKmh, interceptDistance)
-  const collectionTime = getCollectionTime(lateralDistance)
+
+  // Fielder can move toward intercept point during ball flight
+  const availableMovementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
+  const distanceCovered = availableMovementTime * FIELDER_RUN_SPEED
+
+  // Effective lateral distance after accounting for movement during flight
+  const effectiveLateral = Math.max(0, lateralDistance - distanceCovered)
+
+  const collectionTime = getCollectionTime(effectiveLateral)
   const throwDistance = getThrowDistance(fielderX, fielderY)
   const throwTime = throwDistance / THROW_SPEED
 
@@ -851,6 +915,8 @@ export function simulateDelivery(
     lateralDistance: number
     interceptDistance: number
     fielderDistance: number
+    interceptX: number  // Where fielder collects the ball
+    interceptY: number
   }> = []
 
   for (const fielder of fieldConfig) {
@@ -861,19 +927,26 @@ export function simulateDelivery(
     )
     if (t < 0.05) continue
 
-    if (lateralDist <= GROUND_FIELDING_RANGE) {
-      const interceptDistance = distanceFromBatter(closestX, closestY)
-      const fielderDist = distanceFromBatter(fielder.x, fielder.y)
-      if (fielderDist <= projectedDistance + GROUND_FIELDING_RANGE) {
-        groundChances.push({
-          fielder: fielder.name,
-          fielderX: fielder.x,
-          fielderY: fielder.y,
-          lateralDistance: lateralDist,
-          interceptDistance,
-          fielderDistance: fielderDist,
-        })
-      }
+    const interceptDistance = distanceFromBatter(closestX, closestY)
+    const fielderDist = distanceFromBatter(fielder.x, fielder.y)
+
+    // Calculate dynamic reach based on ball travel time
+    // Fielder can run toward the ball while it's traveling
+    const ballTravelTime = getBallTravelTime(exitSpeed, interceptDistance)
+    const availableMovement = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME) * FIELDER_RUN_SPEED
+    const maxReach = GROUND_FIELDING_RANGE + availableMovement
+
+    if (lateralDist <= maxReach && fielderDist <= projectedDistance + maxReach) {
+      groundChances.push({
+        fielder: fielder.name,
+        fielderX: fielder.x,
+        fielderY: fielder.y,
+        lateralDistance: lateralDist,
+        interceptDistance,
+        fielderDistance: fielderDist,
+        interceptX: closestX,
+        interceptY: closestY,
+      })
     }
   }
 
@@ -903,7 +976,8 @@ export function simulateDelivery(
           is_aerial: isAerial,
           fielder_involved: chance.fielder,
           fielder_position: { x: chance.fielderX, y: chance.fielderY },
-          end_position: { x: chance.fielderX, y: chance.fielderY },
+          fielding_position: { x: chance.interceptX, y: chance.interceptY },
+          end_position: { x: chance.interceptX, y: chance.interceptY },
           description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)} fielded by ${chance.fielder}, no run`,
         }
       }
@@ -914,12 +988,13 @@ export function simulateDelivery(
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
-        end_position: { x: chance.fielderX, y: chance.fielderY },
+        fielding_position: { x: chance.interceptX, y: chance.interceptY },
+        end_position: { x: chance.interceptX, y: chance.interceptY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${chance.fielder} fields, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     } else if (outcome === 'misfield_no_extra') {
       // Fumbled but recovered - slight delay, ball stays near fielder
-      const runs = Math.max(1, calculateRunsFromFieldingTime(fieldingTime + 0.8, false))
+      const runs = Math.max(1, calculateRunsFromFieldingTime(fieldingTime + 1.0, false))
       return {
         outcome: 'misfield',
         runs,
@@ -927,7 +1002,8 @@ export function simulateDelivery(
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
-        end_position: { x: chance.fielderX, y: chance.fielderY },
+        fielding_position: { x: chance.interceptX, y: chance.interceptY },
+        end_position: { x: chance.interceptX, y: chance.interceptY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
       }
     } else {
@@ -940,6 +1016,7 @@ export function simulateDelivery(
         is_aerial: isAerial,
         fielder_involved: chance.fielder,
         fielder_position: { x: chance.fielderX, y: chance.fielderY },
+        fielding_position: { x: chance.interceptX, y: chance.interceptY },
         end_position: { x: landingX, y: landingY },
         description: `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, misfield by ${chance.fielder}, ${runs} run${runs > 1 ? 's' : ''}`,
       }
@@ -980,6 +1057,7 @@ export function simulateDelivery(
       is_aerial: isAerial,
       fielder_involved: nearestFielder.name,
       fielder_position: { x: nearestFielder.x, y: nearestFielder.y },
+      fielding_position: { x: landingX, y: landingY },  // Fielder retrieves from landing point
       end_position: { x: landingX, y: landingY },
       description: runs > 0
         ? `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${nearestFielder.name} retrieves, ${runs} run${runs > 1 ? 's' : ''}`
