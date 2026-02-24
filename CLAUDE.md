@@ -34,8 +34,8 @@ git add -A && git commit -m "description" && git push origin master
 ## Key Constants
 
 ```typescript
-TIME_FOR_FIRST_RUN = 3.5    // seconds for first run
-TIME_FOR_EXTRA_RUN = 2.5    // seconds for each additional run
+TIME_FOR_FIRST_RUN = 4.0    // seconds for first run
+TIME_FOR_EXTRA_RUN = 3.0    // seconds for each additional run
 GROUND_FRICTION = 0.08      // exponential decay factor
 THROW_SPEED = 30.0          // m/s (~108 km/h)
 FIELDER_RUN_SPEED = 7.0     // m/s
@@ -48,6 +48,6 @@ Runs are based on total fielding time:
 2. Collection time (0.5-1.5s depending on lateral distance)
 3. Throw time = throw_distance / 30 m/s
 
-If total time < 3.5s → dot ball
-If total time >= 3.5s → 1 run
-Each additional 2.5s → +1 run (max 3 before boundary)
+If total time < 4.0s → dot ball
+If total time >= 4.0s → 1 run
+Each additional 3.0s → +1 run (max 3 before boundary)

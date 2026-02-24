@@ -66,8 +66,8 @@ const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach 
 
 // Ground fielding time constants - matched to Python engine
 const PITCH_LENGTH = 20.12          // metres between stumps (22 yards)
-const TIME_FOR_FIRST_RUN = 3.5      // seconds - quick single takes 2.5-3s + reaction/call
-const TIME_FOR_EXTRA_RUN = 2.5      // seconds - already running, turn and sprint
+const TIME_FOR_FIRST_RUN = 4.0      // seconds - quick single takes 2.5-3s + reaction/call
+const TIME_FOR_EXTRA_RUN = 3.0      // seconds - already running, turn and sprint
 const THROW_SPEED = 30.0            // m/s - 108 km/h, professional throw speed
 const COLLECTION_TIME_DIRECT = 0.5  // seconds - ball straight to fielder, clean take
 const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
