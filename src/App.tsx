@@ -178,6 +178,10 @@ function App() {
     screenY: number
   } | null>(null)
 
+  // Timeout refs to reset fielder positions after animations
+  const catchResetTimeout = useRef<number | null>(null)
+  const fieldingResetTimeout = useRef<number | null>(null)
+
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
   const currentOver = currentSession.overs[currentSession.overs.length - 1]
@@ -269,6 +273,15 @@ function App() {
   // Simulate a shot using the TypeScript game engine
   const simulateShot = () => {
     setSimError(null)
+    // Clear any pending reset timeouts
+    if (catchResetTimeout.current) {
+      clearTimeout(catchResetTimeout.current)
+      catchResetTimeout.current = null
+    }
+    if (fieldingResetTimeout.current) {
+      clearTimeout(fieldingResetTimeout.current)
+      fieldingResetTimeout.current = null
+    }
     // Reset any previous catch/fielding display positions
     setCatchDisplayPosition(null)
     setFieldingDisplayPosition(null)
@@ -349,6 +362,10 @@ function App() {
             screenX: screen.x,
             screenY: screen.y,
           })
+          // Reset fielder position after animation completes
+          catchResetTimeout.current = window.setTimeout(() => {
+            setCatchDisplayPosition(null)
+          }, 1500)
         }
       }
 
@@ -367,6 +384,10 @@ function App() {
             screenX: fieldingScreen.x,
             screenY: fieldingScreen.y,
           })
+          // Reset fielder position after animation completes
+          fieldingResetTimeout.current = window.setTimeout(() => {
+            setFieldingDisplayPosition(null)
+          }, 1500)
         }
       } else {
         console.log('No fielding animation: hasPos=', !!result.fielding_position, 'fielder=', result.fielder_involved, 'outcome=', result.outcome)

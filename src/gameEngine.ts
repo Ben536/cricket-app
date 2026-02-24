@@ -647,14 +647,14 @@ function getCollectionTime(lateralDistance: number): number {
 
 /**
  * Calculate distance from fielder to the relevant stumps.
- * For first run, batsman runs to bowler's end (0, -PITCH_LENGTH).
- * For second run, back to batting end (0, 0).
- * We use the shorter throw distance since fielder chooses which end.
+ * Coordinate system: +Y = toward bowler
+ * - Batting end stumps at (0, 0)
+ * - Bowler's end stumps at (0, +PITCH_LENGTH) = (0, ~20m toward bowler)
+ * Fielder throws to whichever end is closer.
  */
 function getThrowDistance(fielderX: number, fielderY: number): number {
-  // Batting end stumps at (0, 0), bowler's end at (0, -PITCH_LENGTH)
   const distToBattingEnd = Math.sqrt(fielderX * fielderX + fielderY * fielderY)
-  const distToBowlerEnd = Math.sqrt(fielderX * fielderX + (fielderY + PITCH_LENGTH) * (fielderY + PITCH_LENGTH))
+  const distToBowlerEnd = Math.sqrt(fielderX * fielderX + (fielderY - PITCH_LENGTH) * (fielderY - PITCH_LENGTH))
   return Math.min(distToBattingEnd, distToBowlerEnd)
 }
 
