@@ -1108,7 +1108,18 @@ export function simulateDelivery(
 
   if (nearestFielder) {
     // Fielder can move while ball is in flight (with acceleration)
-    const ballTravelTime = getBallTravelTime(exitSpeed, projectedDistance)
+    // Ball travel = aerial time + rolling time (not all rolling!)
+    let ballTravelTime: number
+    if (projectedDistance <= trajectory.aerial_distance) {
+      // Ball caught/stopped before landing (shouldn't happen here, but handle it)
+      ballTravelTime = trajectory.time_of_flight * (projectedDistance / trajectory.aerial_distance)
+    } else {
+      // Ball lands then rolls - calculate rolling time for distance after landing
+      const rollingDistance = projectedDistance - trajectory.aerial_distance
+      const rollingSpeed = getGroundBallSpeed(exitSpeed, rollingDistance)
+      const rollingTime = rollingDistance / rollingSpeed
+      ballTravelTime = trajectory.time_of_flight + rollingTime
+    }
     const fielderAvailableRunTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
     const distanceCoveredDuringFlight = getFielderMovementDistance(fielderAvailableRunTime)
     const remainingDistance = Math.max(0, nearestFielder.distance - distanceCoveredDuringFlight)
