@@ -69,9 +69,8 @@ const COLLECTION_TIME_DIRECT = 0.5  // seconds - ball straight to fielder, clean
 const COLLECTION_TIME_MOVING = 1.0  // seconds - fielder moves to collect
 const COLLECTION_TIME_DIVING = 1.5  // seconds - diving stop, recover, release
 const PICKUP_TIME_STOPPED = 0.4     // seconds - picking up a stationary ball
-const GROUND_FRICTION = 0.08        // deceleration factor per metre - cricket outfield
+const GROUND_FRICTION = 0.05        // deceleration factor per metre - cricket outfield
 const FIELDER_ACCEL_TIME = 1.0      // seconds to reach max speed from standstill
-const MAX_DYNAMIC_REACH = 2.0       // metres - maximum extra reach from running during ball flight
 
 // Difficulty weights for catch scoring
 const WEIGHT_REACTION = 0.25        // How much time pressure matters
@@ -1000,10 +999,9 @@ export function simulateDelivery(
 
     // Calculate dynamic reach based on ball travel time
     // Fielder can run toward the ball while it's traveling (with acceleration)
-    // Capped at MAX_DYNAMIC_REACH to prevent superhuman coverage
     const ballTravelTime = getBallTravelTime(exitSpeed, interceptDistance)
     const movementTime = Math.max(0, ballTravelTime - FIELDER_REACTION_TIME)
-    const dynamicMovement = Math.min(MAX_DYNAMIC_REACH, getFielderMovementDistance(movementTime))
+    const dynamicMovement = getFielderMovementDistance(movementTime)
     const maxReach = GROUND_FIELDING_RANGE + dynamicMovement
 
     if (lateralDist <= maxReach && fielderDist <= projectedDistance + maxReach) {
