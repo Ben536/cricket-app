@@ -603,25 +603,29 @@ function rollCatchOutcome(
   return Math.random() < catchProb ? 'caught' : 'dropped'
 }
 
-function rollGroundFieldingOutcome(difficulty: Difficulty, lateralDistance: number): string {
+function rollGroundFieldingOutcome(difficulty: Difficulty, collectionDifficulty: number): string {
   const settings = DIFFICULTY_SETTINGS[difficulty]
   const probs = settings.ground_fielding
 
-  // Diving stops (lateral > 2m) are much harder to control
-  // Reduce clean stop probability significantly for diving attempts
+  // Collection difficulty is based on how rushed the fielder was:
+  // 0 = easy (arrived early, set for the ball)
+  // 0.5 = moderate (had to hustle)
+  // 1.0 = hard (barely made it, diving/stretching)
   let stoppedProb = probs.stopped
   let misfieldNoExtraProb = probs.misfield_no_extra
 
-  if (lateralDistance > 2.0) {
-    // Diving stop - high chance of misfield
-    // On medium: 85% stopped → 45% stopped, 35% misfield_no_extra, 20% misfield_extra
-    stoppedProb = probs.stopped * 0.5
-    misfieldNoExtraProb = 0.35
-  } else if (lateralDistance > 1.0) {
-    // Stretching/moving stop - moderate penalty
-    stoppedProb = probs.stopped * 0.8
-    misfieldNoExtraProb = probs.misfield_no_extra + 0.1
+  if (collectionDifficulty > 0.7) {
+    // Hard collection - diving/rushing, high misfield chance
+    // On medium: 85% stopped → 50% stopped, 30% misfield_no_extra, 20% misfield_extra
+    stoppedProb = probs.stopped * 0.6
+    misfieldNoExtraProb = 0.30
+  } else if (collectionDifficulty > 0.3) {
+    // Moderate - had to move quickly but under control
+    // On medium: 85% stopped → 75% stopped, 15% misfield_no_extra, 10% misfield_extra
+    stoppedProb = probs.stopped * 0.88
+    misfieldNoExtraProb = probs.misfield_no_extra + 0.05
   }
+  // else: easy collection (arrived early) - use base probabilities (85% stopped on medium)
 
   const roll = Math.random()
   if (roll < stoppedProb) return 'stopped'
@@ -703,7 +707,7 @@ function findEarliestGroundIntercept(
   aerialDistance: number,
   timeOfFlight: number,
   projectedDistance: number
-): { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number } | null {
+): { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number } | null {
   // Direction unit vector of ball path
   const pathLength = Math.sqrt(finalX * finalX + finalY * finalY)
   if (pathLength < 0.1) return null
@@ -713,7 +717,7 @@ function findEarliestGroundIntercept(
   // Sample points along the ball path, starting close to batter
   // Check every 2 metres to find earliest intercept
   const stepSize = 2.0
-  let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number } | null = null
+  let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number } | null = null
 
   for (let dist = 5; dist <= projectedDistance; dist += stepSize) {
     const pointX = dirX * dist
@@ -763,11 +767,26 @@ function findEarliestGroundIntercept(
     // Can fielder reach this point before or when ball arrives?
     if (fielderTime <= ballTime + 0.1) {  // 0.1s grace for diving/stretching
       // This is a valid intercept point
+      // Collection difficulty based on how rushed the fielder is:
+      // - timeRatio < 0.6: easy (arrived early, can set) → difficulty 0
+      // - timeRatio 0.6-0.9: moderate → difficulty 0.3-0.7
+      // - timeRatio > 0.9: hard (barely made it) → difficulty 0.8-1.0
+      const timeRatio = fielderTime / ballTime
+      let collectionDifficulty: number
+      if (timeRatio < 0.6) {
+        collectionDifficulty = 0  // Easy - fielder arrived with plenty of time
+      } else if (timeRatio < 0.9) {
+        collectionDifficulty = (timeRatio - 0.6) / 0.3 * 0.5  // 0 to 0.5
+      } else {
+        collectionDifficulty = 0.5 + (timeRatio - 0.9) / 0.2 * 0.5  // 0.5 to 1.0
+      }
+
       bestIntercept = {
         interceptX: pointX,
         interceptY: pointY,
         interceptDistance: dist,
-        lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5)  // Cap for collection time calc
+        lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5),
+        collectionDifficulty: Math.min(1, collectionDifficulty)
       }
       break  // Found earliest intercept, stop searching
     }
@@ -1070,6 +1089,7 @@ export function simulateDelivery(
     fielderDistance: number
     interceptX: number  // Where fielder collects the ball
     interceptY: number
+    collectionDifficulty: number  // 0 = easy (arrived early), 1 = hard (barely made it)
   }> = []
 
   for (const fielder of fieldConfig) {
@@ -1099,6 +1119,7 @@ export function simulateDelivery(
         fielderDistance: fielderDist,
         interceptX: intercept.interceptX,
         interceptY: intercept.interceptY,
+        collectionDifficulty: intercept.collectionDifficulty,
       })
     }
   }
@@ -1107,7 +1128,7 @@ export function simulateDelivery(
   groundChances.sort((a, b) => a.interceptDistance - b.interceptDistance)
 
   for (const chance of groundChances) {
-    const outcome = rollGroundFieldingOutcome(difficulty, chance.lateralDistance)
+    const outcome = rollGroundFieldingOutcome(difficulty, chance.collectionDifficulty)
 
     // Calculate time-based runs using physics model
     const fieldingTime = calculateFieldingTime(
