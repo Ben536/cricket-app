@@ -31,31 +31,74 @@ git add -A && git commit -m "description" && git push origin master
 - Bowler's end stumps at (0, +20.12) - PITCH_LENGTH meters toward bowler
 - Boundary at 70m radius
 
-## Key Constants
+## Simulation Input Limits
 
-```typescript
-// Timing
-TIME_FOR_FIRST_RUN = 3.5      // seconds for first run
-TIME_FOR_EXTRA_RUN = 2.5      // seconds for each additional run
-FIELDER_REACTION_TIME = 0.25  // seconds before fielder starts moving
-FIELDER_ACCEL_TIME = 0.5      // seconds to reach max speed
+| Parameter | Min | Max | Description |
+|-----------|-----|-----|-------------|
+| `angle` | -180 | 180 | Horizontal angle (0=straight, +off, -leg) |
+| `elevation` | 0 | 90 | Vertical angle (0=ground, 90=straight up) |
+| `speed` | 0 | 200 | Exit speed in km/h |
 
-// Physics
-GROUND_FRICTION = 0.05        // exponential decay factor for rolling
-THROW_SPEED = 30.0            // m/s (~108 km/h)
-FIELDER_RUN_SPEED = 6.0       // m/s (~21.6 km/h)
+## All Configurable Parameters
 
-// Fielding ranges
-GROUND_FIELDING_RANGE = 3.0   // metres static reach for ground balls
-FIELDER_STATIC_RANGE = 1.5    // metres catch without moving
-FIELDER_DIVE_RANGE = 1.0      // metres diving catch/stop reach
+### Catching
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `CATCH_HEIGHT_MIN` | 0.2m | Below this = half-volley, uncatchable |
+| `CATCH_HEIGHT_MAX` | 4.0m | Above this = uncatchable (jumping limit) |
+| `FIELDER_STATIC_RANGE` | 1.5m | Catch without moving feet |
+| `FIELDER_DIVE_RANGE` | 1.0m | Extra reach when diving |
 
-// Collection times
-COLLECTION_TIME_DIRECT = 0.5  // ball straight to fielder
-COLLECTION_TIME_MOVING = 1.0  // fielder moves to collect
-COLLECTION_TIME_DIVING = 1.5  // diving stop, recover, release
-PICKUP_TIME_STOPPED = 0.4     // picking up stationary ball
+### Fielder Movement
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `FIELDER_REACTION_TIME` | 0.25s | Delay before fielder starts moving |
+| `FIELDER_RUN_SPEED` | 6.0 m/s | Max sprint speed (21.6 km/h) |
+| `FIELDER_ACCEL_TIME` | 0.5s | Time to reach max speed |
+
+### Ground Fielding
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `GROUND_FIELDING_RANGE` | 3.0m | Static reach for ground balls |
+| `COLLECTION_TIME_DIRECT` | 0.5s | Ball straight to fielder |
+| `COLLECTION_TIME_MOVING` | 1.0s | Fielder moves to collect |
+| `COLLECTION_TIME_DIVING` | 1.5s | Diving stop + recover |
+| `PICKUP_TIME_STOPPED` | 0.4s | Picking up stationary ball |
+
+### Run Calculation
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `TIME_FOR_FIRST_RUN` | 3.5s | Time threshold for 1 run |
+| `TIME_FOR_EXTRA_RUN` | 2.5s | Additional time per run |
+| `THROW_SPEED` | 30.0 m/s | Throw speed (108 km/h) |
+| `PITCH_LENGTH` | 20.12m | Distance between stumps |
+
+### Ball Physics
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `GROUND_FRICTION` | 0.05 | Rolling deceleration factor |
+
+### Catch Difficulty Weights (must sum to 1.0)
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `WEIGHT_REACTION` | 0.25 | Time pressure importance |
+| `WEIGHT_MOVEMENT` | 0.35 | Running distance importance |
+| `WEIGHT_HEIGHT` | 0.20 | Awkward height penalty |
+| `WEIGHT_SPEED` | 0.20 | Ball speed importance |
+
+### Difficulty Setting Probabilities
 ```
+easy:   catch 70%/30%, ground stop 70%
+medium: catch 90%/55%, ground stop 85%
+hard:   catch 98%/75%, ground stop 95%
+```
+
+### Field Geometry
+| Parameter | Current | Description |
+|-----------|---------|-------------|
+| `INNER_RING_RADIUS` | 15.0m | Inner fielding circle |
+| `MID_FIELD_RADIUS` | 30.0m | Mid-field boundary |
+| `boundaryDistance` | 70.0m | Boundary (passed to simulation) |
 
 ---
 

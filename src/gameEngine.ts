@@ -140,9 +140,14 @@ export function calculateTrajectory(
   hAngle: number,
   vAngle: number
 ): TrajectoryData {
-  const speedMs = speedKmh / 3.6
-  const hRad = (hAngle * Math.PI) / 180
-  const vRad = (vAngle * Math.PI) / 180
+  // Clamp inputs to valid ranges
+  const clampedSpeed = Math.max(0, Math.min(200, speedKmh))
+  const clampedHAngle = Math.max(-180, Math.min(180, hAngle))
+  const clampedVAngle = Math.max(0, Math.min(90, vAngle))
+
+  const speedMs = clampedSpeed / 3.6
+  const hRad = (clampedHAngle * Math.PI) / 180
+  const vRad = (clampedVAngle * Math.PI) / 180
 
   const vHorizontal = speedMs * Math.cos(vRad)
   const vVertical = speedMs * Math.sin(vRad)
