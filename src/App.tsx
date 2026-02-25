@@ -287,9 +287,16 @@ function App() {
     setFieldingDisplayPosition(null)
 
     try {
-      const speed = parseFloat(simSpeed)
-      const angle = parseFloat(simAngle)
-      const elevation = parseFloat(simElevation)
+      // Parse inputs, default to 0 if empty/invalid
+      const speed = parseFloat(simSpeed) || 0
+      const angle = parseFloat(simAngle) || 0
+      const elevation = parseFloat(simElevation) || 0
+
+      // Validate - need at least some speed to simulate
+      if (speed <= 0) {
+        setSimError('Speed must be greater than 0')
+        return
+      }
 
       // Calculate trajectory
       const trajectory = calculateTrajectory(speed, angle, elevation)
