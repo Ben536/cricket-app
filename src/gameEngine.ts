@@ -382,7 +382,9 @@ export interface CatchAnalysis {
   movementPossible: number    // metres fielder can move given time
   ballSpeedAtFielder: number  // km/h
   heightAtIntercept: number   // metres
-  timeToIntercept: number     // seconds until ball reaches fielder
+  timeToIntercept: number     // seconds until ball reaches intercept point
+  fielderArrivalTime: number  // seconds for fielder to reach intercept point
+  arrivedBeforeLanding: boolean // did fielder get there before ball landed?
 }
 
 /**
@@ -503,6 +505,7 @@ function analyzeCatchDifficulty(
   if (intercept.time === Infinity) {
     const origTime = getTimeAtDistance(trajectory, interceptDistance)
     const origPos = getBallPositionAtTime(trajectory, origTime)
+    const fielderArrivalTime = getFielderTravelTime(lateralDistance)
     return {
       canCatch: false,
       difficulty: 1,
@@ -513,6 +516,8 @@ function analyzeCatchDifficulty(
       ballSpeedAtFielder: trajectory.horizontal_speed * 3.6,
       heightAtIntercept: origPos.z,
       timeToIntercept: origTime,
+      fielderArrivalTime,
+      arrivedBeforeLanding: fielderArrivalTime <= trajectory.time_of_flight,
     }
   }
 
@@ -584,6 +589,13 @@ function analyzeCatchDifficulty(
     catchType = 'spectacular'
   }
 
+  // Calculate fielder arrival time
+  const runDistance = Math.max(0, lateralDistActual - FIELDER_STATIC_RANGE)
+  const fielderArrivalTime = getFielderTravelTime(runDistance)
+
+  // Did fielder arrive before ball landed?
+  const arrivedBeforeLanding = fielderArrivalTime <= trajectory.time_of_flight
+
   return {
     canCatch: true,
     difficulty,
@@ -594,6 +606,8 @@ function analyzeCatchDifficulty(
     ballSpeedAtFielder: ballSpeedKmh,
     heightAtIntercept,
     timeToIntercept,
+    fielderArrivalTime,
+    arrivedBeforeLanding,
   }
 }
 
@@ -713,6 +727,31 @@ function getFielderMovementDistance(movementTime: number): number {
     const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
     const maxSpeedTime = movementTime - FIELDER_ACCEL_TIME
     return accelDist + FIELDER_RUN_SPEED * maxSpeedTime
+  }
+}
+
+/**
+ * Calculate time for fielder to cover a distance (inverse of getFielderMovementDistance).
+ * Includes reaction time.
+ */
+function getFielderTravelTime(distance: number): number {
+  if (distance <= 0) return FIELDER_REACTION_TIME
+
+  // Instant max speed when no acceleration time
+  if (FIELDER_ACCEL_TIME <= 0) {
+    return FIELDER_REACTION_TIME + distance / FIELDER_RUN_SPEED
+  }
+
+  const accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME
+  const accelDist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
+
+  if (distance <= accelDist) {
+    // Still in acceleration phase: d = 0.5 * a * t², so t = sqrt(2d/a)
+    return FIELDER_REACTION_TIME + Math.sqrt(2 * distance / accel)
+  } else {
+    // Past acceleration: d = accelDist + speed * (t - accelTime)
+    const remainingDist = distance - accelDist
+    return FIELDER_REACTION_TIME + FIELDER_ACCEL_TIME + remainingDist / FIELDER_RUN_SPEED
   }
 }
 

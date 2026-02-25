@@ -357,6 +357,17 @@ function App() {
           alignment_score: result.alignment_score,
           priority_score: result.priority_score,
         },
+        catch_analysis: result.catch_analysis ? {
+          can_catch: result.catch_analysis.canCatch,
+          difficulty: result.catch_analysis.difficulty,
+          catch_type: result.catch_analysis.catchType,
+          ball_arrival_time: result.catch_analysis.timeToIntercept,
+          fielder_arrival_time: result.catch_analysis.fielderArrivalTime,
+          arrived_before_landing: result.catch_analysis.arrivedBeforeLanding,
+          flight_time: trajectory.time_of_flight,
+          movement_required: result.catch_analysis.movementRequired,
+          height_at_intercept: result.catch_analysis.heightAtIntercept,
+        } : null,
         description: result.description,
       }, null, 2))
 
