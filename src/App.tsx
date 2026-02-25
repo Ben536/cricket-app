@@ -1018,30 +1018,51 @@ function App() {
                       <input
                         type="number"
                         value={simAngle}
-                        onChange={(e) => setSimAngle(e.target.value)}
+                        min={-180}
+                        max={180}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9\-]/g, '')
+                          const num = parseInt(val, 10)
+                          if (val === '' || val === '-') setSimAngle(val)
+                          else if (!isNaN(num)) setSimAngle(String(Math.max(-180, Math.min(180, num))))
+                        }}
                         placeholder="0"
                       />
-                      <span className="sim-hint">0=straight, +off, -leg</span>
+                      <span className="sim-hint">-180 to 180</span>
                     </div>
                     <div className="sim-input-group">
                       <label>Elevation (°)</label>
                       <input
                         type="number"
                         value={simElevation}
-                        onChange={(e) => setSimElevation(e.target.value)}
+                        min={0}
+                        max={90}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '')
+                          const num = parseInt(val, 10)
+                          if (val === '') setSimElevation(val)
+                          else if (!isNaN(num)) setSimElevation(String(Math.max(0, Math.min(90, num))))
+                        }}
                         placeholder="10"
                       />
-                      <span className="sim-hint">0=ground, 45=lofted</span>
+                      <span className="sim-hint">0 to 90</span>
                     </div>
                     <div className="sim-input-group">
                       <label>Speed (km/h)</label>
                       <input
                         type="number"
                         value={simSpeed}
-                        onChange={(e) => setSimSpeed(e.target.value)}
+                        min={0}
+                        max={200}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '')
+                          const num = parseInt(val, 10)
+                          if (val === '') setSimSpeed(val)
+                          else if (!isNaN(num)) setSimSpeed(String(Math.max(0, Math.min(200, num))))
+                        }}
                         placeholder="80"
                       />
-                      <span className="sim-hint">25=soft, 110=power</span>
+                      <span className="sim-hint">0 to 200</span>
                     </div>
                   </div>
                   <button
