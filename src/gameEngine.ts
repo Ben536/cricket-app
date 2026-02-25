@@ -63,7 +63,7 @@ const MID_FIELD_RADIUS = 30.0
 // Fielder movement constants - matched to Python engine
 const FIELDER_REACTION_TIME = 0.25  // seconds - reaction time before moving
 const FIELDER_RUN_SPEED = 6.0       // m/s - 21.6 km/h, realistic sprint while watching ball
-const FIELDER_DIVE_RANGE = 0.5      // metres - diving catch/stop reach
+const FIELDER_DIVE_RANGE = 1.0      // metres - diving catch/stop reach
 const FIELDER_STATIC_RANGE = 1.5    // metres - catch without moving (arm reach + step)
 
 // Ground fielding time constants - matched to Python engine

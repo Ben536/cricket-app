@@ -48,7 +48,7 @@ FIELDER_RUN_SPEED = 6.0       // m/s (~21.6 km/h)
 // Fielding ranges
 GROUND_FIELDING_RANGE = 3.0   // metres static reach for ground balls
 FIELDER_STATIC_RANGE = 1.5    // metres catch without moving
-FIELDER_DIVE_RANGE = 0.5      // metres diving catch/stop reach
+FIELDER_DIVE_RANGE = 1.0      // metres diving catch/stop reach
 
 // Collection times
 COLLECTION_TIME_DIRECT = 0.5  // ball straight to fielder
