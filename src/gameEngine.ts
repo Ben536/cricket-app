@@ -28,6 +28,8 @@ export interface SimulationResult {
   collection_difficulty?: number  // 0-1, how rushed was the fielder
   alignment_score?: number        // 0-1, how directly ball was going at fielder (0 = direct)
   priority_score?: number         // Combined weighted score used for fielder selection
+  fielder_arrival_time?: number   // Seconds for fielder to reach intercept point
+  ball_arrival_time?: number      // Seconds for ball to reach intercept point
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -773,7 +775,7 @@ function findBestGroundIntercept(
   aerialDistance: number,
   timeOfFlight: number,
   projectedDistance: number
-): { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number } | null {
+): { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number; fielderTime: number; ballTime: number } | null {
   // Direction unit vector of ball path
   const pathLength = Math.sqrt(finalX * finalX + finalY * finalY)
   if (pathLength < 0.1) return null
@@ -782,7 +784,7 @@ function findBestGroundIntercept(
 
   // Sample ALL points along the ball path and find the one with lowest difficulty
   const stepSize = 2.0
-  let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number } | null = null
+  let bestIntercept: { interceptX: number; interceptY: number; interceptDistance: number; lateralDistance: number; collectionDifficulty: number; fielderTime: number; ballTime: number } | null = null
   let lowestDifficulty = Infinity
 
   for (let dist = 5; dist <= projectedDistance; dist += stepSize) {
@@ -860,7 +862,9 @@ function findBestGroundIntercept(
           interceptY: pointY,
           interceptDistance: dist,
           lateralDistance: Math.min(fielderDist, GROUND_FIELDING_RANGE + 2.5),
-          collectionDifficulty
+          collectionDifficulty,
+          fielderTime,
+          ballTime,
         }
       }
     }
@@ -1156,6 +1160,8 @@ export function simulateDelivery(
     collectionDifficulty: number  // 0 = easy (arrived early), 1 = hard (barely made it)
     alignmentScore: number  // 0 = ball going directly at fielder, 1 = far from ball path
     priorityScore: number   // Combined weighted score (lower = higher priority)
+    fielderTime: number     // Seconds for fielder to reach intercept
+    ballTime: number        // Seconds for ball to reach intercept
   }> = []
 
   // Calculate ball path direction for alignment scoring
@@ -1211,6 +1217,8 @@ export function simulateDelivery(
         collectionDifficulty: intercept.collectionDifficulty,
         alignmentScore,
         priorityScore,
+        fielderTime: intercept.fielderTime,
+        ballTime: intercept.ballTime,
       })
     }
   }
@@ -1252,6 +1260,8 @@ export function simulateDelivery(
           collection_difficulty: chance.collectionDifficulty,
           alignment_score: chance.alignmentScore,
           priority_score: chance.priorityScore,
+          fielder_arrival_time: chance.fielderTime,
+          ball_arrival_time: chance.ballTime,
         }
       }
       return {
@@ -1268,6 +1278,8 @@ export function simulateDelivery(
         collection_difficulty: chance.collectionDifficulty,
         alignment_score: chance.alignmentScore,
         priority_score: chance.priorityScore,
+        fielder_arrival_time: chance.fielderTime,
+        ball_arrival_time: chance.ballTime,
       }
     } else if (outcome === 'misfield_no_extra') {
       // Fumbled but recovered - slight delay, ball stays near fielder
@@ -1286,6 +1298,8 @@ export function simulateDelivery(
         collection_difficulty: chance.collectionDifficulty,
         alignment_score: chance.alignmentScore,
         priority_score: chance.priorityScore,
+        fielder_arrival_time: chance.fielderTime,
+        ball_arrival_time: chance.ballTime,
       }
     } else {
       // Ball gets past fielder
@@ -1306,6 +1320,8 @@ export function simulateDelivery(
           collection_difficulty: chance.collectionDifficulty,
           alignment_score: chance.alignmentScore,
           priority_score: chance.priorityScore,
+          fielder_arrival_time: chance.fielderTime,
+          ball_arrival_time: chance.ballTime,
         }
       }
       // Non-boundary ball - they must chase and throw from further back
@@ -1324,6 +1340,8 @@ export function simulateDelivery(
         collection_difficulty: chance.collectionDifficulty,
         alignment_score: chance.alignmentScore,
         priority_score: chance.priorityScore,
+        fielder_arrival_time: chance.fielderTime,
+        ball_arrival_time: chance.ballTime,
       }
     }
   }

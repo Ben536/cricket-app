@@ -356,6 +356,8 @@ function App() {
           collection_difficulty: result.collection_difficulty,
           alignment_score: result.alignment_score,
           priority_score: result.priority_score,
+          fielder_arrival_time: result.fielder_arrival_time,
+          ball_arrival_time: result.ball_arrival_time,
         },
         catch_analysis: result.catch_analysis ? {
           can_catch: result.catch_analysis.canCatch,
