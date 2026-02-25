@@ -1403,6 +1403,9 @@ export function simulateDelivery(
     const totalTime = ballTravelTime + additionalRunTime + collectionTime + throwTime
     const runs = calculateRunsFromFieldingTime(totalTime, false)
 
+    // Fielder arrival time = time to reach the ball (reaction + run during flight + chase after)
+    const fielderArrivalTime = FIELDER_REACTION_TIME + fielderAvailableRunTime + additionalRunTime
+
     return {
       outcome: runs > 0 ? String(runs) : 'dot',
       runs,
@@ -1415,6 +1418,9 @@ export function simulateDelivery(
       description: runs > 0
         ? `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${nearestFielder.name} retrieves, ${runs} run${runs > 1 ? 's' : ''}`
         : `${shotName.charAt(0).toUpperCase() + shotName.slice(1)}, ${nearestFielder.name} collects, no run`,
+      fielding_time: totalTime,
+      fielder_arrival_time: fielderArrivalTime,
+      ball_arrival_time: ballTravelTime,
     }
   }
 
