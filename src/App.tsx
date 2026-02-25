@@ -1016,12 +1016,11 @@ function App() {
                     <div className="sim-input-group">
                       <label>Angle (°)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={simAngle}
-                        min={-180}
-                        max={180}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9\-]/g, '')
+                          const val = e.target.value.replace(/[^0-9\-]/g, '').replace(/(?!^)-/g, '')
                           const num = parseInt(val, 10)
                           if (val === '' || val === '-') setSimAngle(val)
                           else if (!isNaN(num)) setSimAngle(String(Math.max(-180, Math.min(180, num))))
@@ -1033,10 +1032,9 @@ function App() {
                     <div className="sim-input-group">
                       <label>Elevation (°)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={simElevation}
-                        min={0}
-                        max={90}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '')
                           const num = parseInt(val, 10)
@@ -1050,10 +1048,9 @@ function App() {
                     <div className="sim-input-group">
                       <label>Speed (km/h)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={simSpeed}
-                        min={0}
-                        max={200}
                         onChange={(e) => {
                           const val = e.target.value.replace(/[^0-9]/g, '')
                           const num = parseInt(val, 10)
