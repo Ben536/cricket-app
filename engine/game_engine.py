@@ -580,6 +580,9 @@ def _calculate_trajectory(
 
     speed_ms = speed_kmh / 3.6
 
+    # Normalize angle to -180 to 180 range (handles both 0-360 and -180 to 180 input)
+    horizontal_angle = _normalize_angle(horizontal_angle)
+
     # Precompute trig (expensive on Pi)
     h_rad = math.radians(horizontal_angle)
     v_rad = math.radians(vertical_angle)
@@ -781,9 +784,16 @@ def _is_fielder_in_ball_path(
     if perpendicular_dist > 20:
         return False
 
+    fielder_distance = _distance(fielder.x, fielder.y)
+
+    # For forward shots, exclude distant fielders who are behind the batter
+    # They can't intercept a ball going away from them at speed
+    ball_going_forward = landing_y > 5
+    if ball_going_forward and fielder.y < 0 and fielder_distance > 10:
+        return False
+
     # Dot product: positive = fielder in forward hemisphere
     dot = fielder.x * shot_dir_x + fielder.y * shot_dir_y
-    fielder_distance = _distance(fielder.x, fielder.y)
 
     # Close fielders can catch edges going backward
     if fielder_distance < 10:
@@ -1736,8 +1746,8 @@ def _evaluate_ground_fielding(
                     is_boundary=False,
                     is_aerial=is_aerial,
                     fielder=fielder,
-                    end_x=fielder.x,
-                    end_y=fielder.y,
+                    end_x=intercept_x,
+                    end_y=intercept_y,
                     description=f"{shot_name.capitalize()} fielded by {fielder.name}, no run",
                     fielding_position={'x': intercept_x, 'y': intercept_y},
                     fielding_time=fielding_time,
@@ -1754,8 +1764,8 @@ def _evaluate_ground_fielding(
                 is_boundary=False,
                 is_aerial=is_aerial,
                 fielder=fielder,
-                end_x=fielder.x,
-                end_y=fielder.y,
+                end_x=intercept_x,
+                end_y=intercept_y,
                 description=f"{shot_name.capitalize()}, {fielder.name} fields, {runs} run{'s' if runs > 1 else ''}",
                 fielding_position={'x': intercept_x, 'y': intercept_y},
                 fielding_time=fielding_time,
@@ -1774,8 +1784,8 @@ def _evaluate_ground_fielding(
                 is_boundary=False,
                 is_aerial=is_aerial,
                 fielder=fielder,
-                end_x=fielder.x,
-                end_y=fielder.y,
+                end_x=intercept_x,
+                end_y=intercept_y,
                 description=f"{shot_name.capitalize()}, misfield by {fielder.name}, {runs} run{'s' if runs > 1 else ''}",
                 fielding_position={'x': intercept_x, 'y': intercept_y},
                 fielding_time=fielding_time + FUMBLE_TIME_PENALTY,
@@ -1868,9 +1878,46 @@ def _fallback_nearest_fielder(
             description=f"{shot_name.capitalize()} to the boundary",
         )
 
-    # Find nearest fielder to landing point
-    nearest = min(fielders, key=lambda f: _distance(f.x, f.y, landing_x, landing_y))
-    nearest_dist = _distance(nearest.x, nearest.y, landing_x, landing_y)
+    # Prefer fielders on the correct side AND in the ball's direction
+    # Off side = negative X, Leg side = positive X
+    # Forward = positive Y, Backward = negative Y
+    ball_going_off_side = landing_x < -5
+    ball_going_leg_side = landing_x > 5
+    ball_going_forward = landing_y > 5
+
+    # Filter to fielders who can realistically retrieve
+    same_side_fielders = []
+    for f in fielders:
+        # Side filtering
+        if ball_going_off_side and f.x > 8:
+            continue  # Skip leg-side fielders for off-side shots
+        if ball_going_leg_side and f.x < -8:
+            continue  # Skip off-side fielders for leg-side shots
+        # Forward/backward filtering - exclude fielders behind the play
+        # For forward shots, fielders behind batter can't retrieve unless close
+        if ball_going_forward and f.y < 0:
+            fielder_dist_to_batter = _distance(f.x, f.y)
+            if fielder_dist_to_batter > 10:
+                continue  # Skip distant backward fielders for forward shots
+        same_side_fielders.append(f)
+
+    # Use same-side fielders if available, otherwise use all fielders
+    candidate_fielders = same_side_fielders if same_side_fielders else fielders
+
+    # Calculate final position where ball stops (not just landing position)
+    # The ball rolls from landing position in the same direction
+    landing_dist = _distance(landing_x, landing_y)
+    if landing_dist > 0.1:
+        dir_x = landing_x / landing_dist
+        dir_y = landing_y / landing_dist
+        final_x = dir_x * projected_distance
+        final_y = dir_y * projected_distance
+    else:
+        final_x, final_y = landing_x, landing_y
+
+    # Find nearest fielder to FINAL position (where ball stops) from candidates
+    nearest = min(candidate_fielders, key=lambda f: _distance(f.x, f.y, final_x, final_y))
+    nearest_dist = _distance(nearest.x, nearest.y, final_x, final_y)
 
     # Time calculation with fielder movement during flight
     ball_time = _get_ball_travel_time(exit_speed, projected_distance)
@@ -1880,7 +1927,8 @@ def _fallback_nearest_fielder(
     additional_run = _get_fielder_travel_time(remaining) - FIELDER_REACTION_TIME if remaining > 0 else 0
     fielder_arrival_time = ball_time + additional_run
 
-    throw_dist = _get_throw_distance(landing_x, landing_y)
+    # Throw distance is from final position (where ball stopped)
+    throw_dist = _get_throw_distance(final_x, final_y)
     throw_time = throw_dist / THROW_SPEED
 
     total_time = ball_time + additional_run + PICKUP_TIME_STOPPED + throw_time
@@ -1899,7 +1947,7 @@ def _fallback_nearest_fielder(
         collection_difficulty = 0.5
 
     # Calculate alignment and priority scores
-    alignment_score = _calculate_alignment_score(landing_x, landing_y, landing_x, landing_y)
+    alignment_score = _calculate_alignment_score(final_x, final_y, final_x, final_y)
     priority_score = _calculate_priority_score(collection_difficulty, alignment_score, total_time)
 
     if runs == 0:
@@ -1913,10 +1961,10 @@ def _fallback_nearest_fielder(
         is_boundary=False,
         is_aerial=is_aerial,
         fielder=nearest,
-        end_x=landing_x,
-        end_y=landing_y,
+        end_x=final_x,
+        end_y=final_y,
         description=desc,
-        fielding_position={'x': landing_x, 'y': landing_y},
+        fielding_position={'x': final_x, 'y': final_y},
         fielding_time=total_time,
         collection_difficulty=collection_difficulty,
         alignment_score=alignment_score,
