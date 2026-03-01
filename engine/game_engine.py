@@ -61,6 +61,11 @@ class Trajectory(NamedTuple):
     # Precomputed trig values
     sin_h: float
     cos_h: float
+    # Additional fields - Matched to TypeScript
+    aerial_distance: float  # Distance traveled through air only
+    rolling_distance: float  # Distance ball rolls after landing
+    final_x: float  # Where ball stops (after rolling)
+    final_y: float  # Where ball stops (after rolling)
 
 
 class CatchAnalysis(TypedDict):
@@ -74,6 +79,9 @@ class CatchAnalysis(TypedDict):
     ball_speed_at_fielder: float
     height_at_intercept: float
     time_to_intercept: float
+    # Additional fields - Matched to TypeScript
+    fielder_arrival_time: float  # Seconds for fielder to reach intercept
+    arrived_before_landing: bool  # Did fielder arrive before ball landed
 
 
 class SimulationResult(TypedDict):
@@ -87,6 +95,14 @@ class SimulationResult(TypedDict):
     end_position: dict
     description: str
     catch_analysis: Optional[CatchAnalysis]
+    # Additional fields - Matched to TypeScript
+    fielding_position: Optional[dict]  # Where fielder collects ball {x, y}
+    fielding_time: Optional[float]  # Total time from bat to stumps
+    collection_difficulty: Optional[float]  # 0-1 how rushed was fielder
+    alignment_score: Optional[float]  # 0-1 how direct ball path was
+    priority_score: Optional[float]  # Combined weighted score
+    fielder_arrival_time: Optional[float]  # Seconds for fielder to reach
+    ball_arrival_time: Optional[float]  # Seconds for ball to reach
 
 
 # =============================================================================
@@ -105,18 +121,84 @@ BAT_HEIGHT = 1.0  # metres
 
 CATCH_HEIGHT_MIN = 0.2   # metres - below this is half-volley/scoop
 CATCH_HEIGHT_MAX = 4.0   # metres - above this is uncatchable (jumping catch limit)
-CATCH_OPTIMAL_MIN = 0.8  # metres - waist height
-CATCH_OPTIMAL_MAX = 1.6  # metres - chest height
+CATCH_OPTIMAL_MIN = 1.0  # metres - waist height  # Matched to TypeScript
+CATCH_OPTIMAL_MAX = 1.8  # metres - chest height  # Matched to TypeScript
 
 # =============================================================================
 # Fielder Movement Constants
 # =============================================================================
 
-FIELDER_REACTION_TIME = 0.20  # seconds - elite fielders react in 0.15-0.25s
-FIELDER_RUN_SPEED = 7.0       # m/s - 25 km/h, professional fielder sprint
-FIELDER_DIVE_RANGE = 2.5      # metres - full-length diving catch
+FIELDER_REACTION_TIME = 0.25  # seconds - elite fielders react in 0.15-0.25s  # Matched to TypeScript
+FIELDER_RUN_SPEED = 6.0       # m/s - ~22 km/h, professional fielder sprint  # Matched to TypeScript
+FIELDER_DIVE_RANGE = 1.0      # metres - full-length diving catch  # Matched to TypeScript
+FIELDER_ACCEL_TIME = 0.5      # seconds to reach max speed  # Matched to TypeScript
 FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving (arm reach + step)
 GROUND_FIELDING_RANGE = 3.0   # metres - lateral reach for ground balls
+
+
+# =============================================================================
+# Fielder Movement Helpers (with acceleration model)
+# =============================================================================
+
+def _get_fielder_movement_distance(movement_time: float) -> float:
+    """
+    Calculate distance a fielder can cover in given time.
+    Uses linear acceleration model - fielder takes FIELDER_ACCEL_TIME to reach max speed.
+
+    Args:
+        movement_time: Time available for movement in seconds
+
+    Returns:
+        Distance covered in metres
+    """
+    if movement_time <= 0:
+        return 0.0
+
+    # Instant max speed when no acceleration time
+    if FIELDER_ACCEL_TIME <= 0:
+        return FIELDER_RUN_SPEED * movement_time
+
+    accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME  # acceleration in m/s²
+
+    if movement_time <= FIELDER_ACCEL_TIME:
+        # Still accelerating: d = 0.5 * a * t²
+        return 0.5 * accel * movement_time * movement_time
+    else:
+        # Reached max speed
+        accel_dist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
+        max_speed_time = movement_time - FIELDER_ACCEL_TIME
+        return accel_dist + FIELDER_RUN_SPEED * max_speed_time
+
+
+def _get_fielder_travel_time(distance: float) -> float:
+    """
+    Calculate time for fielder to cover a distance.
+    Inverse of _get_fielder_movement_distance. Includes reaction time.
+
+    Args:
+        distance: Distance to cover in metres
+
+    Returns:
+        Total time including reaction time in seconds
+    """
+    if distance <= 0:
+        return FIELDER_REACTION_TIME
+
+    # Instant max speed when no acceleration time
+    if FIELDER_ACCEL_TIME <= 0:
+        return FIELDER_REACTION_TIME + distance / FIELDER_RUN_SPEED
+
+    accel = FIELDER_RUN_SPEED / FIELDER_ACCEL_TIME
+    accel_dist = 0.5 * accel * FIELDER_ACCEL_TIME * FIELDER_ACCEL_TIME
+
+    if distance <= accel_dist:
+        # Still in acceleration phase: d = 0.5 * a * t², so t = sqrt(2d/a)
+        return FIELDER_REACTION_TIME + math.sqrt(2 * distance / accel)
+    else:
+        # Past acceleration
+        remaining_dist = distance - accel_dist
+        return FIELDER_REACTION_TIME + FIELDER_ACCEL_TIME + remaining_dist / FIELDER_RUN_SPEED
+
 
 # =============================================================================
 # Ground Fielding Time Constants
@@ -130,7 +212,7 @@ COLLECTION_TIME_DIRECT = 0.5  # seconds - ball straight to fielder, clean take
 COLLECTION_TIME_MOVING = 1.0  # seconds - fielder moves to collect
 COLLECTION_TIME_DIVING = 1.5  # seconds - diving stop, recover, release
 PICKUP_TIME_STOPPED = 0.4     # seconds - picking up stationary ball
-GROUND_FRICTION = 0.03        # deceleration factor per metre - cricket outfield
+GROUND_FRICTION = 0.05        # deceleration factor per metre - cricket outfield  # Matched to TypeScript
 MISFIELD_TIME_PENALTY = 2.5   # seconds added when ball gets past fielder
 FUMBLE_TIME_PENALTY = 1.0     # seconds added on fumble/bobble
 
@@ -180,18 +262,28 @@ MAX_HEIGHT = 50.0           # metres - extreme lofted shot
 # Difficulty Settings
 # =============================================================================
 
-# Ground fielding probabilities by difficulty
+# Difficulty settings - Matched to TypeScript
+# Catch probabilities:
+# - regulation_catch: standard catches with time to prepare
+# - hard_catch: diving, running, or awkward catches
+# Ground fielding probabilities:
 # - stopped: clean fielding, ball returned quickly
 # - misfield_no_extra: fumble but recovers, slight delay
 # - misfield_extra: ball gets past, significant delay
 DIFFICULTY_SETTINGS = {
     'easy': {
+        'regulation_catch': {'caught': 0.70, 'dropped': 0.20, 'runs': 0.10},
+        'hard_catch': {'caught': 0.30, 'dropped': 0.40, 'runs': 0.30},
         'ground_fielding': {'stopped': 0.70, 'misfield_no_extra': 0.20, 'misfield_extra': 0.10},
     },
     'medium': {
+        'regulation_catch': {'caught': 0.90, 'dropped': 0.08, 'runs': 0.02},
+        'hard_catch': {'caught': 0.55, 'dropped': 0.30, 'runs': 0.15},
         'ground_fielding': {'stopped': 0.85, 'misfield_no_extra': 0.10, 'misfield_extra': 0.05},
     },
     'hard': {
+        'regulation_catch': {'caught': 0.98, 'dropped': 0.02, 'runs': 0.00},
+        'hard_catch': {'caught': 0.75, 'dropped': 0.20, 'runs': 0.05},
         'ground_fielding': {'stopped': 0.95, 'misfield_no_extra': 0.04, 'misfield_extra': 0.01},
     },
 }
@@ -427,6 +519,35 @@ def _get_shot_direction_name(horizontal_angle: float, is_aerial: bool) -> str:
 # Trajectory Calculations
 # =============================================================================
 
+def _calculate_rolling_distance(horizontal_speed_ms: float, vertical_angle: float) -> float:
+    """
+    Calculate how far the ball rolls after landing.
+    Uses exponential decay model: v = v0 * e^(-k*d)
+
+    Args:
+        horizontal_speed_ms: Horizontal component of ball speed in m/s
+        vertical_angle: Vertical angle in degrees (0=flat, 90=straight up)
+
+    Returns:
+        Rolling distance in metres
+    """
+    # Energy retention on landing depends on impact angle
+    # Low flat shots retain more speed, high lofted shots bounce and slow more
+    # At 0 degrees: 85% retention, at 45 degrees: 40% retention, at 90 degrees: 5%
+    impact_retention = 0.85 - 0.8 * math.sin(math.radians(vertical_angle))
+    landing_speed = horizontal_speed_ms * impact_retention
+
+    # Ball stops when it slows to ~1.5 m/s
+    stop_threshold = 1.5
+    if landing_speed <= stop_threshold:
+        return 0.0
+
+    # Exponential decay: d = ln(v0/threshold) / k
+    rolling_distance = math.log(landing_speed / stop_threshold) / GROUND_FRICTION
+
+    return max(0.0, rolling_distance)
+
+
 def _calculate_trajectory(
     speed_kmh: float,
     horizontal_angle: float,
@@ -451,6 +572,10 @@ def _calculate_trajectory(
             direction_y=-1.0,
             sin_h=0.0,
             cos_h=1.0,
+            aerial_distance=0.0,
+            rolling_distance=0.0,
+            final_x=0.0,
+            final_y=0.0,
         )
 
     speed_ms = speed_kmh / 3.6
@@ -477,8 +602,13 @@ def _calculate_trajectory(
             t_flight = math.sqrt(2 * BAT_HEIGHT / GRAVITY)
             max_height = BAT_HEIGHT
 
+        # Minimal horizontal travel - negligible rolling
+        aerial_distance = 0.1
+        rolling_dist = _calculate_rolling_distance(0.1, vertical_angle)
+        total_distance = aerial_distance + rolling_dist
+
         return Trajectory(
-            projected_distance=0.1,
+            projected_distance=total_distance,
             max_height=max_height,
             landing_x=0.0,
             landing_y=0.0,
@@ -489,6 +619,10 @@ def _calculate_trajectory(
             direction_y=-1.0,
             sin_h=sin_h,
             cos_h=cos_h,
+            aerial_distance=aerial_distance,
+            rolling_distance=rolling_dist,
+            final_x=0.0,
+            final_y=0.0,
         )
 
     # Normal trajectory calculation
@@ -502,9 +636,22 @@ def _calculate_trajectory(
         t_flight = math.sqrt(2 * BAT_HEIGHT / GRAVITY)
         max_height = BAT_HEIGHT
 
-    distance = v_horizontal * t_flight
-    landing_x = -distance * sin_h
-    landing_y = distance * cos_h
+    # Aerial distance (flight only)
+    aerial_distance = v_horizontal * t_flight
+
+    # Rolling distance after landing
+    rolling_dist = _calculate_rolling_distance(v_horizontal, vertical_angle)
+
+    # Total distance = air + rolling
+    total_distance = aerial_distance + rolling_dist
+
+    # Landing position (where ball hits ground after air travel)
+    landing_x = -aerial_distance * sin_h
+    landing_y = aerial_distance * cos_h
+
+    # Final position (where ball stops after rolling)
+    final_x = -total_distance * sin_h
+    final_y = total_distance * cos_h
 
     # Direction unit vector
     dir_mag = math.sqrt(landing_x * landing_x + landing_y * landing_y)
@@ -516,7 +663,7 @@ def _calculate_trajectory(
         dir_y = -1.0
 
     return Trajectory(
-        projected_distance=distance,
+        projected_distance=total_distance,
         max_height=max_height,
         landing_x=landing_x,
         landing_y=landing_y,
@@ -527,6 +674,10 @@ def _calculate_trajectory(
         direction_y=dir_y,
         sin_h=sin_h,
         cos_h=cos_h,
+        aerial_distance=aerial_distance,
+        rolling_distance=rolling_dist,
+        final_x=final_x,
+        final_y=final_y,
     )
 
 
@@ -606,9 +757,29 @@ def _is_fielder_in_ball_path(
     if shot_length < MIN_SHOT_LENGTH:
         return False
 
+    # Side exclusion: if ball going to one side and fielder clearly on opposite side
+    # Allow fielders within 8m of center line to field either side
+    ball_going_off_side = landing_x < -5   # Off side is negative X
+    ball_going_leg_side = landing_x > 5    # Leg side is positive X
+    fielder_on_leg_side = fielder.x > 8    # Fielder clearly on leg side
+    fielder_on_off_side = fielder.x < -8   # Fielder clearly on off side
+
+    if ball_going_off_side and fielder_on_leg_side:
+        return False
+    if ball_going_leg_side and fielder_on_off_side:
+        return False
+
     # Normalize shot direction
     shot_dir_x = landing_x / shot_length
     shot_dir_y = landing_y / shot_length
+
+    # Calculate perpendicular distance from fielder to ball path
+    cross_product = fielder.x * shot_dir_y - fielder.y * shot_dir_x
+    perpendicular_dist = abs(cross_product)
+
+    # If fielder is more than 20m laterally from ball path, exclude them
+    if perpendicular_dist > 20:
+        return False
 
     # Dot product: positive = fielder in forward hemisphere
     dot = fielder.x * shot_dir_x + fielder.y * shot_dir_y
@@ -709,7 +880,7 @@ def _find_catchable_intercept(
 
             # Can fielder reach this point?
             movement_time = max(0.0, t - FIELDER_REACTION_TIME)
-            movement_possible = movement_time * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+            movement_possible = _get_fielder_movement_distance(movement_time) + FIELDER_DIVE_RANGE
 
             if lateral_dist <= movement_possible:
                 margin = movement_possible - lateral_dist
@@ -757,7 +928,7 @@ def _analyze_catch_difficulty(
         fielder, traj, landing_x, landing_y, projected_distance, max_height
     )
 
-    # Can't catch
+    # Can't catch - no arrival possible
     if time_to_intercept == float('inf'):
         return CatchAnalysis(
             can_catch=False,
@@ -769,11 +940,13 @@ def _analyze_catch_difficulty(
             ball_speed_at_fielder=traj.horizontal_speed * 3.6,
             height_at_intercept=0.0,
             time_to_intercept=0.0,
+            fielder_arrival_time=0.0,
+            arrived_before_landing=False,
         )
 
     # Movement calculations
     movement_time = max(0.0, time_to_intercept - FIELDER_REACTION_TIME)
-    movement_possible = movement_time * FIELDER_RUN_SPEED + FIELDER_DIVE_RANGE
+    movement_possible = _get_fielder_movement_distance(movement_time) + FIELDER_DIVE_RANGE
 
     # Difficulty components
     reaction_score = _clamp(1.0 - (time_to_intercept - 0.5) / 1.5, 0.0, 1.0)
@@ -814,6 +987,13 @@ def _analyze_catch_difficulty(
     else:
         catch_type = 'spectacular'
 
+    # Calculate fielder arrival time - Matched to TypeScript
+    run_distance = max(0.0, lateral_dist_actual - FIELDER_STATIC_RANGE)
+    fielder_arrival_time = _get_fielder_travel_time(run_distance)
+
+    # Did fielder arrive before ball landed?
+    arrived_before_landing = fielder_arrival_time <= traj.time_of_flight
+
     return CatchAnalysis(
         can_catch=True,
         difficulty=difficulty,
@@ -824,6 +1004,8 @@ def _analyze_catch_difficulty(
         ball_speed_at_fielder=ball_speed_kmh,
         height_at_intercept=height,
         time_to_intercept=time_to_intercept,
+        fielder_arrival_time=fielder_arrival_time,
+        arrived_before_landing=arrived_before_landing,
     )
 
 
@@ -840,14 +1022,44 @@ def _roll_catch_outcome(analysis: CatchAnalysis, difficulty: str) -> str:
     return 'caught' if random.random() < catch_prob else 'dropped'
 
 
-def _roll_ground_fielding_outcome(probs: dict) -> str:
-    """Roll ground fielding outcome."""
-    gf = probs['ground_fielding']
-    roll = random.random()
+def _roll_ground_fielding_outcome(probs: dict, collection_difficulty: float = 0.0) -> str:
+    """
+    Roll ground fielding outcome with probability modified by collection difficulty.
 
-    if roll < gf['stopped']:
+    Args:
+        probs: Difficulty settings dict with 'ground_fielding' probabilities
+        collection_difficulty: 0-1, how rushed the fielder was
+            0 = routine (arrived very early)
+            0.3 = easy (arrived early, set for ball)
+            0.5 = moderate (had to hustle)
+            1.0 = hard (barely made it, diving)
+
+    Returns:
+        'stopped', 'misfield_no_extra', or 'misfield_extra'
+    """
+    gf = probs['ground_fielding']
+
+    # Super easy - fielder arrived with plenty of time, routine collection
+    if collection_difficulty < 0.15:
+        return 'stopped'  # 100% clean stop for routine collections
+
+    stopped_prob = gf['stopped']
+    misfield_no_extra_prob = gf['misfield_no_extra']
+
+    if collection_difficulty > 0.7:
+        # Hard collection - diving/rushing, high misfield chance
+        stopped_prob = gf['stopped'] * 0.6
+        misfield_no_extra_prob = 0.30
+    elif collection_difficulty > 0.3:
+        # Moderate - had to move quickly but under control
+        stopped_prob = gf['stopped'] * 0.88
+        misfield_no_extra_prob = gf['misfield_no_extra'] + 0.05
+    # else (0.15-0.3): easy collection - use base probabilities
+
+    roll = random.random()
+    if roll < stopped_prob:
         return 'stopped'
-    elif roll < gf['stopped'] + gf['misfield_no_extra']:
+    if roll < stopped_prob + misfield_no_extra_prob:
         return 'misfield_no_extra'
     return 'misfield_extra'
 
@@ -885,36 +1097,50 @@ def _calculate_fielding_time(
     exit_speed: float,
     intercept_distance: float,
     lateral_distance: float,
-    fielder_x: float,
-    fielder_y: float
+    intercept_x: float,
+    intercept_y: float,
+    aerial_distance: float,
+    time_of_flight: float,
 ) -> float:
     """
     Total time from ball leaving bat to reaching stumps.
 
-    Accounts for fielder movement during ball flight - the fielder can
-    cover ground while the ball is traveling, reducing effective lateral distance.
+    Accounts for fielder movement during ball flight using acceleration model.
     """
-    ball_time = _get_ball_travel_time(exit_speed, intercept_distance)
+    # Ball travel time = air time + rolling time
+    if intercept_distance <= aerial_distance:
+        # Ball still in air at intercept point
+        if aerial_distance > 0:
+            ball_travel_time = time_of_flight * (intercept_distance / aerial_distance)
+        else:
+            ball_travel_time = 0.0
+    else:
+        # Ball has landed, need to roll to intercept
+        rolling_distance = intercept_distance - aerial_distance
+        rolling_speed = _get_ground_ball_speed(exit_speed, rolling_distance)
+        rolling_time = rolling_distance / rolling_speed
+        ball_travel_time = time_of_flight + rolling_time
 
     # Fielder can move toward intercept point during ball flight
-    available_movement_time = max(0.0, ball_time - FIELDER_REACTION_TIME)
-    distance_covered = available_movement_time * FIELDER_RUN_SPEED
+    available_movement_time = max(0.0, ball_travel_time - FIELDER_REACTION_TIME)
+    distance_covered = _get_fielder_movement_distance(available_movement_time)
 
     # Effective lateral distance after accounting for movement during flight
     effective_lateral = max(0.0, lateral_distance - distance_covered)
 
-    # Collection time based on remaining distance to cover
+    # Collection time based on remaining lateral distance
     if effective_lateral < 0.5:
-        collection = COLLECTION_TIME_DIRECT
+        collection_time = COLLECTION_TIME_DIRECT
     elif effective_lateral < 2.0:
-        collection = COLLECTION_TIME_MOVING
+        collection_time = COLLECTION_TIME_MOVING
     else:
-        collection = COLLECTION_TIME_DIVING
+        collection_time = COLLECTION_TIME_DIVING
 
-    throw_dist = _get_throw_distance(fielder_x, fielder_y)
-    throw_time = throw_dist / THROW_SPEED
+    # Throw from where ball is collected (intercept position)
+    throw_distance = _get_throw_distance(intercept_x, intercept_y)
+    throw_time = throw_distance / THROW_SPEED
 
-    return ball_time + collection + throw_time
+    return ball_travel_time + collection_time + throw_time
 
 
 def _calculate_runs_from_fielding_time(fielding_time: float, is_misfield: bool) -> int:
@@ -937,6 +1163,102 @@ def _calculate_runs_from_fielding_time(fielding_time: float, is_misfield: bool) 
     return runs
 
 
+def _calculate_alignment_score(
+    intercept_x: float,
+    intercept_y: float,
+    landing_x: float,
+    landing_y: float,
+) -> float:
+    """
+    Calculate how direct the ball path is from intercept point to stumps.
+
+    Args:
+        intercept_x: X position where ball is intercepted
+        intercept_y: Y position where ball is intercepted
+        landing_x: X landing coordinate (ball direction)
+        landing_y: Y landing coordinate (ball direction)
+
+    Returns:
+        0-1 score where 1.0 = perfect alignment (ball going straight at stumps)
+    """
+    # Calculate throw distance to both ends
+    dist_to_batting = _distance(intercept_x, intercept_y)
+    dist_to_bowling = _distance(intercept_x, intercept_y + PITCH_LENGTH)
+
+    # Use the closer stumps
+    throw_dist = min(dist_to_batting, dist_to_bowling)
+    is_batting_end = dist_to_batting <= dist_to_bowling
+
+    # Calculate angle between ball path and throw path
+    ball_path_length = _distance(landing_x, landing_y)
+    if ball_path_length < MIN_SHOT_LENGTH:
+        return 1.0  # Ball not moving, trivially aligned
+
+    # Unit vector of ball path
+    ball_dir_x = landing_x / ball_path_length
+    ball_dir_y = landing_y / ball_path_length
+
+    # Vector from intercept point to target stumps
+    if is_batting_end:
+        throw_dir_x = -intercept_x
+        throw_dir_y = -intercept_y
+    else:
+        throw_dir_x = -intercept_x
+        throw_dir_y = -(intercept_y + PITCH_LENGTH)
+
+    throw_dir_length = math.sqrt(throw_dir_x * throw_dir_x + throw_dir_y * throw_dir_y)
+    if throw_dir_length < 0.1:
+        return 1.0  # At stumps already
+
+    throw_dir_x /= throw_dir_length
+    throw_dir_y /= throw_dir_length
+
+    # Dot product gives alignment (1 = same direction, -1 = opposite)
+    # We want 1 when ball is going toward stumps (opposite to throw direction)
+    alignment = -(ball_dir_x * throw_dir_x + ball_dir_y * throw_dir_y)
+
+    # Convert from [-1, 1] to [0, 1]
+    return _clamp((alignment + 1.0) / 2.0, 0.0, 1.0)
+
+
+def _calculate_priority_score(
+    collection_difficulty: float,
+    alignment_score: float,
+    fielding_time: float,
+) -> float:
+    """
+    Calculate combined priority score for fielding assessment.
+
+    Weights:
+    - Collection difficulty (40%): How easy was it to field
+    - Alignment (30%): How direct is the throw path
+    - Fielding time (30%): How quickly can ball reach stumps
+
+    Args:
+        collection_difficulty: 0-1 how rushed was fielder (lower = easier)
+        alignment_score: 0-1 how direct ball path was (higher = better)
+        fielding_time: Total time from bat to stumps
+
+    Returns:
+        0-1 priority score where higher = better fielding opportunity
+    """
+    # Invert collection_difficulty (lower difficulty = higher score)
+    ease_score = 1.0 - collection_difficulty
+
+    # Normalize fielding time (faster = higher score)
+    # Assume 2s is excellent (1.0), 8s is poor (0.0)
+    time_score = _clamp((8.0 - fielding_time) / 6.0, 0.0, 1.0)
+
+    # Weighted combination
+    priority = (
+        0.4 * ease_score +
+        0.3 * alignment_score +
+        0.3 * time_score
+    )
+
+    return _clamp(priority, 0.0, 1.0)
+
+
 # =============================================================================
 # Result Builders
 # =============================================================================
@@ -952,6 +1274,14 @@ def _build_result(
     description: str,
     catch_analysis: Optional[CatchAnalysis] = None,
     fielder_pos: Optional[dict] = None,
+    # New output fields - Matched to TypeScript
+    fielding_position: Optional[dict] = None,
+    fielding_time: Optional[float] = None,
+    collection_difficulty: Optional[float] = None,
+    alignment_score: Optional[float] = None,
+    priority_score: Optional[float] = None,
+    fielder_arrival_time: Optional[float] = None,
+    ball_arrival_time: Optional[float] = None,
 ) -> dict:
     """Build standardized result dictionary."""
     result = {
@@ -960,17 +1290,33 @@ def _build_result(
         'is_boundary': is_boundary,
         'is_aerial': is_aerial,
         'fielder_involved': fielder.name if fielder else None,
+        'fielder_position': fielder_pos if fielder_pos else ({'x': fielder.x, 'y': fielder.y} if fielder else None),
         'end_position': {'x': end_x, 'y': end_y},
         'description': description,
+        # Always include catch_analysis (may be None for non-catch outcomes)
+        'catch_analysis': None,
+        # New output fields - always include (may be None)
+        'fielding_position': fielding_position,
+        'fielding_time': fielding_time,
+        'collection_difficulty': collection_difficulty,
+        'alignment_score': alignment_score,
+        'priority_score': priority_score,
+        'fielder_arrival_time': fielder_arrival_time,
+        'ball_arrival_time': ball_arrival_time,
     }
-
-    if fielder_pos:
-        result['fielder_position'] = fielder_pos
-    elif fielder:
-        result['fielder_position'] = {'x': fielder.x, 'y': fielder.y}
 
     if catch_analysis:
         result['catch_analysis'] = dict(catch_analysis)
+        # For catches, extract timing info from catch_analysis if not already set
+        if result['fielder_arrival_time'] is None and 'fielder_arrival_time' in catch_analysis:
+            result['fielder_arrival_time'] = catch_analysis['fielder_arrival_time']
+        if result['ball_arrival_time'] is None and 'time_to_intercept' in catch_analysis:
+            result['ball_arrival_time'] = catch_analysis['time_to_intercept']
+        if result['collection_difficulty'] is None and 'difficulty' in catch_analysis:
+            result['collection_difficulty'] = catch_analysis['difficulty']
+        if result['fielding_position'] is None:
+            # For catches, fielding_position is where the catch is made (end_position)
+            result['fielding_position'] = {'x': end_x, 'y': end_y}
 
     return result
 
@@ -1028,8 +1374,8 @@ def _evaluate_catches(
     is_aerial: bool,
 ) -> Optional[dict]:
     """Evaluate catching chances for all fielders."""
-    # Only evaluate catches for aerial shots
-    if not is_aerial or max_height < CATCH_HEIGHT_MIN:
+    # TS:1037 - Any ball at catchable height can be caught (regardless of isAerial)
+    if max_height < CATCH_HEIGHT_MIN:
         return None
 
     chances = []
@@ -1124,11 +1470,16 @@ def _evaluate_catches(
 
 
 def _calculate_runs_for_dropped(projected_distance: float, exit_speed: float) -> int:
-    """Calculate runs when catch is dropped."""
+    """Calculate runs when catch is dropped.
+
+    Matched to TypeScript: calculateRunsForDistance(distance, false, exitSpeed > 80)
+    """
+    # TS: if (distance >= MID_FIELD_RADIUS) return Math.random() < 0.33 ? 3 : 2
     if projected_distance >= MID_FIELD_RADIUS:
-        return random.choice([2, 2, 3])
+        return 3 if random.random() < 0.33 else 2
+    # TS: if (distance >= INNER_RING_RADIUS) return Math.random() < 0.33 ? 2 : 1
     elif projected_distance >= INNER_RING_RADIUS:
-        return random.choice([1, 1, 2])
+        return 2 if random.random() < 0.33 else 1
     return 1
 
 
@@ -1157,6 +1508,119 @@ def _check_boundary_four(
     )
 
 
+def _find_best_ground_intercept(
+    fielder_x: float,
+    fielder_y: float,
+    final_x: float,
+    final_y: float,
+    exit_speed_kmh: float,
+    aerial_distance: float,
+    time_of_flight: float,
+    projected_distance: float,
+) -> Optional[dict]:
+    """
+    Find the BEST (easiest) point along the ball path where a fielder can intercept.
+
+    Scans all reachable points and returns the one with lowest collection difficulty.
+    This ensures fielders collect at their natural position rather than sprinting
+    to cut off the ball early when they could collect more comfortably later.
+
+    Args:
+        fielder_x: Fielder X position
+        fielder_y: Fielder Y position
+        final_x: Where ball ends up (after rolling)
+        final_y: Where ball ends up (after rolling)
+        exit_speed_kmh: Ball exit speed in km/h
+        aerial_distance: Distance ball travels in air
+        time_of_flight: Time ball is in air
+        projected_distance: Total distance (aerial + rolling)
+
+    Returns:
+        Dict with intercept details, or None if fielder cannot intercept
+        {
+            'intercept_x': float,
+            'intercept_y': float,
+            'intercept_distance': float,
+            'lateral_distance': float,
+            'collection_difficulty': float,
+            'fielder_time': float,
+            'ball_time': float,
+        }
+    """
+    # TS:785-788 - Direction unit vector of ball path
+    path_length = math.sqrt(final_x * final_x + final_y * final_y)
+    if path_length < 0.1:
+        return None
+    dir_x = final_x / path_length
+    dir_y = final_y / path_length
+
+    # TS:791-793 - Sample points along ball path, find one with lowest difficulty
+    step_size = 2.0
+    best_intercept: Optional[dict] = None
+    lowest_difficulty = float('inf')
+
+    # TS:795 - Loop from 5m to projected distance
+    dist = 5.0
+    while dist <= projected_distance:
+        point_x = dir_x * dist
+        point_y = dir_y * dist
+
+        # TS:799-809 - Calculate ball travel time to this point
+        if dist <= aerial_distance:
+            # Ball still in air
+            ball_time = time_of_flight * (dist / aerial_distance) if aerial_distance > 0 else 0.0
+        else:
+            # Ball has landed, rolling
+            rolling_dist = dist - aerial_distance
+            rolling_speed = _get_ground_ball_speed(exit_speed_kmh, rolling_dist)
+            ball_time = time_of_flight + (rolling_dist / rolling_speed)
+
+        # TS:811-819 - Calculate fielder travel time to this point
+        dx = point_x - fielder_x
+        dy = point_y - fielder_y
+        fielder_dist = math.sqrt(dx * dx + dy * dy)
+
+        # Fielder can reach within GROUND_FIELDING_RANGE of the point
+        dist_to_travel = max(0.0, fielder_dist - GROUND_FIELDING_RANGE)
+
+        # TS:821-841 - Calculate time for fielder to cover this distance
+        if dist_to_travel <= 0:
+            fielder_time = FIELDER_REACTION_TIME  # Already in range
+        else:
+            fielder_time = _get_fielder_travel_time(dist_to_travel)
+
+        # TS:844 - Can fielder reach before ball? (0.1s grace for diving/stretching)
+        if fielder_time <= ball_time + 0.1:
+            # TS:846-858 - Calculate collection difficulty based on time ratio
+            time_ratio = fielder_time / ball_time if ball_time > 0 else 0.0
+
+            if time_ratio < 0.6:
+                collection_difficulty = 0.0  # Easy - arrived with plenty of time
+            elif time_ratio < 0.9:
+                collection_difficulty = (time_ratio - 0.6) / 0.3 * 0.5  # 0 to 0.5
+            else:
+                collection_difficulty = 0.5 + (time_ratio - 0.9) / 0.2 * 0.5  # 0.5 to 1.0
+
+            collection_difficulty = min(1.0, collection_difficulty)
+
+            # TS:863-876 - Keep track of easiest intercept point
+            if collection_difficulty < lowest_difficulty:
+                lowest_difficulty = collection_difficulty
+                best_intercept = {
+                    'intercept_x': point_x,
+                    'intercept_y': point_y,
+                    'intercept_distance': dist,
+                    'lateral_distance': min(fielder_dist, GROUND_FIELDING_RANGE + 2.5),
+                    'collection_difficulty': collection_difficulty,
+                    'fielder_time': fielder_time,
+                    'ball_time': ball_time,
+                }
+
+        dist += step_size
+
+    return best_intercept
+
+
 def _evaluate_ground_fielding(
     fielders: list[Fielder],
     projected_distance: float,
@@ -1166,40 +1630,100 @@ def _evaluate_ground_fielding(
     is_aerial: bool,
     shot_name: str,
     probs: dict,
+    aerial_distance: float,
+    time_of_flight: float,
+    boundary_distance: float = 70.0,
 ) -> Optional[dict]:
-    """Evaluate ground fielding chances."""
+    """
+    Evaluate ground fielding chances.
+
+    For boundary balls, fielders must intercept BEFORE the boundary.
+    If they misfield a boundary ball, it's automatically a four.
+
+    Uses weighted priority scoring to select the best fielder:
+    - 0.5: alignment (is ball going toward them?)
+    - 0.25: collection difficulty (how easy is the stop?)
+    - 0.25: normalized intercept distance (closer intercept = can return faster)
+    """
+    # Check if ball is heading to boundary - fielders must intercept before boundary
+    is_boundary_ball = projected_distance >= boundary_distance
+    max_intercept_distance = boundary_distance if is_boundary_ball else projected_distance
+
+    # Calculate ball path direction for alignment scoring
+    ball_path_length = math.sqrt(landing_x * landing_x + landing_y * landing_y)
+    ball_dir_x = landing_x / ball_path_length if ball_path_length > 0 else 0.0
+    ball_dir_y = landing_y / ball_path_length if ball_path_length > 0 else 1.0
+
     chances = []
 
     for fielder in fielders:
+        # TS:1178 - Skip fielders not in ball path
         if not _is_fielder_in_ball_path(fielder, landing_x, landing_y):
             continue
 
-        lat_dist, closest_x, closest_y, t = _distance_point_to_line_segment(
-            fielder.x, fielder.y, 0.0, 0.0, landing_x, landing_y
+        # TS:1184-1193 - Find best intercept point using findBestGroundIntercept
+        # This scans all points along ball path (5m to maxInterceptDistance) to find
+        # the easiest intercept point for this fielder
+        intercept = _find_best_ground_intercept(
+            fielder.x,
+            fielder.y,
+            landing_x,
+            landing_y,
+            exit_speed,
+            aerial_distance,
+            time_of_flight,
+            max_intercept_distance,  # Use boundary as limit for potential fours
         )
 
-        if t < FIELDER_PATH_START_T:
-            continue
+        if intercept:
+            # TS:1196-1201 - Calculate alignment: perpendicular distance from fielder to ball path
+            cross_product = fielder.x * ball_dir_y - fielder.y * ball_dir_x
+            perpendicular_dist = abs(cross_product)
+            # Normalize to 0-1 range (0 = directly on path, 1 = 30m+ away from path)
+            alignment_score = min(1.0, perpendicular_dist / 30.0)
 
-        intercept_dist = _distance(closest_x, closest_y)
-        fielder_dist = _distance(fielder.x, fielder.y)
+            # TS:1203-1211 - Weighted priority score
+            normalized_intercept = min(1.0, intercept['intercept_distance'] / projected_distance) if projected_distance > 0 else 0.0
+            priority_score = (
+                0.5 * alignment_score +
+                0.25 * intercept['collection_difficulty'] +
+                0.25 * normalized_intercept
+            )
 
-        # Check if fielder can reach the ball
-        # Account for movement during ball flight
-        ball_travel_time = _get_ball_travel_time(exit_speed, intercept_dist)
-        available_movement = max(0.0, ball_travel_time - FIELDER_REACTION_TIME) * FIELDER_RUN_SPEED
-        max_reach = GROUND_FIELDING_RANGE + available_movement
+            chances.append({
+                'fielder': fielder,
+                'lateral_distance': intercept['lateral_distance'],
+                'intercept_distance': intercept['intercept_distance'],
+                'intercept_x': intercept['intercept_x'],
+                'intercept_y': intercept['intercept_y'],
+                'alignment_score': alignment_score,
+                'collection_difficulty': intercept['collection_difficulty'],
+                'priority_score': priority_score,
+                'ball_arrival_time': intercept['ball_time'],
+                'fielder_arrival_time': intercept['fielder_time'],
+            })
 
-        if lat_dist <= max_reach and fielder_dist <= projected_distance + max_reach:
-            chances.append((fielder, lat_dist, intercept_dist))
+    # Sort by priority score (lower = higher priority)
+    chances.sort(key=lambda x: x['priority_score'])
 
-    chances.sort(key=lambda x: x[1])  # Sort by lateral distance
+    for chance in chances:
+        fielder = chance['fielder']
+        lat_dist = chance['lateral_distance']
+        intercept_dist = chance['intercept_distance']
+        intercept_x = chance['intercept_x']
+        intercept_y = chance['intercept_y']
+        alignment_score = chance['alignment_score']
+        collection_difficulty = chance['collection_difficulty']
+        priority_score = chance['priority_score']
+        ball_time = chance['ball_arrival_time']
+        fielder_time = chance['fielder_arrival_time']
 
-    for fielder, lat_dist, intercept_dist in chances:
-        outcome = _roll_ground_fielding_outcome(probs)
+        outcome = _roll_ground_fielding_outcome(probs, collection_difficulty)
 
         fielding_time = _calculate_fielding_time(
-            exit_speed, intercept_dist, lat_dist, fielder.x, fielder.y
+            exit_speed, intercept_dist, lat_dist,
+            intercept_x, intercept_y,
+            aerial_distance, time_of_flight
         )
 
         if outcome == 'stopped':
@@ -1215,6 +1739,13 @@ def _evaluate_ground_fielding(
                     end_x=fielder.x,
                     end_y=fielder.y,
                     description=f"{shot_name.capitalize()} fielded by {fielder.name}, no run",
+                    fielding_position={'x': intercept_x, 'y': intercept_y},
+                    fielding_time=fielding_time,
+                    collection_difficulty=collection_difficulty,
+                    alignment_score=alignment_score,
+                    priority_score=priority_score,
+                    fielder_arrival_time=fielder_time,
+                    ball_arrival_time=ball_time,
                 )
 
             return _build_result(
@@ -1226,6 +1757,13 @@ def _evaluate_ground_fielding(
                 end_x=fielder.x,
                 end_y=fielder.y,
                 description=f"{shot_name.capitalize()}, {fielder.name} fields, {runs} run{'s' if runs > 1 else ''}",
+                fielding_position={'x': intercept_x, 'y': intercept_y},
+                fielding_time=fielding_time,
+                collection_difficulty=collection_difficulty,
+                alignment_score=alignment_score,
+                priority_score=priority_score,
+                fielder_arrival_time=fielder_time,
+                ball_arrival_time=ball_time,
             )
 
         elif outcome == 'misfield_no_extra':
@@ -1239,9 +1777,38 @@ def _evaluate_ground_fielding(
                 end_x=fielder.x,
                 end_y=fielder.y,
                 description=f"{shot_name.capitalize()}, misfield by {fielder.name}, {runs} run{'s' if runs > 1 else ''}",
+                fielding_position={'x': intercept_x, 'y': intercept_y},
+                fielding_time=fielding_time + FUMBLE_TIME_PENALTY,
+                collection_difficulty=collection_difficulty,
+                alignment_score=alignment_score,
+                priority_score=priority_score,
+                fielder_arrival_time=fielder_time,
+                ball_arrival_time=ball_time,
             )
 
-        else:  # misfield_extra
+        else:  # misfield_extra - ball gets past fielder
+            # If it was a boundary ball, misfield = four
+            if is_boundary_ball:
+                boundary_point = _get_boundary_intersection(landing_x, landing_y, boundary_distance)
+                return _build_result(
+                    outcome='4',
+                    runs=4,
+                    is_boundary=True,
+                    is_aerial=is_aerial,
+                    fielder=fielder,
+                    end_x=boundary_point['x'],
+                    end_y=boundary_point['y'],
+                    description=f"{shot_name.capitalize()}, misfield by {fielder.name}, four!",
+                    fielding_position={'x': intercept_x, 'y': intercept_y},
+                    fielding_time=fielding_time,
+                    collection_difficulty=collection_difficulty,
+                    alignment_score=alignment_score,
+                    priority_score=priority_score,
+                    fielder_arrival_time=fielder_time,
+                    ball_arrival_time=ball_time,
+                )
+
+            # Non-boundary ball - they must chase and throw from further back
             runs = _calculate_runs_from_fielding_time(fielding_time, True)
             return _build_result(
                 outcome='misfield',
@@ -1252,7 +1819,28 @@ def _evaluate_ground_fielding(
                 end_x=landing_x,
                 end_y=landing_y,
                 description=f"{shot_name.capitalize()}, misfield by {fielder.name}, {runs} run{'s' if runs > 1 else ''}",
+                fielding_position={'x': intercept_x, 'y': intercept_y},
+                fielding_time=fielding_time,
+                collection_difficulty=collection_difficulty,
+                alignment_score=alignment_score,
+                priority_score=priority_score,
+                fielder_arrival_time=fielder_time,
+                ball_arrival_time=ball_time,
             )
+
+    # No fielder intercepted - if it was a boundary ball, it's a four
+    if is_boundary_ball:
+        boundary_point = _get_boundary_intersection(landing_x, landing_y, boundary_distance)
+        return _build_result(
+            outcome='4',
+            runs=4,
+            is_boundary=True,
+            is_aerial=is_aerial,
+            fielder=None,
+            end_x=boundary_point['x'],
+            end_y=boundary_point['y'],
+            description=f"{shot_name.capitalize()} to the boundary for four!",
+        )
 
     return None
 
@@ -1286,16 +1874,33 @@ def _fallback_nearest_fielder(
 
     # Time calculation with fielder movement during flight
     ball_time = _get_ball_travel_time(exit_speed, projected_distance)
-    available_run = max(0.0, ball_time - FIELDER_REACTION_TIME)
-    covered = available_run * FIELDER_RUN_SPEED
+    available_run_time = max(0.0, ball_time - FIELDER_REACTION_TIME)
+    covered = _get_fielder_movement_distance(available_run_time)
     remaining = max(0.0, nearest_dist - covered)
-    additional_run = remaining / FIELDER_RUN_SPEED if FIELDER_RUN_SPEED > 0 else 0
+    additional_run = _get_fielder_travel_time(remaining) - FIELDER_REACTION_TIME if remaining > 0 else 0
+    fielder_arrival_time = ball_time + additional_run
 
     throw_dist = _get_throw_distance(landing_x, landing_y)
     throw_time = throw_dist / THROW_SPEED
 
     total_time = ball_time + additional_run + PICKUP_TIME_STOPPED + throw_time
     runs = _calculate_runs_from_fielding_time(total_time, False)
+
+    # Calculate collection difficulty - for fallback, it's always a chase so difficulty is higher
+    if ball_time > 0:
+        time_ratio = fielder_arrival_time / ball_time
+        if time_ratio < 1.2:
+            collection_difficulty = 0.3  # Arrived soon after ball
+        elif time_ratio < 1.8:
+            collection_difficulty = 0.5  # Had to chase a bit
+        else:
+            collection_difficulty = 0.7  # Long chase
+    else:
+        collection_difficulty = 0.5
+
+    # Calculate alignment and priority scores
+    alignment_score = _calculate_alignment_score(landing_x, landing_y, landing_x, landing_y)
+    priority_score = _calculate_priority_score(collection_difficulty, alignment_score, total_time)
 
     if runs == 0:
         desc = f"{shot_name.capitalize()}, {nearest.name} collects, no run"
@@ -1311,6 +1916,13 @@ def _fallback_nearest_fielder(
         end_x=landing_x,
         end_y=landing_y,
         description=desc,
+        fielding_position={'x': landing_x, 'y': landing_y},
+        fielding_time=total_time,
+        collection_difficulty=collection_difficulty,
+        alignment_score=alignment_score,
+        priority_score=priority_score,
+        fielder_arrival_time=fielder_arrival_time,
+        ball_arrival_time=ball_time,
     )
 
 
@@ -1394,18 +2006,22 @@ def simulate_delivery(
         logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
-    # Check 3: Four
+    # Check 3: Ground fielding (including potential boundary balls)
+    # For boundary balls, fielders must intercept BEFORE the boundary
+    # This check comes before _check_boundary_four so fielders get a chance to intercept
+    result = _evaluate_ground_fielding(fielders, projected_distance, landing_x, landing_y,
+                                        exit_speed, is_aerial, shot_name, probs,
+                                        traj.aerial_distance, traj.time_of_flight,
+                                        boundary_distance)
+    if result:
+        logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
+        return result
+
+    # Check 4: Four (only reached if no fielder intercepted boundary ball)
     result = _check_boundary_four(projected_distance, boundary_distance,
                                    landing_x, landing_y, is_aerial, shot_name)
     if result:
         logger.info(f"Result: FOUR - {result['description']}")
-        return result
-
-    # Check 4: Ground fielding
-    result = _evaluate_ground_fielding(fielders, projected_distance, landing_x, landing_y,
-                                        exit_speed, is_aerial, shot_name, probs)
-    if result:
-        logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
     # Fallback: Nearest fielder retrieves

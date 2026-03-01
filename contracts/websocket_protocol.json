@@ -1,0 +1,586 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cricket App WebSocket Protocol",
+  "description": "Complete WebSocket message protocol for real-time communication between React UI and Python game engine on Raspberry Pi",
+  "version": "1.0.0",
+
+  "definitions": {
+    "Position": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number", "description": "X coordinate in metres from batter" },
+        "y": { "type": "number", "description": "Y coordinate in metres from batter (positive = toward bowler)" }
+      },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    },
+
+    "FielderConfig": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Optional unique fielder identifier - UI can generate for drag tracking, game engine doesn't require" },
+        "x": { "type": "number", "description": "Screen X position (0-100%)" },
+        "y": { "type": "number", "description": "Screen Y position (0-100%)" },
+        "name": { "type": "string", "description": "Zone name e.g. 'cover', 'mid-off'" }
+      },
+      "required": ["x", "y", "name"],
+      "additionalProperties": false
+    },
+
+    "TrajectoryData": {
+      "type": "object",
+      "properties": {
+        "projected_distance": { "type": "number", "description": "Total distance in metres (aerial + rolling)" },
+        "aerial_distance": { "type": "number", "description": "Distance traveled through air" },
+        "rolling_distance": { "type": "number", "description": "Distance ball rolls after landing" },
+        "max_height": { "type": "number", "description": "Peak height in metres" },
+        "landing_x": { "type": "number", "description": "X landing coordinate" },
+        "landing_y": { "type": "number", "description": "Y landing coordinate" },
+        "final_x": { "type": "number", "description": "X where ball stops" },
+        "final_y": { "type": "number", "description": "Y where ball stops" },
+        "time_of_flight": { "type": "number", "description": "Seconds in air" },
+        "horizontal_speed": { "type": "number", "description": "m/s along ground" },
+        "vertical_speed": { "type": "number", "description": "m/s initial vertical" },
+        "direction_x": { "type": "number", "description": "Unit vector X component" },
+        "direction_y": { "type": "number", "description": "Unit vector Y component" }
+      },
+      "required": [
+        "projected_distance", "aerial_distance", "rolling_distance", "max_height",
+        "landing_x", "landing_y", "final_x", "final_y", "time_of_flight",
+        "horizontal_speed", "vertical_speed", "direction_x", "direction_y"
+      ],
+      "additionalProperties": false
+    },
+
+    "CatchAnalysis": {
+      "type": "object",
+      "description": "Wire format uses camelCase to match TypeScript conventions. Python snake_case properties are converted during JSON serialization.",
+      "properties": {
+        "canCatch": { "type": "boolean" },
+        "difficulty": { "type": "number", "minimum": 0, "maximum": 1 },
+        "catchType": { "type": ["string", "null"], "enum": ["regulation", "hard", "spectacular", null] },
+        "reactionTime": { "type": "number" },
+        "movementRequired": { "type": "number" },
+        "movementPossible": { "type": "number" },
+        "ballSpeedAtFielder": { "type": "number" },
+        "heightAtIntercept": { "type": "number" },
+        "timeToIntercept": { "type": "number" },
+        "fielderArrivalTime": { "type": "number" },
+        "arrivedBeforeLanding": { "type": "boolean" }
+      },
+      "required": [
+        "canCatch", "difficulty", "catchType", "reactionTime",
+        "movementRequired", "movementPossible", "ballSpeedAtFielder",
+        "heightAtIntercept", "timeToIntercept", "fielderArrivalTime",
+        "arrivedBeforeLanding"
+      ],
+      "additionalProperties": false
+    },
+
+    "ShotOutcome": {
+      "type": "string",
+      "enum": ["dot", "1", "2", "3", "4", "6", "caught", "dropped", "misfield"]
+    },
+
+    "BallResult": {
+      "type": "string",
+      "enum": ["dot", "1", "2", "3", "4", "6", "W", "wd", "nb"]
+    },
+
+    "Difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"]
+    },
+
+    "BattingHand": {
+      "type": "string",
+      "enum": ["right", "left"]
+    },
+
+    "ConnectionState": {
+      "type": "string",
+      "enum": ["disconnected", "connecting", "connected", "reconnecting"]
+    },
+
+    "SessionState": {
+      "type": "string",
+      "enum": ["none", "active", "ended"]
+    },
+
+    "Over": {
+      "type": "object",
+      "properties": {
+        "balls": { "type": "array", "items": { "$ref": "#/definitions/BallResult" } },
+        "runs": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["balls", "runs"],
+      "additionalProperties": false
+    },
+
+    "SessionData": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "player_id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "runs": { "type": "integer", "minimum": 0 },
+        "balls": { "type": "integer", "minimum": 0 },
+        "fours": { "type": "integer", "minimum": 0 },
+        "sixes": { "type": "integer", "minimum": 0 },
+        "wickets": { "type": "integer", "minimum": 0 },
+        "is_out": { "type": "boolean" },
+        "overs": { "type": "array", "items": { "$ref": "#/definitions/Over" } },
+        "strike_rate": { "type": "number", "minimum": 0 },
+        "field_config": { "type": "array", "items": { "$ref": "#/definitions/FielderConfig" }, "description": "Sessions always have a field config" }
+      },
+      "required": [
+        "id", "player_id", "date", "runs", "balls", "fours", "sixes",
+        "wickets", "is_out", "overs", "strike_rate", "field_config"
+      ],
+      "additionalProperties": false
+    },
+
+    "Profile": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "batting_hand": { "$ref": "#/definitions/BattingHand" }
+      },
+      "required": ["id", "name", "batting_hand"],
+      "additionalProperties": false
+    },
+
+    "SimulationResult": {
+      "type": "object",
+      "description": "Full simulation result stored in database. Use REST API GET /api/sessions/:id/deliveries for detailed data.",
+      "properties": {
+        "outcome": { "$ref": "#/definitions/ShotOutcome" },
+        "runs": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "is_boundary": { "type": "boolean" },
+        "is_aerial": { "type": "boolean" },
+        "fielder_involved": { "type": ["string", "null"] },
+        "fielder_position": { "oneOf": [{ "$ref": "#/definitions/Position" }, { "type": "null" }] },
+        "fielding_position": { "oneOf": [{ "$ref": "#/definitions/Position" }, { "type": "null" }] },
+        "end_position": { "$ref": "#/definitions/Position" },
+        "description": { "type": "string" },
+        "trajectory": { "oneOf": [{ "$ref": "#/definitions/TrajectoryData" }, { "type": "null" }] },
+        "catch_analysis": { "oneOf": [{ "$ref": "#/definitions/CatchAnalysis" }, { "type": "null" }] },
+        "fielding_time": { "type": ["number", "null"] },
+        "collection_difficulty": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "alignment_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "priority_score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "fielder_arrival_time": { "type": ["number", "null"] },
+        "ball_arrival_time": { "type": ["number", "null"] }
+      },
+      "required": ["outcome", "runs", "is_boundary", "is_aerial", "end_position", "description"],
+      "additionalProperties": false
+    },
+
+    "SlimShotResult": {
+      "type": "object",
+      "description": "Minimal shot data for real-time WebSocket display (5 fields only). Full SimulationResult stored in database - use REST API GET /api/sessions/:id/deliveries for details.",
+      "properties": {
+        "outcome": { "$ref": "#/definitions/ShotOutcome" },
+        "runs": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "description": { "type": "string" },
+        "end_position": { "$ref": "#/definitions/Position", "description": "For wagon wheel visualization" },
+        "fielder_involved": { "type": ["string", "null"] }
+      },
+      "required": ["outcome", "runs", "description", "end_position", "fielder_involved"],
+      "additionalProperties": false
+    },
+
+    "RadarTrackingData": {
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "exit_speed": { "type": "number", "minimum": 0, "maximum": 200, "description": "km/h" },
+        "horizontal_angle": { "type": "number", "minimum": -180, "maximum": 180, "description": "degrees from straight" },
+        "vertical_angle": { "type": "number", "minimum": 0, "maximum": 90, "description": "degrees from horizontal" },
+        "projected_distance": { "type": "number", "minimum": 0 },
+        "max_height": { "type": "number", "minimum": 0 },
+        "landing_x": { "type": "number" },
+        "landing_y": { "type": "number" },
+        "frames_captured": { "type": "integer", "minimum": 0 },
+        "detection_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": [
+        "timestamp", "exit_speed", "horizontal_angle", "vertical_angle",
+        "projected_distance", "max_height", "landing_x", "landing_y",
+        "frames_captured", "detection_confidence"
+      ],
+      "additionalProperties": false
+    },
+
+    "ErrorPayload": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Error code from error_codes.md" },
+        "message": { "type": "string" },
+        "details": { "type": ["object", "null"] },
+        "recoverable": { "type": "boolean" }
+      },
+      "required": ["code", "message", "recoverable"],
+      "additionalProperties": false
+    }
+  },
+
+  "clientToServer": {
+    "description": "Messages sent from React UI to Python server",
+
+    "set_field": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "set_field" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "fielders": { "type": "array", "items": { "$ref": "#/definitions/FielderConfig" }, "minItems": 1, "maxItems": 11 },
+            "boundary_distance": { "type": "number", "minimum": 50, "maximum": 100, "default": 70 }
+          },
+          "required": ["fielders"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "set_difficulty": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "set_difficulty" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "difficulty": { "$ref": "#/definitions/Difficulty" }
+          },
+          "required": ["difficulty"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "select_profile": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "select_profile" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "profile_id": { "type": "string" }
+          },
+          "required": ["profile_id"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "create_profile": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create_profile" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "batting_hand": { "$ref": "#/definitions/BattingHand" }
+          },
+          "required": ["name", "batting_hand"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "manual_input": {
+      "type": "object",
+      "description": "Manual ball entry when radar is not connected or for testing",
+      "properties": {
+        "type": { "const": "manual_input" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "result": { "$ref": "#/definitions/BallResult" },
+            "is_boundary": { "type": "boolean", "default": false }
+          },
+          "required": ["result"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "start_session": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "start_session" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "profile_id": { "type": "string" },
+            "field_config": { "type": "array", "items": { "$ref": "#/definitions/FielderConfig" } },
+            "difficulty": { "$ref": "#/definitions/Difficulty" },
+            "notes": { "type": ["string", "null"], "maxLength": 500 }
+          },
+          "required": ["profile_id"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "end_session": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "end_session" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session_id": { "type": "string" },
+            "save_to_database": { "type": "boolean", "default": true }
+          },
+          "required": ["session_id"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "undo": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "undo" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session_id": { "type": "string" }
+          },
+          "required": ["session_id"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "update_profile": {
+      "type": "object",
+      "description": "Update an existing player profile (rename, change batting hand)",
+      "properties": {
+        "type": { "const": "update_profile" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "profile_id": { "type": "string" },
+            "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "batting_hand": { "$ref": "#/definitions/BattingHand" }
+          },
+          "required": ["profile_id"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "ping": {
+      "type": "object",
+      "description": "Heartbeat ping from client to keep connection alive",
+      "properties": {
+        "type": { "const": "ping" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "message_id", "timestamp"],
+      "additionalProperties": false
+    }
+  },
+
+  "serverToClient": {
+    "description": "Messages sent from Python server to React UI",
+
+    "shot_result": {
+      "type": "object",
+      "description": "Result of a delivery (from radar tracking or manual input). Uses SlimShotResult for efficient WebSocket transfer. Full data available via REST API.",
+      "properties": {
+        "type": { "const": "shot_result" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "in_reply_to": { "type": ["string", "null"], "format": "uuid" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session_id": { "type": "string" },
+            "ball_number": { "type": "integer", "minimum": 1 },
+            "radar_data": { "oneOf": [{ "$ref": "#/definitions/RadarTrackingData" }, { "type": "null" }] },
+            "simulation": { "$ref": "#/definitions/SlimShotResult" }
+          },
+          "required": ["session_id", "ball_number", "simulation"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "session_state": {
+      "type": "object",
+      "description": "Full session state snapshot (sent on connect, after updates)",
+      "properties": {
+        "type": { "const": "session_state" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "in_reply_to": { "type": ["string", "null"], "format": "uuid" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session": { "oneOf": [{ "$ref": "#/definitions/SessionData" }, { "type": "null" }] },
+            "profiles": { "type": "array", "items": { "$ref": "#/definitions/Profile" } },
+            "active_profile_id": { "type": ["string", "null"] },
+            "difficulty": { "$ref": "#/definitions/Difficulty" },
+            "field_config": { "type": "array", "items": { "$ref": "#/definitions/FielderConfig" } },
+            "boundary_distance": { "type": "number" }
+          },
+          "required": ["session", "profiles", "difficulty", "field_config", "boundary_distance"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "wagon_wheel_update": {
+      "type": "object",
+      "description": "Update wagon wheel visualization with new shot",
+      "properties": {
+        "type": { "const": "wagon_wheel_update" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session_id": { "type": "string" },
+            "shot": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "end_x": { "type": "number", "description": "Screen X % (0-100)" },
+                "end_y": { "type": "number", "description": "Screen Y % (0-100)" },
+                "outcome": { "$ref": "#/definitions/BallResult" },
+                "distance": { "type": "number", "description": "Distance in metres" }
+              },
+              "required": ["id", "end_x", "end_y", "outcome", "distance"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["session_id", "shot"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "ball_tracking": {
+      "type": "object",
+      "description": "Real-time ball tracking updates from radar (high frequency)",
+      "properties": {
+        "type": { "const": "ball_tracking" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "tracking_state": { "type": "string", "enum": ["idle", "detecting", "tracking", "completed"] },
+            "current_position": { "oneOf": [{ "$ref": "#/definitions/Position" }, { "type": "null" }] },
+            "current_speed": { "type": ["number", "null"] },
+            "frames_captured": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["tracking_state"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "connection_status": {
+      "type": "object",
+      "description": "Connection and device status updates",
+      "properties": {
+        "type": { "const": "connection_status" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "connection_state": { "$ref": "#/definitions/ConnectionState" },
+            "session_state": { "$ref": "#/definitions/SessionState" },
+            "radar_connected": { "type": "boolean" },
+            "radar_status": { "type": ["string", "null"] },
+            "server_version": { "type": "string" },
+            "uptime_seconds": { "type": "number" }
+          },
+          "required": ["connection_state", "session_state", "radar_connected", "server_version"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "error": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "error" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "in_reply_to": { "type": ["string", "null"], "format": "uuid" },
+        "payload": { "$ref": "#/definitions/ErrorPayload" }
+      },
+      "required": ["type", "message_id", "timestamp", "payload"],
+      "additionalProperties": false
+    },
+
+    "pong": {
+      "type": "object",
+      "description": "Heartbeat pong response from server",
+      "properties": {
+        "type": { "const": "pong" },
+        "message_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "in_reply_to": { "type": "string", "format": "uuid", "description": "UUID of the ping message" }
+      },
+      "required": ["type", "message_id", "timestamp", "in_reply_to"],
+      "additionalProperties": false
+    }
+  }
+}

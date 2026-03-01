@@ -1,35 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
-import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
-import { simulateDelivery, calculateTrajectory, type SimulationResult } from './gameEngine'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, type FielderWithZone } from './fieldZones'
+import { useGameState } from './api/hooks/useGameState'
+import { useGameActions } from './api/hooks/useGameActions'
+import { ServerConfig } from './components/ServerConfig'
+import type { BallResult, Over, WagonWheelShot, FielderConfig } from './api/types'
 
-// Types
+// Types for UI-only state
 interface ShotLine {
   id: string
   endX: number      // Screen % (0-100)
   endY: number      // Screen % (0-100)
   outcome: BallResult
   distance: number  // metres from batter
-}
-
-interface Session {
-  id: string
-  date: string
-  runs: number
-  balls: number
-  fours: number
-  sixes: number
-  wickets: number
-  isOut: boolean
-  overs: Over[]
-  strikeRate: number
-}
-
-interface Profile {
-  id: string
-  name: string
-  sessions: Session[]
-  currentSession: Session
 }
 
 // Simple fielder position (zone calculated dynamically)
@@ -40,51 +23,14 @@ interface FielderPosition {
 }
 
 type BattingHand = 'right' | 'left'
-type Difficulty = 'easy' | 'medium' | 'hard'
-type BallResult = 'dot' | '1' | '2' | '3' | '4' | '6' | 'W' | 'wd' | 'nb'
-type LastBallResult = null | BallResult
-
-interface Over {
-  balls: BallResult[]
-  runs: number
-}
-
-const createEmptySession = (): Session => ({
-  id: Date.now().toString(),
-  date: new Date().toISOString(),
-  runs: 0,
-  balls: 0,
-  fours: 0,
-  sixes: 0,
-  wickets: 0,
-  isOut: false,
-  overs: [{ balls: [], runs: 0 }],
-  strikeRate: 0,
-})
-
-const createDefaultProfiles = (): Profile[] => [
-  {
-    id: '1',
-    name: 'Player 1',
-    sessions: [],
-    currentSession: createEmptySession(),
-  },
-  {
-    id: '2',
-    name: 'Player 2',
-    sessions: [],
-    currentSession: createEmptySession(),
-  },
-]
-
-// LocalStorage helpers
-const STORAGE_KEY = 'cricket-app-profiles'
-const CUSTOM_FIELDS_KEY = 'cricket-app-custom-fields'
 
 type CustomFieldPreset = {
   name: string
   positions: Array<{ id: string; x: number; y: number }>
 }
+
+// LocalStorage helpers for custom fields (UI-only)
+const CUSTOM_FIELDS_KEY = 'cricket-app-custom-fields'
 
 const loadCustomFields = (): CustomFieldPreset[] => {
   try {
@@ -106,63 +52,63 @@ const saveCustomFields = (fields: CustomFieldPreset[]) => {
   }
 }
 
-const migrateSession = (session: Session): Session => ({
-  ...session,
-  wickets: session.wickets ?? 0,
-})
-
-const loadProfiles = (): Profile[] => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const profiles: Profile[] = JSON.parse(saved)
-      // Migrate old sessions to include wickets field
-      return profiles.map(profile => ({
-        ...profile,
-        currentSession: migrateSession(profile.currentSession),
-        sessions: profile.sessions.map(migrateSession),
-      }))
-    }
-  } catch (e) {
-    console.error('Failed to load profiles:', e)
+// Convert server WagonWheelShot to UI ShotLine
+function serverShotToShotLine(shot: WagonWheelShot): ShotLine {
+  return {
+    id: shot.id,
+    endX: shot.end_x,
+    endY: shot.end_y,
+    outcome: shot.outcome,
+    distance: shot.distance,
   }
-  return createDefaultProfiles()
 }
 
-const saveProfiles = (profiles: Profile[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles))
-  } catch (e) {
-    console.error('Failed to save profiles:', e)
+// Convert FielderConfig to FielderPosition
+function fielderConfigToPosition(config: FielderConfig): FielderPosition {
+  return {
+    id: config.id || config.name,
+    x: config.x,
+    y: config.y,
   }
 }
 
 function App() {
-  const [profiles, setProfiles] = useState<Profile[]>(loadProfiles)
-  const [activeProfileId, setActiveProfileId] = useState<string>('1')
+  // ============================================================================
+  // SERVER STATE (from WebSocket)
+  // ============================================================================
+  const { gameState, isLoading, error, connectionStatus, isConnected, client } = useGameState()
+  const actions = useGameActions(client)
+
+  // ============================================================================
+  // UI-ONLY STATE (animations, modals, drag positions, local preferences)
+  // ============================================================================
+
+  // Field editor state
   const [fielderPositions, setFielderPositions] = useState<FielderPosition[]>(FIELD_PRESET_POSITIONS['Standard Pace'])
   const [batterHand, setBatterHand] = useState<BattingHand>('right')
   const [showFieldEditor, setShowFieldEditor] = useState(false)
-  const [showSessionHistory, setShowSessionHistory] = useState(false)
-  const [historyProfileId, setHistoryProfileId] = useState<string | null>(null)
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
-  const [lastBall, setLastBall] = useState<LastBallResult>(null)
-  const [isFlashing, setIsFlashing] = useState(false)
-  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState('')
-  const [sessionHistory, setSessionHistory] = useState<Session[]>([])
   const [customFields, setCustomFields] = useState<CustomFieldPreset[]>(loadCustomFields)
   const [isSavingField, setIsSavingField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false)
-  const [wagonWheelShots, setWagonWheelShots] = useState<ShotLine[]>([])
 
-  // Shot simulator state
-  const [simAngle, setSimAngle] = useState('30')
-  const [simElevation, setSimElevation] = useState('10')
-  const [simSpeed, setSimSpeed] = useState('80')
-  const [simResult, setSimResult] = useState<SimulationResult | null>(null)
-  const [simError, setSimError] = useState<string | null>(null)
+  // Session history modal
+  const [showSessionHistory, setShowSessionHistory] = useState(false)
+  const [historyProfileId, setHistoryProfileId] = useState<string | null>(null)
+
+  // Server settings modal
+  const [showServerConfig, setShowServerConfig] = useState(false)
+
+  // Profile editing
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+
+  // Animation state
+  const [lastBall, setLastBall] = useState<BallResult | null>(null)
+  const [isFlashing, setIsFlashing] = useState(false)
+
+  // Local wagon wheel shots for animation (synced from server)
+  const [wagonWheelShots, setWagonWheelShots] = useState<ShotLine[]>([])
 
   // Track fielder catch position (fielder ID -> screen position where they caught it)
   const [catchDisplayPosition, setCatchDisplayPosition] = useState<{
@@ -171,7 +117,7 @@ function App() {
     screenY: number
   } | null>(null)
 
-  // Track fielder ground fielding position (fielder ID -> screen position where they fielded it)
+  // Track fielder ground fielding position
   const [fieldingDisplayPosition, setFieldingDisplayPosition] = useState<{
     fielderId: string
     screenX: number
@@ -182,21 +128,103 @@ function App() {
   const catchResetTimeout = useRef<number | null>(null)
   const fieldingResetTimeout = useRef<number | null>(null)
 
-  const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
-  const currentSession = activeProfile.currentSession
-  const currentOver = currentSession.overs[currentSession.overs.length - 1]
-  const currentOverNumber = currentSession.overs.length
-  const legalBallsInOver = currentOver.balls.filter(b => b !== 'wd' && b !== 'nb').length
+  // ============================================================================
+  // DERIVED STATE
+  // ============================================================================
 
-  // Save to localStorage when profiles change
+  // Get current session data from server state
+  const currentSession = gameState?.session
+  const profiles = gameState?.profiles || []
+  const activeProfileId = gameState?.activeProfileId
+  const activeProfile = profiles.find(p => p.id === activeProfileId)
+  const difficulty = gameState?.difficulty || 'medium'
+
+  // Current over calculations
+  const currentOver: Over | null = currentSession?.overs?.[currentSession.overs.length - 1] || null
+  const currentOverNumber = currentSession?.overs?.length || 1
+  const legalBallsInOver = currentOver?.balls.filter(b => b !== 'wd' && b !== 'nb').length || 0
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Sync wagon wheel shots from server
   useEffect(() => {
-    saveProfiles(profiles)
-  }, [profiles])
+    if (gameState?.wagonWheelShots) {
+      setWagonWheelShots(gameState.wagonWheelShots.map(serverShotToShotLine))
+    }
+  }, [gameState?.wagonWheelShots])
 
-  // Save to localStorage when custom fields change
+  // Sync field config from server
+  useEffect(() => {
+    if (gameState?.fieldConfig && gameState.fieldConfig.length > 0) {
+      setFielderPositions(gameState.fieldConfig.map(fielderConfigToPosition))
+    }
+  }, [gameState?.fieldConfig])
+
+  // Handle shot results for animations
+  useEffect(() => {
+    if (gameState?.lastShotResult) {
+      const result = gameState.lastShotResult
+
+      // Determine ball result for display
+      let ballResult: BallResult
+      if (result.outcome === 'caught') {
+        ballResult = 'W'
+      } else if (result.outcome === 'dropped' || result.outcome === 'misfield') {
+        ballResult = result.runs.toString() as BallResult
+      } else if (result.runs === 4) {
+        ballResult = '4'
+      } else if (result.runs === 6) {
+        ballResult = '6'
+      } else if (result.runs === 0) {
+        ballResult = 'dot'
+      } else {
+        ballResult = result.runs.toString() as BallResult
+      }
+
+      setLastBall(ballResult)
+      setIsFlashing(true)
+      setTimeout(() => setIsFlashing(false), 500)
+
+      // Handle fielder animations
+      if (result.outcome === 'caught' && result.fielder_involved && result.end_position) {
+        const screen = fieldToScreen(result.end_position.x, result.end_position.y)
+        setCatchDisplayPosition({
+          fielderId: result.fielder_involved,
+          screenX: screen.x,
+          screenY: screen.y,
+        })
+        if (catchResetTimeout.current) clearTimeout(catchResetTimeout.current)
+        catchResetTimeout.current = window.setTimeout(() => {
+          setCatchDisplayPosition(null)
+        }, 1500)
+      }
+
+      // Fielding animation - use end_position for non-catches
+      if (result.fielder_involved && result.end_position && result.outcome !== 'caught') {
+        const fieldingScreen = fieldToScreen(result.end_position.x, result.end_position.y)
+        setFieldingDisplayPosition({
+          fielderId: result.fielder_involved,
+          screenX: fieldingScreen.x,
+          screenY: fieldingScreen.y,
+        })
+        if (fieldingResetTimeout.current) clearTimeout(fieldingResetTimeout.current)
+        fieldingResetTimeout.current = window.setTimeout(() => {
+          setFieldingDisplayPosition(null)
+        }, 1500)
+      }
+    }
+  }, [gameState?.lastShotResult])
+
+  // Save custom fields to localStorage
   useEffect(() => {
     saveCustomFields(customFields)
   }, [customFields])
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
 
   const handleSaveNewCustomField = () => {
     if (newFieldName.trim()) {
@@ -223,369 +251,36 @@ function App() {
     setCustomFields(prev => prev.filter(f => f.name !== name))
   }
 
-  const calculateStrikeRate = (runs: number, balls: number): number => {
-    if (balls === 0) return 0
-    return (runs / balls) * 100
+  const handleDifficultyChange = (newDifficulty: 'easy' | 'medium' | 'hard') => {
+    actions.setDifficulty(newDifficulty)
   }
 
-  // Generate a random shot for wagon wheel based on outcome
-  const generateShotLine = (outcome: BallResult): ShotLine | null => {
-    // Don't generate shots for extras
-    if (outcome === 'wd' || outcome === 'nb') return null
-
-    // Distance ranges based on outcome (in metres)
-    let minDist: number, maxDist: number
-    switch (outcome) {
-      case 'dot': minDist = 5; maxDist = 25; break
-      case '1': minDist = 10; maxDist = 35; break
-      case '2': minDist = 25; maxDist = 50; break
-      case '3': minDist = 35; maxDist = 55; break
-      case '4': minDist = 55; maxDist = 68; break  // Boundary
-      case '6': minDist = 70; maxDist = 85; break  // Over boundary
-      case 'W': minDist = 5; maxDist = 40; break   // Caught anywhere
-      default: return null
-    }
-
-    // Random angle (0-360 degrees, 0 = toward bowler)
-    const angle = Math.random() * 360
-    const angleRad = (angle * Math.PI) / 180
-
-    // Random distance within range
-    const distance = minDist + Math.random() * (maxDist - minDist)
-
-    // Convert to field coordinates (x, y in metres from batter)
-    // y positive = toward bowler, x positive = leg side
-    const fieldX = distance * Math.sin(angleRad)
-    const fieldY = distance * Math.cos(angleRad)
-
-    // Convert to screen coordinates
-    const screen = fieldToScreen(fieldX, fieldY)
-
-    return {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      endX: screen.x,
-      endY: screen.y,
-      outcome,
-      distance
-    }
-  }
-
-  // Simulate a shot using the TypeScript game engine
-  const simulateShot = () => {
-    setSimError(null)
-    // Clear any pending reset timeouts
-    if (catchResetTimeout.current) {
-      clearTimeout(catchResetTimeout.current)
-      catchResetTimeout.current = null
-    }
-    if (fieldingResetTimeout.current) {
-      clearTimeout(fieldingResetTimeout.current)
-      fieldingResetTimeout.current = null
-    }
-    // Reset any previous catch/fielding display positions
-    setCatchDisplayPosition(null)
-    setFieldingDisplayPosition(null)
-
-    try {
-      // Parse inputs, default to 0 if empty/invalid
-      const speed = parseFloat(simSpeed) || 0
-      const angle = parseFloat(simAngle) || 0
-      const elevation = parseFloat(simElevation) || 0
-
-      // Validate - need at least some speed to simulate
-      if (speed <= 0) {
-        setSimError('Speed must be greater than 0')
-        return
+  const handleNewSession = () => {
+    if (activeProfileId) {
+      // End current session first if it exists
+      if (currentSession?.id) {
+        actions.endSession(currentSession.id)
       }
-
-      // Calculate trajectory
-      const trajectory = calculateTrajectory(speed, angle, elevation)
-
-      // Convert current fielder positions to game engine format (screen % -> metres)
-      // Also track fielder ID -> zone name mapping for catch display
-      const fielderIdToZone: Record<string, string> = {}
-      const fieldConfig = fielderPositions.map(f => {
-        const field = screenToField(f.x, f.y)
-        // Find zone name for this fielder
-        const zones = calculateFielderZones([f], batterHand === 'left')
-        const zoneName = zones[0]?.zoneName || 'fielder'
-        fielderIdToZone[f.id] = zoneName
-        return {
-          x: field.x,
-          y: field.y,
-          name: zoneName,
-        }
-      })
-
-      // Run simulation
-      // Use final_x/final_y (where ball stops after rolling) instead of landing point
-      // This ensures the ball path direction matches the total distance
-      const result = simulateDelivery(
-        speed,
-        angle,
-        elevation,
-        trajectory.final_x,
-        trajectory.final_y,
-        trajectory.projected_distance,
-        trajectory.max_height,
-        fieldConfig,
-        70.0,  // Match visual field radius
-        difficulty
-      )
-
-      // Combine result with trajectory
-      const fullResult: SimulationResult = {
-        ...result,
-        trajectory,
-      }
-      setSimResult(fullResult)
-
-      // Debug: comprehensive shot analysis
-      console.log('SHOT DEBUG:', JSON.stringify({
-        input: { speed, angle, elevation },
-        trajectory: {
-          aerial_distance: trajectory.aerial_distance,
-          rolling_distance: trajectory.rolling_distance,
-          total_distance: trajectory.projected_distance,
-          flight_time: trajectory.time_of_flight,
-          max_height: trajectory.max_height,
-          landing: { x: trajectory.landing_x, y: trajectory.landing_y },
-          final: { x: trajectory.final_x, y: trajectory.final_y },
-        },
-        fielding: {
-          outcome: result.outcome,
-          runs: result.runs,
-          fielder: result.fielder_involved,
-          fielder_start: result.fielder_position,
-          intercept_pos: result.fielding_position,
-          is_boundary: result.is_boundary,
-          fielding_time: result.fielding_time,
-          collection_difficulty: result.collection_difficulty,
-          alignment_score: result.alignment_score,
-          priority_score: result.priority_score,
-          fielder_arrival_time: result.fielder_arrival_time,
-          ball_arrival_time: result.ball_arrival_time,
-        },
-        catch_analysis: result.catch_analysis ? {
-          can_catch: result.catch_analysis.canCatch,
-          difficulty: result.catch_analysis.difficulty,
-          catch_type: result.catch_analysis.catchType,
-          ball_arrival_time: result.catch_analysis.timeToIntercept,
-          fielder_arrival_time: result.catch_analysis.fielderArrivalTime,
-          arrived_before_landing: result.catch_analysis.arrivedBeforeLanding,
-          flight_time: trajectory.time_of_flight,
-          movement_required: result.catch_analysis.movementRequired,
-          height_at_intercept: result.catch_analysis.heightAtIntercept,
-        } : null,
-        description: result.description,
-      }, null, 2))
-
-      // Add to wagon wheel - use end_position (where ball ended up)
-      const endPos = result.end_position
-      const screen = fieldToScreen(endPos.x, endPos.y)
-      const shotLine: ShotLine = {
-        id: Date.now().toString(),
-        endX: screen.x,
-        endY: screen.y,
-        outcome: result.outcome === 'caught' || result.outcome === 'dropped' ? 'W' :
-                 result.outcome === 'misfield' ? String(result.runs) as BallResult :
-                 result.outcome as BallResult,
-        distance: Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y),
-      }
-      setWagonWheelShots(prev => [...prev, shotLine])
-
-      // If caught, show fielder at catch position
-      if (result.outcome === 'caught' && result.fielder_involved) {
-        // Find the fielder ID that matches the zone name
-        const catchingFielderId = Object.entries(fielderIdToZone)
-          .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
-
-        if (catchingFielderId) {
-          setCatchDisplayPosition({
-            fielderId: catchingFielderId,
-            screenX: screen.x,
-            screenY: screen.y,
-          })
-          // Reset fielder position after animation completes
-          catchResetTimeout.current = window.setTimeout(() => {
-            setCatchDisplayPosition(null)
-          }, 1500)
-        }
-      }
-
-      // If ground fielding occurred, show fielder at fielding position
-      if (result.fielding_position && result.fielder_involved && result.outcome !== 'caught') {
-        const fieldingFielderId = Object.entries(fielderIdToZone)
-          .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
-
-        console.log('Fielding animation: fielder=', result.fielder_involved, 'id=', fieldingFielderId, 'pos=', result.fielding_position)
-
-        if (fieldingFielderId) {
-          const fieldingScreen = fieldToScreen(result.fielding_position.x, result.fielding_position.y)
-          console.log('Setting fieldingDisplayPosition:', fieldingFielderId, fieldingScreen)
-          setFieldingDisplayPosition({
-            fielderId: fieldingFielderId,
-            screenX: fieldingScreen.x,
-            screenY: fieldingScreen.y,
-          })
-          // Reset fielder position after animation completes
-          fieldingResetTimeout.current = window.setTimeout(() => {
-            setFieldingDisplayPosition(null)
-          }, 1500)
-        }
-      } else {
-        console.log('No fielding animation: hasPos=', !!result.fielding_position, 'fielder=', result.fielder_involved, 'outcome=', result.outcome)
-      }
-
-      // Update score if not caught (skipWagonWheel=true since we already added it above)
-      if (result.outcome !== 'caught') {
-        addRuns(result.runs, result.is_boundary, false, false, false, true)
-      } else {
-        addRuns(0, false, true, false, false, true)  // Wicket
-      }
-
-    } catch (err) {
-      setSimError('Simulation error: ' + (err as Error).message)
-    }
-  }
-
-  const updateCurrentSession = (updater: (session: Session) => Session) => {
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== activeProfileId) return profile
-      const newSession = updater(profile.currentSession)
-      newSession.strikeRate = calculateStrikeRate(newSession.runs, newSession.balls)
-      return { ...profile, currentSession: newSession }
-    }))
-  }
-
-  const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false, skipWagonWheel: boolean = false) => {
-    // Save current state for undo (push to history stack)
-    setSessionHistory(prev => [...prev, { ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) }])
-
-    let ballResult: BallResult
-    if (isNoBall) {
-      ballResult = 'nb'
-    } else if (isWide) {
-      ballResult = 'wd'
-    } else if (isWicket) {
-      ballResult = 'W'
-    } else if (runs === 0) {
-      ballResult = 'dot'
-    } else if (runs === 6) {
-      ballResult = '6'
-    } else if (runs === 4 && isBoundary) {
-      ballResult = '4'
-    } else {
-      ballResult = runs.toString() as BallResult
-    }
-
-    const isExtra = isWide || isNoBall
-
-    updateCurrentSession(session => {
-      const newOvers = [...session.overs]
-      const currentOverIndex = newOvers.length - 1
-      const currentOver = { ...newOvers[currentOverIndex] }
-
-      currentOver.balls = [...currentOver.balls, ballResult]
-      currentOver.runs += (isExtra ? 1 : (isWicket ? 0 : runs))
-      newOvers[currentOverIndex] = currentOver
-
-      // Count legal deliveries (not wides or no balls) to determine end of over
-      const legalBalls = currentOver.balls.filter(b => b !== 'wd' && b !== 'nb').length
-      if (legalBalls === 6) {
-        newOvers.push({ balls: [], runs: 0 })
-      }
-
-      return {
-        ...session,
-        runs: session.runs + (isExtra ? 1 : (isWicket ? 0 : runs)),
-        balls: isExtra ? session.balls : session.balls + 1, // Extras don't count as balls faced
-        fours: runs === 4 && isBoundary ? session.fours + 1 : session.fours,
-        sixes: runs === 6 ? session.sixes + 1 : session.sixes,
-        wickets: isWicket ? session.wickets + 1 : session.wickets,
-        isOut: isWicket ? true : session.isOut,
-        overs: newOvers,
-      }
-    })
-
-    setLastBall(ballResult)
-    setIsFlashing(true)
-    setTimeout(() => setIsFlashing(false), 500)
-
-    // Add shot to wagon wheel (for manual input - generates random position)
-    // Skip if called from simulateShot which adds its own precise trajectory
-    if (!skipWagonWheel) {
-      const shotLine = generateShotLine(ballResult)
-      if (shotLine) {
-        setWagonWheelShots(prev => [...prev, shotLine])
-      }
-    }
-  }
-
-  const undoLastBall = () => {
-    if (sessionHistory.length === 0) return
-
-    const previousSession = sessionHistory[sessionHistory.length - 1]
-
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== activeProfileId) return profile
-      return { ...profile, currentSession: previousSession }
-    }))
-
-    // Set last ball to the previous ball (if any)
-    const prevOvers = previousSession.overs
-    const prevOver = prevOvers[prevOvers.length - 1]
-    if (prevOver.balls.length > 0) {
-      setLastBall(prevOver.balls[prevOver.balls.length - 1])
-    } else if (prevOvers.length > 1) {
-      const overBefore = prevOvers[prevOvers.length - 2]
-      setLastBall(overBefore.balls[overBefore.balls.length - 1])
-    } else {
+      // Start new session
+      const fieldConfig: FielderConfig[] = fielderPositions.map(f => ({
+        id: f.id,
+        x: f.x,
+        y: f.y,
+        name: f.id, // Use ID as name for now
+      }))
+      actions.startSession(activeProfileId, fieldConfig, difficulty)
       setLastBall(null)
+      setWagonWheelShots([])
     }
-
-    // Pop from history stack
-    setSessionHistory(prev => prev.slice(0, -1))
-
-    // Remove last wagon wheel shot
-    setWagonWheelShots(prev => prev.slice(0, -1))
   }
 
-  const addNewProfile = () => {
-    const newId = Date.now().toString()
-    const newProfile: Profile = {
-      id: newId,
-      name: `Player ${profiles.length + 1}`,
-      sessions: [],
-      currentSession: createEmptySession(),
-    }
-    setProfiles(prev => [...prev, newProfile])
-    setActiveProfileId(newId)
+  const handleSelectProfile = (profileId: string) => {
+    actions.selectProfile(profileId)
   }
 
-  const startNewSession = () => {
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== activeProfileId) return profile
-
-      // Only save session if there were balls faced
-      const sessions = profile.currentSession.balls > 0
-        ? [...profile.sessions, profile.currentSession]
-        : profile.sessions
-
-      return {
-        ...profile,
-        sessions,
-        currentSession: createEmptySession(),
-      }
-    }))
-    setLastBall(null)
-    setSessionHistory([])
-    setWagonWheelShots([])
-  }
-
-  const openSessionHistory = (profileId: string) => {
-    setHistoryProfileId(profileId)
-    setShowSessionHistory(true)
+  const handleAddNewProfile = () => {
+    const name = `Player ${profiles.length + 1}`
+    actions.createProfile(name, 'right')
   }
 
   const startEditingName = (profileId: string, currentName: string) => {
@@ -595,66 +290,107 @@ function App() {
 
   const saveProfileName = () => {
     if (editingProfileId && editingName.trim()) {
-      setProfiles(prev => prev.map(profile =>
-        profile.id === editingProfileId
-          ? { ...profile, name: editingName.trim() }
-          : profile
-      ))
+      actions.updateProfile(editingProfileId, editingName.trim())
     }
     setEditingProfileId(null)
     setEditingName('')
   }
 
-  const resumeSession = (sessionId: string) => {
-    if (!historyProfileId) return
+  const handleManualInput = (result: BallResult, isBoundary: boolean = false) => {
+    actions.manualInput(result, isBoundary)
+    setLastBall(result)
+    setIsFlashing(true)
+    setTimeout(() => setIsFlashing(false), 500)
+  }
 
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== historyProfileId) return profile
+  const handleUndo = () => {
+    if (currentSession?.id) {
+      actions.undo(currentSession.id)
+    }
+  }
 
-      const sessionIndex = profile.sessions.findIndex(s => s.id === sessionId)
-      if (sessionIndex === -1) return profile
+  const openSessionHistory = (profileId: string) => {
+    setHistoryProfileId(profileId)
+    setShowSessionHistory(true)
+  }
 
-      const sessionToResume = profile.sessions[sessionIndex]
-      const remainingSessions = profile.sessions.filter(s => s.id !== sessionId)
-
-      // Save current session if it has balls, then load the old one
-      const updatedSessions = profile.currentSession.balls > 0
-        ? [...remainingSessions, profile.currentSession]
-        : remainingSessions
-
-      return {
-        ...profile,
-        sessions: updatedSessions,
-        currentSession: { ...sessionToResume, date: new Date().toISOString() },
-      }
+  const handleFieldUpdate = (newPositions: FielderPosition[]) => {
+    setFielderPositions(newPositions)
+    // Send to server
+    const fieldConfig: FielderConfig[] = newPositions.map(f => ({
+      id: f.id,
+      x: f.x,
+      y: f.y,
+      name: f.id,
     }))
-
-    setActiveProfileId(historyProfileId)
-    setShowSessionHistory(false)
-    setLastBall(null)
-    setSessionHistory([])
-    setWagonWheelShots([])
+    actions.setField(fieldConfig, 70)
   }
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  // ============================================================================
+  // CONNECTION STATUS UI
+  // ============================================================================
+
+  if (!isConnected) {
+    return (
+      <div className="app">
+        <div className="connection-overlay">
+          <div className="connection-status">
+            <div className="connection-icon">
+              {connectionStatus.state === 'connecting' || connectionStatus.state === 'reconnecting' ? (
+                <div className="spinner" />
+              ) : (
+                <span className="disconnected-icon">!</span>
+              )}
+            </div>
+            <h2>
+              {connectionStatus.state === 'connecting' && 'Connecting to server...'}
+              {connectionStatus.state === 'reconnecting' && `Reconnecting... (attempt ${connectionStatus.reconnectAttempts})`}
+              {connectionStatus.state === 'disconnected' && 'Disconnected'}
+            </h2>
+            {connectionStatus.lastError && (
+              <p className="connection-error">{connectionStatus.lastError.message}</p>
+            )}
+            {connectionStatus.state === 'disconnected' && (
+              <button className="reconnect-btn" onClick={() => client?.connect()}>
+                Reconnect
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const formatOvers = (overs: Over[]): string => {
-    const countLegalBalls = (balls: BallResult[]) => balls.filter(b => b !== 'wd' && b !== 'nb').length
-    const completedOvers = overs.filter(o => countLegalBalls(o.balls) === 6).length
-    const ballsInCurrentOver = countLegalBalls(overs[overs.length - 1]?.balls || [])
-    return `${completedOvers}.${ballsInCurrentOver}`
+  if (isLoading) {
+    return (
+      <div className="app">
+        <div className="connection-overlay">
+          <div className="connection-status">
+            <div className="spinner" />
+            <h2>Loading game state...</h2>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const historyProfile = profiles.find(p => p.id === historyProfileId)
+  if (error) {
+    return (
+      <div className="app">
+        <div className="connection-overlay">
+          <div className="connection-status error">
+            <span className="error-icon">!</span>
+            <h2>Error</h2>
+            <p className="connection-error">{error}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
 
   return (
     <div className="app">
@@ -675,18 +411,35 @@ function App() {
             <label>Difficulty</label>
             <select
               value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+              onChange={(e) => handleDifficultyChange(e.target.value as 'easy' | 'medium' | 'hard')}
             >
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
           </div>
-          <button className="new-session-btn" onClick={startNewSession}>
+          <button className="new-session-btn" onClick={handleNewSession}>
             New Session
+          </button>
+          <button
+            className="settings-btn"
+            onClick={() => setShowServerConfig(true)}
+            title="Server Settings"
+          >
+            <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`} />
+            Settings
           </button>
         </div>
       </header>
+
+      {/* Server Config Modal */}
+      {showServerConfig && (
+        <ServerConfig
+          isConnected={isConnected}
+          connectionState={connectionStatus.state}
+          onClose={() => setShowServerConfig(false)}
+        />
+      )}
 
       {/* Main Content */}
       <main className="main-content">
@@ -699,12 +452,12 @@ function App() {
                 <button
                   key={profile.id}
                   className={`batsman-btn ${activeProfileId === profile.id ? 'active' : ''}`}
-                  onClick={() => setActiveProfileId(profile.id)}
+                  onClick={() => handleSelectProfile(profile.id)}
                 >
                   {profile.name}
                 </button>
               ))}
-              <button className="batsman-btn add-batsman-btn" onClick={addNewProfile}>
+              <button className="batsman-btn add-batsman-btn" onClick={handleAddNewProfile}>
                 + Add
               </button>
             </div>
@@ -731,44 +484,46 @@ function App() {
                     autoFocus
                   />
                 ) : (
-                  <span className="batsman-name">{activeProfile.name}</span>
+                  <span className="batsman-name">{activeProfile?.name || 'No player selected'}</span>
                 )}
-                <button
-                  className="inline-btn edit"
-                  onClick={() => startEditingName(activeProfileId, activeProfile.name)}
-                  title="Edit name"
-                >
-                  ✏️
-                </button>
-                {activeProfile.sessions.length > 0 && (
+                {activeProfileId && (
+                  <button
+                    className="inline-btn edit"
+                    onClick={() => startEditingName(activeProfileId, activeProfile?.name || '')}
+                    title="Edit name"
+                  >
+                    ✏️
+                  </button>
+                )}
+                {activeProfileId && (
                   <button
                     className="inline-btn history"
                     onClick={() => openSessionHistory(activeProfileId)}
                     title="View session history"
                   >
-                    📊 {activeProfile.sessions.length}
+                    📊
                   </button>
                 )}
               </div>
               <span className="batsman-status">
-                {currentSession.isOut ? 'OUT' : 'BATTING'}
+                {currentSession?.is_out ? 'OUT' : 'BATTING'}
               </span>
             </div>
             <div className="score-display">
               <div className={`runs ${isFlashing ? 'flash' : ''}`}>
-                {currentSession.runs}-{currentSession.wickets}
+                {currentSession?.runs ?? 0}-{currentSession?.wickets ?? 0}
               </div>
               <div className="score-details">
                 <div className="score-stat">
-                  <div className="score-stat-value">{currentSession.balls}</div>
+                  <div className="score-stat-value">{currentSession?.balls ?? 0}</div>
                   <div className="score-stat-label">Balls</div>
                 </div>
                 <div className="score-stat">
-                  <div className="score-stat-value">{currentSession.fours}</div>
+                  <div className="score-stat-value">{currentSession?.fours ?? 0}</div>
                   <div className="score-stat-label">Fours</div>
                 </div>
                 <div className="score-stat">
-                  <div className="score-stat-value">{currentSession.sixes}</div>
+                  <div className="score-stat-value">{currentSession?.sixes ?? 0}</div>
                   <div className="score-stat-label">Sixes</div>
                 </div>
               </div>
@@ -776,7 +531,7 @@ function App() {
             <div className="strike-rate">
               <span className="strike-rate-label">Strike Rate</span>
               <span className="strike-rate-value">
-                {currentSession.strikeRate.toFixed(2)}
+                {(currentSession?.strike_rate ?? 0).toFixed(2)}
               </span>
             </div>
           </div>
@@ -785,10 +540,10 @@ function App() {
           <div className="over-tracker">
             <div className="over-tracker-header">
               <span className="over-number">Over {currentOverNumber}</span>
-              <span className="over-runs">{currentOver.runs} runs</span>
+              <span className="over-runs">{currentOver?.runs ?? 0} runs</span>
             </div>
             <div className="over-balls">
-              {currentOver.balls.map((ball, idx) => (
+              {(currentOver?.balls || []).map((ball, idx) => (
                 <span
                   key={idx}
                   className={`ball-result ${
@@ -807,7 +562,7 @@ function App() {
                 <span key={`empty-${idx}`} className="ball-result empty">-</span>
               ))}
             </div>
-            {currentSession.overs.length > 1 && (
+            {currentSession && currentSession.overs.length > 1 && (
               <div className="previous-overs">
                 {currentSession.overs.slice(0, -1).slice(-4).map((over, idx) => (
                   <div key={idx} className="prev-over">
@@ -848,21 +603,21 @@ function App() {
           <div className="manual-input">
             <h3>Manual Input</h3>
             <div className="manual-buttons">
-              <button className="score-btn runs" onClick={() => addRuns(0)}>•</button>
-              <button className="score-btn runs" onClick={() => addRuns(1)}>1</button>
-              <button className="score-btn runs" onClick={() => addRuns(2)}>2</button>
-              <button className="score-btn runs" onClick={() => addRuns(3)}>3</button>
-              <button className="score-btn four" onClick={() => addRuns(4, true)}>4</button>
-              <button className="score-btn six" onClick={() => addRuns(6)}>6</button>
+              <button className="score-btn runs" onClick={() => handleManualInput('dot')}>•</button>
+              <button className="score-btn runs" onClick={() => handleManualInput('1')}>1</button>
+              <button className="score-btn runs" onClick={() => handleManualInput('2')}>2</button>
+              <button className="score-btn runs" onClick={() => handleManualInput('3')}>3</button>
+              <button className="score-btn four" onClick={() => handleManualInput('4', true)}>4</button>
+              <button className="score-btn six" onClick={() => handleManualInput('6')}>6</button>
             </div>
             <div className="manual-buttons extras-row">
-              <button className="score-btn wide" onClick={() => addRuns(0, false, false, true)}>Wide</button>
-              <button className="score-btn noball" onClick={() => addRuns(0, false, false, false, true)}>No Ball</button>
-              <button className="score-btn wicket" onClick={() => addRuns(0, false, true)}>OUT</button>
+              <button className="score-btn wide" onClick={() => handleManualInput('wd')}>Wide</button>
+              <button className="score-btn noball" onClick={() => handleManualInput('nb')}>No Ball</button>
+              <button className="score-btn wicket" onClick={() => handleManualInput('W')}>OUT</button>
               <button
                 className="score-btn undo"
-                onClick={undoLastBall}
-                disabled={sessionHistory.length === 0}
+                onClick={handleUndo}
+                disabled={!currentSession}
               >
                 Undo
               </button>
@@ -888,7 +643,7 @@ function App() {
             <div className="field-editor-content">
               <FieldView
                 fielderPositions={fielderPositions}
-                setFielderPositions={setFielderPositions}
+                setFielderPositions={handleFieldUpdate}
                 batterHand={batterHand}
                 wagonWheelShots={wagonWheelShots}
                 catchDisplayPosition={catchDisplayPosition}
@@ -917,7 +672,7 @@ function App() {
                       <button
                         key={preset}
                         className="preset-btn"
-                        onClick={() => setFielderPositions(FIELD_PRESET_POSITIONS[preset])}
+                        onClick={() => handleFieldUpdate(FIELD_PRESET_POSITIONS[preset])}
                       >
                         {preset}
                       </button>
@@ -941,7 +696,7 @@ function App() {
                       <div key={field.name} className="custom-field-btn-wrapper">
                         <button
                           className="preset-btn"
-                          onClick={() => setFielderPositions(field.positions)}
+                          onClick={() => handleFieldUpdate(field.positions)}
                         >
                           {field.name}
                         </button>
@@ -1015,91 +770,6 @@ function App() {
                     </button>
                   )}
                 </div>
-
-                {/* Shot Simulator */}
-                <div className="shot-simulator">
-                  <h3>Shot Simulator</h3>
-                  <div className="sim-inputs">
-                    <div className="sim-input-group">
-                      <label>Angle (°)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simAngle}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9\-]/g, '').replace(/(?!^)-/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '' || val === '-') setSimAngle(val)
-                          else if (!isNaN(num)) setSimAngle(String(Math.max(-180, Math.min(180, num))))
-                        }}
-                        placeholder="0"
-                      />
-                      <span className="sim-hint">-180 to 180</span>
-                    </div>
-                    <div className="sim-input-group">
-                      <label>Elevation (°)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simElevation}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '') setSimElevation(val)
-                          else if (!isNaN(num)) setSimElevation(String(Math.max(0, Math.min(90, num))))
-                        }}
-                        placeholder="10"
-                      />
-                      <span className="sim-hint">0 to 90</span>
-                    </div>
-                    <div className="sim-input-group">
-                      <label>Speed (km/h)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simSpeed}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '') setSimSpeed(val)
-                          else if (!isNaN(num)) setSimSpeed(String(Math.max(0, Math.min(200, num))))
-                        }}
-                        placeholder="80"
-                      />
-                      <span className="sim-hint">0 to 200</span>
-                    </div>
-                  </div>
-                  <button
-                    className="sim-button"
-                    onClick={simulateShot}
-                  >
-                    Simulate Shot
-                  </button>
-                  {simError && (
-                    <div className="sim-error">{simError}</div>
-                  )}
-                  {simResult && (
-                    <div className="sim-result" data-outcome={simResult.outcome}>
-                      <div className="sim-outcome">{simResult.outcome.toUpperCase()}</div>
-                      <div className="sim-runs">{simResult.runs} run{simResult.runs !== 1 ? 's' : ''}</div>
-                      <div className="sim-description">{simResult.description}</div>
-                      {simResult.fielder_involved && (
-                        <div className="sim-fielder">Fielder: {simResult.fielder_involved}</div>
-                      )}
-                      {simResult.trajectory && (
-                        <div className="sim-distance">
-                          Distance: {simResult.trajectory.projected_distance.toFixed(1)}m
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <button
-                    className="sim-clear-btn"
-                    onClick={() => setWagonWheelShots([])}
-                  >
-                    Clear Wagon Wheel
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -1107,51 +777,16 @@ function App() {
       )}
 
       {/* Session History Modal */}
-      {showSessionHistory && historyProfile && (
+      {showSessionHistory && historyProfileId && (
         <>
           <div className="field-editor-overlay" onClick={() => setShowSessionHistory(false)} />
           <div className="session-history-modal">
             <div className="field-editor-header">
-              <h2>{historyProfile.name} - Session History</h2>
+              <h2>{profiles.find(p => p.id === historyProfileId)?.name} - Session History</h2>
               <button className="close-btn" onClick={() => setShowSessionHistory(false)}>×</button>
             </div>
             <div className="session-history-content">
-              {historyProfile.sessions.length === 0 ? (
-                <p className="no-sessions">No past sessions yet</p>
-              ) : (
-                <div className="session-list">
-                  {[...historyProfile.sessions].reverse().map((session) => (
-                    <div
-                      key={session.id}
-                      className="session-card clickable"
-                      onClick={() => resumeSession(session.id)}
-                      title="Click to continue this session"
-                    >
-                      <div className="session-card-header">
-                        <span className="session-date">{formatDate(session.date)}</span>
-                        <span className={`session-status ${session.isOut ? 'out' : 'not-out'}`}>
-                          {session.isOut ? 'OUT' : 'NOT OUT'}
-                        </span>
-                      </div>
-                      <div className="session-card-stats">
-                        <div className="session-stat-main">
-                          <span className="session-runs">{session.runs}-{session.wickets ?? 0}</span>
-                          <span className="session-balls">({session.balls})</span>
-                        </div>
-                        <div className="session-stat-details">
-                          <span>4s: {session.fours}</span>
-                          <span>6s: {session.sixes}</span>
-                          <span>SR: {session.strikeRate.toFixed(1)}</span>
-                          <span>Overs: {formatOvers(session.overs)}</span>
-                        </div>
-                      </div>
-                      <div className="session-resume-hint">
-                        Click to continue →
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <p className="no-sessions">Session history is managed by the server</p>
             </div>
           </div>
         </>
@@ -1169,8 +804,8 @@ function FieldView({
   catchDisplayPosition,
   fieldingDisplayPosition,
 }: {
-  fielderPositions: FielderPosition[]
-  setFielderPositions: React.Dispatch<React.SetStateAction<FielderPosition[]>>
+  fielderPositions: { id: string; x: number; y: number }[]
+  setFielderPositions: (positions: { id: string; x: number; y: number }[]) => void
   batterHand: BattingHand
   wagonWheelShots?: ShotLine[]
   catchDisplayPosition: { fielderId: string; screenX: number; screenY: number } | null
@@ -1203,7 +838,7 @@ function FieldView({
     // Convert screen x back to stored x (mirror for left-handed)
     const storedX = batterHand === 'left' ? 100 - constrained.x : constrained.x
 
-    setFielderPositions(prev => prev.map(f =>
+    setFielderPositions(fielderPositions.map(f =>
       f.id === dragging ? { ...f, x: storedX, y: constrained.y } : f
     ))
   }

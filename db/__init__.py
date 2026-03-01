@@ -20,7 +20,24 @@ from .database import (
     delete_session,
 )
 
+from .repository import (
+    Repository,
+    RepositoryError,
+    RecordNotFoundError,
+    VersionConflictError,
+    ConstraintViolationError,
+    DatabaseError,
+    DatabaseLockedError,
+    User,
+    AuthToken,
+    Player,
+    Session,
+    ActiveSession,
+    Delivery,
+)
+
 __all__ = [
+    # Legacy database functions
     "init_db",
     "create_player",
     "get_all_players",
@@ -38,4 +55,18 @@ __all__ = [
     "get_speed_statistics",
     "delete_player",
     "delete_session",
+    # Repository layer
+    "Repository",
+    "RepositoryError",
+    "RecordNotFoundError",
+    "VersionConflictError",
+    "ConstraintViolationError",
+    "DatabaseError",
+    "DatabaseLockedError",
+    "User",
+    "AuthToken",
+    "Player",
+    "Session",
+    "ActiveSession",
+    "Delivery",
 ]
