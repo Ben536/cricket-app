@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
 import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
 import { simulateDelivery, calculateTrajectory, type SimulationResult } from './gameEngine'
+import { useServerSimulation } from './hooks/useServerSimulation'
+import { ServerConfig } from './components/ServerConfig'
 
 // Types
 interface ShotLine {
@@ -156,6 +158,10 @@ function App() {
   const [newFieldName, setNewFieldName] = useState('')
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false)
   const [wagonWheelShots, setWagonWheelShots] = useState<ShotLine[]>([])
+
+  // Server connection state
+  const [showServerConfig, setShowServerConfig] = useState(false)
+  const { isConnected, connectionState } = useServerSimulation()
 
   // Shot simulator state
   const [simAngle, setSimAngle] = useState('30')
@@ -665,6 +671,14 @@ function App() {
           <h1 className="header-title">VGA Cricket 26</h1>
         </div>
         <div className="header-controls">
+          <button
+            className="server-status-btn"
+            onClick={() => setShowServerConfig(true)}
+            title={isConnected ? 'Connected to Pi' : 'Not connected - click to configure'}
+          >
+            <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
+            <span className="status-text">{isConnected ? 'Pi' : 'Offline'}</span>
+          </button>
           <div className="overs-display">
             <span className="overs-label">Overs</span>
             <span className="overs-value">
@@ -1155,6 +1169,15 @@ function App() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Server Config Modal */}
+      {showServerConfig && (
+        <ServerConfig
+          isConnected={isConnected}
+          connectionState={connectionState}
+          onClose={() => setShowServerConfig(false)}
+        />
       )}
     </div>
   )

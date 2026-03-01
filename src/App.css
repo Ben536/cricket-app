@@ -1703,6 +1703,33 @@
   box-shadow: 0 0 8px #f87171;
 }
 
+.server-status-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.server-status-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.server-status-btn .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.server-status-btn .status-text {
+  font-weight: 500;
+}
+
 .config-field {
   margin-bottom: 20px;
 }
