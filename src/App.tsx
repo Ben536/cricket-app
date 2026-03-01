@@ -1027,14 +1027,14 @@ function App() {
                         inputMode="numeric"
                         value={simAngle}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9\-]/g, '').replace(/(?!^)-/g, '')
+                          const val = e.target.value.replace(/[^0-9]/g, '')
                           const num = parseInt(val, 10)
-                          if (val === '' || val === '-') setSimAngle(val)
-                          else if (!isNaN(num)) setSimAngle(String(Math.max(-180, Math.min(180, num))))
+                          if (val === '') setSimAngle(val)
+                          else if (!isNaN(num)) setSimAngle(String(Math.max(0, Math.min(360, num))))
                         }}
                         placeholder="0"
                       />
-                      <span className="sim-hint">-180 to 180</span>
+                      <span className="sim-hint">0 to 360</span>
                     </div>
                     <div className="sim-input-group">
                       <label>Elevation (°)</label>
