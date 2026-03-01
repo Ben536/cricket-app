@@ -52,6 +52,11 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
     const width = canvas.width
     const height = canvas.height
 
+    // Reset all context state
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
+    ctx.shadowColor = 'transparent'
+
     // Clear
     ctx.fillStyle = '#1a1a2e'
     ctx.fillRect(0, 0, width, height)
@@ -152,6 +157,7 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
           ctx.arc(screenX, screenY, size, 0, Math.PI * 2)
           ctx.fill()
           ctx.shadowBlur = 0
+          ctx.shadowColor = 'transparent'
         }
       })
     })

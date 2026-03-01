@@ -1276,6 +1276,10 @@ class MessageHandlers:
 
         streamer = get_streamer()
 
+        # Capture the current event loop for thread-safe scheduling
+        import asyncio
+        main_loop = asyncio.get_running_loop()
+
         # Create callback that sends frames to this client
         async def send_frame(frame_data: dict):
             msg = {
@@ -1286,15 +1290,10 @@ class MessageHandlers:
             }
             await self.connection_manager.send_to_client(client_id, msg)
 
-        # Wrapper to handle async in sync callback
+        # Thread-safe wrapper using run_coroutine_threadsafe
         def frame_callback(frame_data: dict):
-            import asyncio
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.ensure_future(send_frame(frame_data))
-                else:
-                    loop.run_until_complete(send_frame(frame_data))
+                asyncio.run_coroutine_threadsafe(send_frame(frame_data), main_loop)
             except Exception as e:
                 logger.error(f"Frame send error: {e}")
 

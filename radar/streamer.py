@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # TLV Magic bytes for IWR6843
 MAGIC_BYTES = bytes([0x02, 0x01, 0x04, 0x03, 0x06, 0x05, 0x08, 0x07])
-HEADER_SIZE = 40
+HEADER_SIZE = 32  # 8 fields × 4 bytes each
 
 
 @dataclass
