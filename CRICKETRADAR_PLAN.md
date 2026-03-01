@@ -1202,6 +1202,8 @@ Every task ends with:
 1. Update CRICKETRADAR_PLAN.md
 2. Ensure code comments explain non-obvious decisions
 3. Verify another agent could continue your work with no verbal handoff
+4. **ALWAYS commit and push to GitHub** - Vercel deploys from GitHub, so changes aren't live until pushed
+5. If Pi server code changed, remind user to redeploy to Pi
 
 ---
 
