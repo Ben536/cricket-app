@@ -1185,6 +1185,34 @@ Every task ends with:
 
 ---
 
+## UI Preservation Rule
+
+> **CRITICAL: The frontend UI (App.tsx, App.css, fieldZones.ts) is COMPLETE and WORKING. Do NOT rewrite or restructure these files.**
+
+The fielding UI, scoring display, wagon wheel, and shot simulator have been carefully built and refined. When integrating new features:
+
+1. **DO NOT** refactor or restructure App.tsx
+2. **DO NOT** change how state is managed unless absolutely necessary
+3. **DO NOT** rename variables or reorganize code "for clarity"
+4. **DO** add new imports at the top
+5. **DO** add new components as separate files (e.g., `src/components/`)
+6. **DO** add hooks that wrap existing logic without replacing it
+7. **DO** add small UI elements (like connection status) without moving existing code
+
+**WebSocket Integration Approach:**
+- Create hooks that mirror the existing localStorage-based state management
+- The UI calls the same functions, but under the hood they talk to the server
+- Add connection status indicator as a small addition, not a rewrite
+- ServerConfig modal is a new component, doesn't touch existing UI
+
+**If you need to modify App.tsx:**
+1. Make the MINIMUM change necessary
+2. Do NOT reorganize surrounding code
+3. Do NOT "improve" or "clean up" unrelated sections
+4. Test that the fielding UI still works exactly as before
+
+---
+
 ## Context Preservation Protocol
 
 **Starting a Task:**
