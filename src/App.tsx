@@ -5,6 +5,7 @@ import { type SimulationResult } from './gameEngine'
 import { useServerSimulation } from './hooks/useServerSimulation'
 import { ServerConfig } from './components/ServerConfig'
 import { RecordingModal } from './components/RecordingModal'
+import { RadarVisualizer } from './components/RadarVisualizer'
 
 // Types
 interface ShotLine {
@@ -166,6 +167,7 @@ function App() {
   // Server connection state
   const [showServerConfig, setShowServerConfig] = useState(false)
   const [showRecordingModal, setShowRecordingModal] = useState(false)
+  const [showRadarViz, setShowRadarViz] = useState(false)
   const { isConnected, connectionState, simulateAsync, sendMessage } = useServerSimulation()
 
   // Shot simulator state
@@ -727,11 +729,18 @@ function App() {
             <span className="status-text">{isConnected ? 'Pi' : 'Offline'}</span>
           </button>
           <button
+            className="radar-view-btn"
+            onClick={() => setShowRadarViz(true)}
+            title="View radar data"
+          >
+            Radar
+          </button>
+          <button
             className="record-radar-btn"
             onClick={() => setShowRecordingModal(true)}
             title="Record radar data for testing"
           >
-            Radar Rec
+            Rec
           </button>
           <div className="overs-display">
             <span className="overs-label">Overs</span>
@@ -1292,6 +1301,15 @@ function App() {
         <RecordingModal
           isConnected={isConnected}
           onClose={() => setShowRecordingModal(false)}
+          sendMessage={sendMessage}
+        />
+      )}
+
+      {/* Radar Visualizer */}
+      {showRadarViz && (
+        <RadarVisualizer
+          isConnected={isConnected}
+          onClose={() => setShowRadarViz(false)}
           sendMessage={sendMessage}
         />
       )}

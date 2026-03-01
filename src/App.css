@@ -1771,6 +1771,24 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
+/* Radar View Button */
+.radar-view-btn {
+  background: rgba(46, 204, 113, 0.2);
+  border: 1px solid var(--sky-green);
+  color: var(--sky-green);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radar-view-btn:hover {
+  background: var(--sky-green);
+  color: var(--white);
+}
+
 /* Record Radar Button */
 .record-radar-btn {
   background: rgba(230, 57, 70, 0.2);

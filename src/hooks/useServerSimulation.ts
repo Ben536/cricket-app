@@ -160,6 +160,11 @@ export function useServerSimulation(): UseServerSimulationResult {
               genericPending.resolve(data)
             }
           }
+
+          // Dispatch radar frames as custom events for visualizer
+          if (data.type === 'radar_frame') {
+            window.dispatchEvent(new CustomEvent('radar-frame', { detail: data.payload }))
+          }
         } catch {
           // Ignore parse errors
         }

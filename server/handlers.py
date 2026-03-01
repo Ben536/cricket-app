@@ -39,8 +39,9 @@ from db.repository import (
 # Game engine
 from engine.game_engine import simulate_delivery
 
-# Radar recorder
+# Radar recorder and streamer
 from radar.recorder import get_recorder, RadarRecorder
+from radar.streamer import get_streamer, RadarStreamer
 
 if TYPE_CHECKING:
     from server.connection_manager import ConnectionManager
@@ -1260,6 +1261,99 @@ class MessageHandlers:
         }
 
     # =========================================================================
+    # RADAR STREAMING HANDLERS
+    # =========================================================================
+
+    async def handle_start_radar_stream(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Start streaming radar data to this client.
+        """
+        message_id = message.get("message_id")
+
+        streamer = get_streamer()
+
+        # Create callback that sends frames to this client
+        async def send_frame(frame_data: dict):
+            msg = {
+                "type": "radar_frame",
+                "message_id": generate_message_id(),
+                "timestamp": create_timestamp(),
+                "payload": frame_data,
+            }
+            await self.connection_manager.send_to_client(client_id, msg)
+
+        # Wrapper to handle async in sync callback
+        def frame_callback(frame_data: dict):
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(send_frame(frame_data))
+                else:
+                    loop.run_until_complete(send_frame(frame_data))
+            except Exception as e:
+                logger.error(f"Frame send error: {e}")
+
+        # Store callback reference for cleanup
+        if not hasattr(self, '_stream_callbacks'):
+            self._stream_callbacks = {}
+        self._stream_callbacks[client_id] = frame_callback
+
+        # Add callback and start if not running
+        streamer.add_callback(frame_callback)
+        if not streamer.is_streaming:
+            streamer.start()
+
+        logger.info(f"Started radar stream for client {client_id[:8]}")
+
+        return {
+            "type": "radar_stream_started",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "status": "streaming",
+            },
+        }
+
+    async def handle_stop_radar_stream(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Stop streaming radar data to this client.
+        """
+        message_id = message.get("message_id")
+
+        streamer = get_streamer()
+
+        # Remove this client's callback
+        if hasattr(self, '_stream_callbacks') and client_id in self._stream_callbacks:
+            callback = self._stream_callbacks.pop(client_id)
+            streamer.remove_callback(callback)
+
+            # Stop streamer if no more callbacks
+            if not self._stream_callbacks and streamer.is_streaming:
+                streamer.stop()
+
+        logger.info(f"Stopped radar stream for client {client_id[:8]}")
+
+        return {
+            "type": "radar_stream_stopped",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "status": "stopped",
+            },
+        }
+
+    # =========================================================================
     # SIMULATE SHOT HANDLER (for shot simulator UI)
     # =========================================================================
 
@@ -1382,6 +1476,10 @@ def register_handlers(
     server.message_router.register_handler("start_recording", handlers.handle_start_recording)
     server.message_router.register_handler("stop_recording", handlers.handle_stop_recording)
     server.message_router.register_handler("get_recording_status", handlers.handle_get_recording_status)
+
+    # Streaming handlers
+    server.message_router.register_handler("start_radar_stream", handlers.handle_start_radar_stream)
+    server.message_router.register_handler("stop_radar_stream", handlers.handle_stop_radar_stream)
 
     logger.info("Registered all message handlers")
 

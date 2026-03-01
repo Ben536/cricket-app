@@ -132,6 +132,9 @@ VALID_CLIENT_TYPES = {
     "start_recording",
     "stop_recording",
     "get_recording_status",
+    # Streaming
+    "start_radar_stream",
+    "stop_radar_stream",
 }
 
 
@@ -152,6 +155,9 @@ MESSAGE_REQUIRED_FIELDS: dict[str, list[str]] = {
     "start_recording": ["payload.session_type"],
     "stop_recording": [],
     "get_recording_status": [],
+    # Streaming
+    "start_radar_stream": [],
+    "stop_radar_stream": [],
 }
 
 
