@@ -19,6 +19,13 @@ interface PendingRequest {
   timeout: number
 }
 
+// Generic pending request for any message type
+interface GenericPendingRequest {
+  resolve: (result: unknown) => void
+  reject: (error: Error) => void
+  timeout: number
+}
+
 interface UseServerSimulationResult {
   /** Run simulation - returns Promise, uses server if connected, local if not */
   simulateAsync: (
@@ -33,6 +40,8 @@ interface UseServerSimulationResult {
   simulate: typeof localSimulate
   /** Calculate trajectory (always local) */
   calculateTrajectory: typeof calculateTrajectory
+  /** Send a generic message to the server - returns Promise with response */
+  sendMessage: (type: string, payload: Record<string, unknown>) => Promise<unknown>
   /** Whether connected to server */
   isConnected: boolean
   /** Current connection state */
@@ -57,6 +66,7 @@ export function useServerSimulation(): UseServerSimulationResult {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
   const pendingRequestsRef = useRef<Map<string, PendingRequest>>(new Map())
+  const genericPendingRef = useRef<Map<string, GenericPendingRequest>>(new Map())
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return
@@ -84,6 +94,13 @@ export function useServerSimulation(): UseServerSimulationResult {
           req.reject(new Error('Connection closed'))
         })
         pendingRequestsRef.current.clear()
+
+        // Reject all generic pending requests
+        genericPendingRef.current.forEach((req) => {
+          clearTimeout(req.timeout)
+          req.reject(new Error('Connection closed'))
+        })
+        genericPendingRef.current.clear()
 
         // Auto-reconnect after 5s
         reconnectTimeoutRef.current = window.setTimeout(() => {
@@ -122,6 +139,25 @@ export function useServerSimulation(): UseServerSimulationResult {
                 pendingRequestsRef.current.delete(data.in_reply_to)
                 pending.reject(new Error(data.payload?.message || 'Server error'))
               }
+
+              // Also check generic pending
+              const genericPending = genericPendingRef.current.get(data.in_reply_to)
+              if (genericPending) {
+                clearTimeout(genericPending.timeout)
+                genericPendingRef.current.delete(data.in_reply_to)
+                // Resolve with error response so caller can handle it
+                genericPending.resolve(data)
+              }
+            }
+          }
+
+          // Handle generic responses (recording, etc.)
+          if (data.in_reply_to && !data.type?.startsWith('simulate')) {
+            const genericPending = genericPendingRef.current.get(data.in_reply_to)
+            if (genericPending) {
+              clearTimeout(genericPending.timeout)
+              genericPendingRef.current.delete(data.in_reply_to)
+              genericPending.resolve(data)
             }
           }
         } catch {
@@ -236,10 +272,46 @@ export function useServerSimulation(): UseServerSimulationResult {
     )
   }, [])
 
+  // Generic message sender for any message type
+  const sendMessage = useCallback(async (
+    type: string,
+    payload: Record<string, unknown>
+  ): Promise<unknown> => {
+    const ws = wsRef.current
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected to server')
+    }
+
+    return new Promise((resolve, reject) => {
+      const messageId = generateMessageId()
+
+      // Set timeout for response (10 seconds for generic messages)
+      const timeout = window.setTimeout(() => {
+        genericPendingRef.current.delete(messageId)
+        reject(new Error('Request timeout'))
+      }, 10000)
+
+      // Store pending request
+      genericPendingRef.current.set(messageId, { resolve, reject, timeout })
+
+      // Send message
+      const message = {
+        type,
+        message_id: messageId,
+        timestamp: new Date().toISOString(),
+        payload,
+      }
+
+      ws.send(JSON.stringify(message))
+    })
+  }, [])
+
   return {
     simulateAsync,
     simulate,
     calculateTrajectory,
+    sendMessage,
     isConnected: connectionState === 'connected',
     connectionState,
     error,

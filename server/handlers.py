@@ -39,6 +39,9 @@ from db.repository import (
 # Game engine
 from engine.game_engine import simulate_delivery
 
+# Radar recorder
+from radar.recorder import get_recorder, RadarRecorder
+
 if TYPE_CHECKING:
     from server.connection_manager import ConnectionManager
 
@@ -1079,6 +1082,184 @@ class MessageHandlers:
         }
 
     # =========================================================================
+    # RADAR RECORDING HANDLERS
+    # =========================================================================
+
+    async def handle_start_recording(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Start radar data recording.
+
+        Begins capturing raw radar frames to disk.
+        Auto-stops after 15 seconds.
+        """
+        payload = message.get("payload", {})
+        message_id = message.get("message_id")
+
+        session_type = payload.get("session_type", "both")
+
+        if session_type not in ["bowling", "batting", "both"]:
+            return create_error_response(
+                ErrorCode.INVALID_FIELD_VALUE,
+                in_reply_to=message_id,
+                details={"field": "session_type", "value": session_type},
+            )
+
+        recorder = get_recorder()
+
+        if recorder.is_recording:
+            return create_extended_error(
+                "E6001",
+                in_reply_to=message_id,
+                message_override="Already recording",
+            )
+
+        try:
+            # Set up callbacks for progress updates
+            async def on_progress(elapsed: int, frame_count: int):
+                progress_msg = {
+                    "type": "recording_progress",
+                    "message_id": generate_message_id(),
+                    "timestamp": create_timestamp(),
+                    "payload": {
+                        "elapsed_seconds": elapsed,
+                        "frame_count": frame_count,
+                        "max_duration": 15,
+                    },
+                }
+                await self.connection_manager.send_to_client(client_id, progress_msg)
+
+            async def on_stopped(session):
+                stopped_msg = {
+                    "type": "recording_auto_stopped",
+                    "message_id": generate_message_id(),
+                    "timestamp": create_timestamp(),
+                    "payload": {
+                        "reason": "max_duration_reached",
+                        "session_type": session.session_type,
+                        "duration_seconds": session.duration_seconds,
+                        "frame_count": session.frame_count,
+                        "file_path": session.file_path,
+                    },
+                }
+                await self.connection_manager.send_to_client(client_id, stopped_msg)
+
+            # Note: callbacks are sync, we'll handle async in wrapper
+            # For now, we'll skip real-time progress (simpler)
+
+            session = recorder.start_recording(session_type)
+
+            logger.info(f"Started recording: type={session_type}")
+
+            return {
+                "type": "recording_started",
+                "message_id": generate_message_id(),
+                "timestamp": create_timestamp(),
+                "in_reply_to": message_id,
+                "payload": {
+                    "session_type": session_type,
+                    "start_time": session.start_time,
+                    "max_duration": 15,
+                    "counts": recorder.get_recording_counts(),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to start recording: {e}")
+            return create_extended_error(
+                "E6002",
+                in_reply_to=message_id,
+                message_override=f"Failed to start recording: {str(e)}",
+            )
+
+    async def handle_stop_recording(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Stop radar data recording.
+
+        Stops capture and saves recorded frames to file.
+        """
+        message_id = message.get("message_id")
+
+        recorder = get_recorder()
+
+        if not recorder.is_recording:
+            return create_extended_error(
+                "E6003",
+                in_reply_to=message_id,
+                message_override="Not currently recording",
+            )
+
+        try:
+            session = recorder.stop_recording()
+
+            if session:
+                logger.info(
+                    f"Stopped recording: type={session.session_type}, "
+                    f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
+                )
+
+                return {
+                    "type": "recording_stopped",
+                    "message_id": generate_message_id(),
+                    "timestamp": create_timestamp(),
+                    "in_reply_to": message_id,
+                    "payload": {
+                        "session_type": session.session_type,
+                        "duration_seconds": session.duration_seconds,
+                        "frame_count": session.frame_count,
+                        "file_path": session.file_path,
+                        "counts": recorder.get_recording_counts(),
+                    },
+                }
+            else:
+                return create_extended_error(
+                    "E6004",
+                    in_reply_to=message_id,
+                    message_override="Recording stop returned no session",
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to stop recording: {e}")
+            return create_extended_error(
+                "E6005",
+                in_reply_to=message_id,
+                message_override=f"Failed to stop recording: {str(e)}",
+            )
+
+    async def handle_get_recording_status(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Get current recording status and counts.
+        """
+        message_id = message.get("message_id")
+
+        recorder = get_recorder()
+        current = recorder.current_session
+
+        return {
+            "type": "recording_status",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "is_recording": recorder.is_recording,
+                "current_session_type": current.session_type if current else None,
+                "current_start_time": current.start_time if current else None,
+                "counts": recorder.get_recording_counts(),
+            },
+        }
+
+    # =========================================================================
     # SIMULATE SHOT HANDLER (for shot simulator UI)
     # =========================================================================
 
@@ -1196,6 +1377,11 @@ def register_handlers(
     server.message_router.register_handler("undo", handlers.handle_undo)
     server.message_router.register_handler("simulate_shot", handlers.handle_simulate_shot)
     server.message_router.register_handler("ping", handlers.handle_ping)
+
+    # Recording handlers
+    server.message_router.register_handler("start_recording", handlers.handle_start_recording)
+    server.message_router.register_handler("stop_recording", handlers.handle_stop_recording)
+    server.message_router.register_handler("get_recording_status", handlers.handle_get_recording_status)
 
     logger.info("Registered all message handlers")
 

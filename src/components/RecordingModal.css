@@ -1,0 +1,294 @@
+/* Recording Modal Styles */
+
+.recording-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 300;
+}
+
+.recording-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--sky-blue-dark);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: 301;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.recording-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--sky-blue);
+  border-bottom: 2px solid var(--sky-gold);
+}
+
+.recording-header h2 {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+  color: var(--white);
+}
+
+.recording-content {
+  padding: 20px;
+}
+
+.recording-section {
+  margin-bottom: 20px;
+}
+
+.recording-section label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--sky-gold);
+  margin-bottom: 8px;
+}
+
+.recording-warning {
+  background: rgba(230, 57, 70, 0.2);
+  border: 1px solid var(--sky-red);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+  color: var(--sky-red);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+/* Session Type Buttons */
+.session-type-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.type-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: var(--grey-light);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.type-btn.active {
+  background: var(--sky-blue);
+  border-color: var(--sky-gold);
+  color: var(--white);
+}
+
+.type-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Recording Status */
+.recording-status {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.recording-status.ready {
+  color: var(--grey-light);
+  font-size: 14px;
+}
+
+.recording-status.recording {
+  background: rgba(230, 57, 70, 0.1);
+  border: 1px solid rgba(230, 57, 70, 0.3);
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--sky-red);
+  margin-bottom: 8px;
+}
+
+.rec-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--sky-red);
+  border-radius: 50%;
+  animation: pulse-rec 1s infinite;
+}
+
+@keyframes pulse-rec {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.recording-time {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 12px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--sky-red);
+  transition: width 1s linear;
+}
+
+/* Record Buttons */
+.record-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.record-btn.start {
+  background: var(--sky-green);
+  color: var(--white);
+}
+
+.record-btn.start:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.record-btn.start:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.record-btn.stop {
+  background: var(--sky-red);
+  color: var(--white);
+}
+
+.record-btn.stop:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* Messages */
+.recording-error {
+  background: rgba(230, 57, 70, 0.2);
+  border: 1px solid var(--sky-red);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  color: var(--sky-red);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.recording-success {
+  background: rgba(46, 204, 113, 0.2);
+  border: 1px solid var(--sky-green);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  color: var(--sky-green);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* Counts Grid */
+.counts-grid {
+  display: flex;
+  gap: 12px;
+}
+
+.count-item {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.count-value {
+  display: block;
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--white);
+}
+
+.count-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--grey);
+}
+
+/* Instructions */
+.recording-section.instructions {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.recording-section.instructions p {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--grey-light);
+}
+
+.recording-section.instructions p:last-child {
+  margin-bottom: 0;
+}
+
+.recording-section.instructions p.note {
+  color: var(--grey);
+  font-style: italic;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.recording-section.instructions strong {
+  color: var(--sky-gold);
+}

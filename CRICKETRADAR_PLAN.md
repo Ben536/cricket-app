@@ -70,6 +70,7 @@
 | **Database Schema** | ✅ Built | SQLite, multi-user ready |
 | **REST API** | ✅ Built | For detailed data queries |
 | **Radar Visualizer** | ✅ Built | Pygame, shows point cloud |
+| **Radar Recording UI** | ✅ Built | Record bowling/batting/both, 15s max |
 | **Radar → Game Engine** | ❌ Not built | Ball detection algorithm |
 | **WiFi Access Point** | ❌ Not configured | hostapd/dnsmasq setup |
 | **Boot Scripts** | ❌ Not built | Auto-start on power |
@@ -83,10 +84,11 @@
 - ✅ Game engine simulates shot outcomes
 - ✅ Database stores sessions and deliveries
 - ✅ UI displays scores and wagon wheel
+- ✅ Frontend → Pi → Frontend round-trip (Phase 0 complete)
+- ✅ Server simulation via WebSocket (simulateAsync uses Pi when connected)
 
 ### Not Yet Tested
 
-- ❌ Frontend → Pi → Frontend round-trip
 - ❌ Ball detection from radar data
 - ❌ Full session with radar tracking
 - ❌ Device mounted at cricket net
@@ -419,18 +421,20 @@ Feed these to game engine → Get outcome → Update UI.
 
 ## Implementation Phases
 
-### Phase 0: Integration Test (CURRENT)
+### Phase 0: Integration Test (COMPLETE)
 *Goal: Prove the full loop works with manual input*
 
-- [ ] Start WebSocket server on Pi
-- [ ] Connect frontend to Pi (configure server URL)
-- [ ] Send manual input → Server processes → UI updates
-- [ ] Verify database stores delivery
-- [ ] **Success criteria:** Manual input works end-to-end
+- [x] Start WebSocket server on Pi
+- [x] Connect frontend to Pi (configure server URL)
+- [x] Send manual input → Server processes → UI updates
+- [x] Verify database stores delivery
+- [x] Server simulation wired up (simulateAsync sends to Pi, falls back to local)
+- [x] **Success criteria:** Manual input works end-to-end
 
 ### Phase 1: Ball Detection Testing
 *Goal: Understand what radar sees*
 
+- [x] Build radar recording system (UI + backend)
 - [ ] Mount radar at net (above batsman position)
 - [ ] Record raw data: balls only
 - [ ] Record raw data: batsman only
@@ -1266,4 +1270,4 @@ The fielding UI, scoring display, wagon wheel, and shot simulator have been care
 
 ---
 
-*Last updated: 2026-03-01*
+*Last updated: 2026-03-01 - Phase 0 complete, radar recording system built for Phase 1 testing*

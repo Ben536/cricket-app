@@ -128,6 +128,10 @@ VALID_CLIENT_TYPES = {
     "undo",
     "ping",
     "simulate_shot",
+    # Recording
+    "start_recording",
+    "stop_recording",
+    "get_recording_status",
 }
 
 
@@ -144,6 +148,10 @@ MESSAGE_REQUIRED_FIELDS: dict[str, list[str]] = {
     "undo": ["payload.session_id"],
     "ping": [],
     "simulate_shot": ["payload.exit_speed", "payload.horizontal_angle", "payload.vertical_angle", "payload.field_config"],
+    # Recording
+    "start_recording": ["payload.session_type"],
+    "stop_recording": [],
+    "get_recording_status": [],
 }
 
 
@@ -437,6 +445,15 @@ class MessageRouter:
                     ErrorCode.FIELD_OUT_OF_RANGE,
                     in_reply_to=message_id,
                     details={"field": "boundary_distance", "min": 50, "max": 100},
+                )
+
+        elif msg_type == "start_recording":
+            session_type = payload.get("session_type")
+            if session_type not in ["bowling", "batting", "both"]:
+                return create_error_response(
+                    ErrorCode.INVALID_FIELD_VALUE,
+                    in_reply_to=message_id,
+                    details={"field": "session_type", "value": session_type},
                 )
 
         return None

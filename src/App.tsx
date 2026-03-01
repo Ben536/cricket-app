@@ -4,6 +4,7 @@ import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constra
 import { type SimulationResult } from './gameEngine'
 import { useServerSimulation } from './hooks/useServerSimulation'
 import { ServerConfig } from './components/ServerConfig'
+import { RecordingModal } from './components/RecordingModal'
 
 // Types
 interface ShotLine {
@@ -164,7 +165,8 @@ function App() {
 
   // Server connection state
   const [showServerConfig, setShowServerConfig] = useState(false)
-  const { isConnected, connectionState, simulateAsync } = useServerSimulation()
+  const [showRecordingModal, setShowRecordingModal] = useState(false)
+  const { isConnected, connectionState, simulateAsync, sendMessage } = useServerSimulation()
 
   // Shot simulator state
   const [simAngle, setSimAngle] = useState('30')
@@ -724,6 +726,13 @@ function App() {
             <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
             <span className="status-text">{isConnected ? 'Pi' : 'Offline'}</span>
           </button>
+          <button
+            className="record-radar-btn"
+            onClick={() => setShowRecordingModal(true)}
+            title="Record radar data for testing"
+          >
+            Radar Rec
+          </button>
           <div className="overs-display">
             <span className="overs-label">Overs</span>
             <span className="overs-value">
@@ -1275,6 +1284,15 @@ function App() {
           isConnected={isConnected}
           connectionState={connectionState}
           onClose={() => setShowServerConfig(false)}
+        />
+      )}
+
+      {/* Recording Modal */}
+      {showRecordingModal && (
+        <RecordingModal
+          isConnected={isConnected}
+          onClose={() => setShowRecordingModal(false)}
+          sendMessage={sendMessage}
         />
       )}
 
