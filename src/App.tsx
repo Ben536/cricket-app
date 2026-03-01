@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
 import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
-import { simulateDelivery, calculateTrajectory, type SimulationResult } from './gameEngine'
+import { type SimulationResult } from './gameEngine'
 import { useServerSimulation } from './hooks/useServerSimulation'
 import { ServerConfig } from './components/ServerConfig'
 
 // Types
 interface ShotLine {
   id: string
-  endX: number      // Screen % (0-100)
-  endY: number      // Screen % (0-100)
+  endX: number           // Screen % where ball ended (0-100)
+  endY: number           // Screen % where ball ended (0-100)
+  boundaryEndX: number   // Screen % at boundary + 1m (for wagon wheel line)
+  boundaryEndY: number   // Screen % at boundary + 1m (for wagon wheel line)
   outcome: BallResult
-  distance: number  // metres from batter
+  distance: number       // metres from batter
 }
 
 interface Session {
@@ -158,10 +160,11 @@ function App() {
   const [newFieldName, setNewFieldName] = useState('')
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false)
   const [wagonWheelShots, setWagonWheelShots] = useState<ShotLine[]>([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Server connection state
   const [showServerConfig, setShowServerConfig] = useState(false)
-  const { isConnected, connectionState } = useServerSimulation()
+  const { isConnected, connectionState, simulateAsync } = useServerSimulation()
 
   // Shot simulator state
   const [simAngle, setSimAngle] = useState('30')
@@ -267,17 +270,33 @@ function App() {
     // Convert to screen coordinates
     const screen = fieldToScreen(fieldX, fieldY)
 
+    // Calculate boundary distance at this angle (batter is offset from pitch center)
+    // Formula: offset * cos(angle) + sqrt(R² - offset² * sin²(angle))
+    const BATTER_OFFSET = 8.84  // metres from pitch center
+    const BOUNDARY_RADIUS = 70  // nominal boundary radius from pitch center
+    const cosAngle = Math.cos(angleRad)
+    const sinAngle = Math.sin(angleRad)
+    const boundaryDist = BATTER_OFFSET * cosAngle +
+      Math.sqrt(BOUNDARY_RADIUS * BOUNDARY_RADIUS - BATTER_OFFSET * BATTER_OFFSET * sinAngle * sinAngle)
+
+    // Calculate wagon wheel endpoint at boundary + 1m
+    const boundaryPlusOne = boundaryDist + 1
+    const boundaryEndField = { x: Math.sin(angleRad) * boundaryPlusOne, y: Math.cos(angleRad) * boundaryPlusOne }
+    const boundaryEndScreen = fieldToScreen(boundaryEndField.x, boundaryEndField.y)
+
     return {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       endX: screen.x,
       endY: screen.y,
+      boundaryEndX: boundaryEndScreen.x,
+      boundaryEndY: boundaryEndScreen.y,
       outcome,
       distance
     }
   }
 
-  // Simulate a shot using the TypeScript game engine
-  const simulateShot = () => {
+  // Simulate a shot using the game engine (server when connected, local when offline)
+  const simulateShot = async () => {
     setSimError(null)
     // Clear any pending reset timeouts
     if (catchResetTimeout.current) {
@@ -304,9 +323,6 @@ function App() {
         return
       }
 
-      // Calculate trajectory
-      const trajectory = calculateTrajectory(speed, angle, elevation)
-
       // Convert current fielder positions to game engine format (screen % -> metres)
       // Also track fielder ID -> zone name mapping for catch display
       const fielderIdToZone: Record<string, string> = {}
@@ -323,28 +339,19 @@ function App() {
         }
       })
 
-      // Run simulation
-      // Use final_x/final_y (where ball stops after rolling) instead of landing point
-      // This ensures the ball path direction matches the total distance
-      const result = simulateDelivery(
+      // Run simulation (uses server if connected, local if offline)
+      const fullResult = await simulateAsync(
         speed,
         angle,
         elevation,
-        trajectory.final_x,
-        trajectory.final_y,
-        trajectory.projected_distance,
-        trajectory.max_height,
         fieldConfig,
         70.0,  // Match visual field radius
         difficulty
       )
 
-      // Combine result with trajectory
-      const fullResult: SimulationResult = {
-        ...result,
-        trajectory,
-      }
       setSimResult(fullResult)
+      const result = fullResult
+      const trajectory = fullResult.trajectory!
 
       // Debug: comprehensive shot analysis
       console.log('SHOT DEBUG:', JSON.stringify({
@@ -389,14 +396,44 @@ function App() {
       // Add to wagon wheel - use end_position (where ball ended up)
       const endPos = result.end_position
       const screen = fieldToScreen(endPos.x, endPos.y)
+
+      // Calculate wagon wheel line endpoint at boundary + 1m
+      // The boundary_distance comes from the server (angle-specific)
+      const boundaryDist = result.boundary_distance || 70
+      const endPosDist = Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y)
+      // Direction unit vector from batter to end position
+      const dirX = endPosDist > 0 ? endPos.x / endPosDist : 0
+      const dirY = endPosDist > 0 ? endPos.y / endPosDist : 1
+      // Point at boundary + 1m along this direction
+      const boundaryPlusOne = boundaryDist + 1
+      const boundaryEndField = { x: dirX * boundaryPlusOne, y: dirY * boundaryPlusOne }
+      const boundaryEndScreen = fieldToScreen(boundaryEndField.x, boundaryEndField.y)
+
+      // Distance to display: for fielded/caught balls, use fielding position
+      // For boundaries, use boundary distance. Otherwise use end position.
+      let displayDistance: number
+      if (result.fielding_position && (result.outcome === 'caught' || result.outcome === 'dropped' ||
+          result.outcome === 'dot' || result.outcome === 'misfield' ||
+          ['1', '2', '3'].includes(result.outcome))) {
+        // Ball was fielded - show distance to fielding position
+        const fp = result.fielding_position
+        displayDistance = Math.sqrt(fp.x * fp.x + fp.y * fp.y)
+      } else if (result.is_boundary) {
+        displayDistance = boundaryDist
+      } else {
+        displayDistance = endPosDist
+      }
+
       const shotLine: ShotLine = {
         id: Date.now().toString(),
         endX: screen.x,
         endY: screen.y,
+        boundaryEndX: boundaryEndScreen.x,
+        boundaryEndY: boundaryEndScreen.y,
         outcome: result.outcome === 'caught' || result.outcome === 'dropped' ? 'W' :
                  result.outcome === 'misfield' ? String(result.runs) as BallResult :
                  result.outcome as BallResult,
-        distance: Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y),
+        distance: displayDistance,
       }
       setWagonWheelShots(prev => [...prev, shotLine])
 
@@ -567,6 +604,14 @@ function App() {
     }
     setProfiles(prev => [...prev, newProfile])
     setActiveProfileId(newId)
+  }
+
+  const deleteProfile = () => {
+    if (profiles.length <= 1) return // Don't delete if it's the last profile
+    const newProfiles = profiles.filter(p => p.id !== activeProfileId)
+    setProfiles(newProfiles)
+    setActiveProfileId(newProfiles[0].id)
+    setShowDeleteConfirm(false)
   }
 
   const startNewSession = () => {
@@ -754,6 +799,15 @@ function App() {
                 >
                   ✏️
                 </button>
+                {profiles.length > 1 && (
+                  <button
+                    className="inline-btn delete"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title="Delete profile"
+                  >
+                    🗑️
+                  </button>
+                )}
                 {activeProfile.sessions.length > 0 && (
                   <button
                     className="inline-btn history"
@@ -1036,50 +1090,86 @@ function App() {
                   <div className="sim-inputs">
                     <div className="sim-input-group">
                       <label>Angle (°)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simAngle}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '') setSimAngle(val)
-                          else if (!isNaN(num)) setSimAngle(String(Math.max(0, Math.min(360, num))))
-                        }}
-                        placeholder="0"
-                      />
+                      <div className="sim-input-with-arrows">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={simAngle}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '')
+                            const num = parseInt(val, 10)
+                            if (val === '') setSimAngle(val)
+                            else if (!isNaN(num)) setSimAngle(String(Math.max(0, Math.min(360, num))))
+                          }}
+                          placeholder="0"
+                        />
+                        <div className="sim-arrows">
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimAngle(String(Math.min(360, (parseInt(simAngle) || 0) + 5)))}
+                          >▲</button>
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimAngle(String(Math.max(0, (parseInt(simAngle) || 0) - 5)))}
+                          >▼</button>
+                        </div>
+                      </div>
                       <span className="sim-hint">0 to 360</span>
                     </div>
                     <div className="sim-input-group">
                       <label>Elevation (°)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simElevation}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '') setSimElevation(val)
-                          else if (!isNaN(num)) setSimElevation(String(Math.max(0, Math.min(90, num))))
-                        }}
-                        placeholder="10"
-                      />
+                      <div className="sim-input-with-arrows">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={simElevation}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '')
+                            const num = parseInt(val, 10)
+                            if (val === '') setSimElevation(val)
+                            else if (!isNaN(num)) setSimElevation(String(Math.max(0, Math.min(90, num))))
+                          }}
+                          placeholder="10"
+                        />
+                        <div className="sim-arrows">
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimElevation(String(Math.min(90, (parseInt(simElevation) || 0) + 1)))}
+                          >▲</button>
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimElevation(String(Math.max(0, (parseInt(simElevation) || 0) - 1)))}
+                          >▼</button>
+                        </div>
+                      </div>
                       <span className="sim-hint">0 to 90</span>
                     </div>
                     <div className="sim-input-group">
                       <label>Speed (km/h)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={simSpeed}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '')
-                          const num = parseInt(val, 10)
-                          if (val === '') setSimSpeed(val)
-                          else if (!isNaN(num)) setSimSpeed(String(Math.max(0, Math.min(200, num))))
-                        }}
-                        placeholder="80"
-                      />
+                      <div className="sim-input-with-arrows">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={simSpeed}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '')
+                            const num = parseInt(val, 10)
+                            if (val === '') setSimSpeed(val)
+                            else if (!isNaN(num)) setSimSpeed(String(Math.max(0, Math.min(200, num))))
+                          }}
+                          placeholder="80"
+                        />
+                        <div className="sim-arrows">
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimSpeed(String(Math.min(200, (parseInt(simSpeed) || 0) + 5)))}
+                          >▲</button>
+                          <button
+                            className="sim-arrow-btn"
+                            onClick={() => setSimSpeed(String(Math.max(0, (parseInt(simSpeed) || 0) - 5)))}
+                          >▼</button>
+                        </div>
+                      </div>
                       <span className="sim-hint">0 to 200</span>
                     </div>
                   </div>
@@ -1102,7 +1192,15 @@ function App() {
                       )}
                       {simResult.trajectory && (
                         <div className="sim-distance">
-                          Distance: {simResult.trajectory.projected_distance.toFixed(1)}m
+                          Distance: {(() => {
+                            // Show actual distance: fielding position for fielded balls, otherwise end position
+                            if (simResult.fielding_position) {
+                              const fp = simResult.fielding_position
+                              return Math.sqrt(fp.x * fp.x + fp.y * fp.y).toFixed(1)
+                            }
+                            const ep = simResult.end_position
+                            return Math.sqrt(ep.x * ep.x + ep.y * ep.y).toFixed(1)
+                          })()}m
                         </div>
                       )}
                     </div>
@@ -1178,6 +1276,21 @@ function App() {
           connectionState={connectionState}
           onClose={() => setShowServerConfig(false)}
         />
+      )}
+
+      {/* Delete Profile Confirmation */}
+      {showDeleteConfirm && (
+        <>
+          <div className="field-editor-overlay" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="delete-confirm-modal">
+            <h3>Delete Profile?</h3>
+            <p>Are you sure you want to delete "{activeProfile.name}"? This will remove all session history for this player.</p>
+            <div className="delete-confirm-actions">
+              <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button className="btn-delete" onClick={deleteProfile}>Delete</button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
@@ -1303,13 +1416,17 @@ function FieldView({
         <svg className="wagon-wheel" viewBox="0 0 100 100" preserveAspectRatio="none">
           {wagonWheelShots.map((shot, index) => {
             const isLatest = index === wagonWheelShots.length - 1
+            // Boundary shots (4, 6) extend to boundary+1m, others go to where ball ended
+            const isBoundary = shot.outcome === '4' || shot.outcome === '6'
+            const lineEndX = isBoundary ? shot.boundaryEndX : shot.endX
+            const lineEndY = isBoundary ? shot.boundaryEndY : shot.endY
             return (
               <line
                 key={shot.id}
                 x1={SCREEN_GEOMETRY.batterX}
                 y1={SCREEN_GEOMETRY.batterY}
-                x2={shot.endX}
-                y2={shot.endY}
+                x2={lineEndX}
+                y2={lineEndY}
                 className={`wagon-wheel-line ${isLatest ? 'latest' : 'old'}`}
                 data-outcome={shot.outcome}
               />

@@ -127,6 +127,7 @@ VALID_CLIENT_TYPES = {
     "end_session",
     "undo",
     "ping",
+    "simulate_shot",
 }
 
 
@@ -142,6 +143,7 @@ MESSAGE_REQUIRED_FIELDS: dict[str, list[str]] = {
     "end_session": ["payload.session_id"],
     "undo": ["payload.session_id"],
     "ping": [],
+    "simulate_shot": ["payload.exit_speed", "payload.horizontal_angle", "payload.vertical_angle", "payload.field_config"],
 }
 
 

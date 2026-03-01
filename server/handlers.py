@@ -1078,6 +1078,85 @@ class MessageHandlers:
             "in_reply_to": message["message_id"],
         }
 
+    # =========================================================================
+    # SIMULATE SHOT HANDLER (for shot simulator UI)
+    # =========================================================================
+
+    async def handle_simulate_shot(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Handle simulate_shot message - run simulation and return full result.
+        This is for the shot simulator UI, not for actual game play.
+        """
+        payload = message.get("payload", {})
+        message_id = message.get("message_id")
+
+        # Extract parameters
+        exit_speed = payload.get("exit_speed", 0)
+        horizontal_angle = payload.get("horizontal_angle", 0)
+        vertical_angle = payload.get("vertical_angle", 0)
+        field_config = payload.get("field_config", [])
+        boundary_distance = payload.get("boundary_distance", 70)
+        difficulty = payload.get("difficulty", "medium")
+
+        # Calculate trajectory data for the simulation
+        from engine.game_engine import _calculate_trajectory
+
+        trajectory = _calculate_trajectory(exit_speed, horizontal_angle, vertical_angle)
+
+        # Run simulation
+        result = simulate_delivery(
+            exit_speed=exit_speed,
+            horizontal_angle=horizontal_angle,
+            vertical_angle=vertical_angle,
+            landing_x=trajectory.landing_x,
+            landing_y=trajectory.landing_y,
+            projected_distance=trajectory.projected_distance,
+            max_height=trajectory.max_height,
+            field_config=field_config,
+            boundary_distance=boundary_distance,
+            difficulty=difficulty,
+        )
+
+        logger.info(
+            f"Simulate shot: speed={exit_speed}, angle={horizontal_angle}, "
+            f"result={result.get('outcome')}, runs={result.get('runs')}"
+        )
+
+        # Build full simulation result with trajectory as dict
+        trajectory_dict = {
+            "projected_distance": trajectory.projected_distance,
+            "aerial_distance": trajectory.aerial_distance,
+            "rolling_distance": trajectory.rolling_distance,
+            "max_height": trajectory.max_height,
+            "landing_x": trajectory.landing_x,
+            "landing_y": trajectory.landing_y,
+            "final_x": trajectory.final_x,
+            "final_y": trajectory.final_y,
+            "time_of_flight": trajectory.time_of_flight,
+            "horizontal_speed": trajectory.horizontal_speed,
+            "vertical_speed": trajectory.vertical_speed,
+            "direction_x": trajectory.direction_x,
+            "direction_y": trajectory.direction_y,
+        }
+        simulation_result = {
+            **result,
+            "trajectory": trajectory_dict,
+        }
+
+        return {
+            "type": "simulate_result",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "simulation": simulation_result,
+            },
+        }
+
 
 # =============================================================================
 # HANDLER REGISTRATION
@@ -1115,6 +1194,7 @@ def register_handlers(
     server.message_router.register_handler("set_difficulty", handlers.handle_set_difficulty)
     server.message_router.register_handler("manual_input", handlers.handle_manual_input)
     server.message_router.register_handler("undo", handlers.handle_undo)
+    server.message_router.register_handler("simulate_shot", handlers.handle_simulate_shot)
     server.message_router.register_handler("ping", handlers.handle_ping)
 
     logger.info("Registered all message handlers")

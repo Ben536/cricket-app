@@ -268,6 +268,18 @@ export interface PingMessage extends BaseClientMessage {
   type: "ping";
 }
 
+export interface SimulateShotMessage extends BaseClientMessage {
+  type: "simulate_shot";
+  payload: {
+    exit_speed: number; // km/h
+    horizontal_angle: number; // degrees (0-360)
+    vertical_angle: number; // degrees (0-90)
+    field_config: FielderConfig[];
+    boundary_distance?: number; // default 70
+    difficulty?: Difficulty; // default 'medium'
+  };
+}
+
 export type ClientMessage =
   | SetFieldMessage
   | SetDifficultyMessage
@@ -278,6 +290,7 @@ export type ClientMessage =
   | StartSessionMessage
   | EndSessionMessage
   | UndoMessage
+  | SimulateShotMessage
   | PingMessage;
 
 // =============================================================================
@@ -352,6 +365,13 @@ export interface PongMessage extends BaseServerMessage {
   in_reply_to: string; // UUID of the ping message (required for pong)
 }
 
+export interface SimulateResultMessage extends BaseServerMessage {
+  type: "simulate_result";
+  payload: {
+    simulation: SimulationResult;
+  };
+}
+
 export type ServerMessage =
   | ShotResultMessage
   | SessionStateMessage
@@ -359,6 +379,7 @@ export type ServerMessage =
   | BallTrackingMessage
   | ConnectionStatusMessage
   | ErrorMessage
+  | SimulateResultMessage
   | PongMessage;
 
 // =============================================================================
@@ -383,6 +404,7 @@ export function isClientMessage(msg: WebSocketMessage): msg is ClientMessage {
     "start_session",
     "end_session",
     "undo",
+    "simulate_shot",
     "ping",
   ];
   return clientTypes.includes(msg.type);
@@ -396,6 +418,7 @@ export function isServerMessage(msg: WebSocketMessage): msg is ServerMessage {
     "ball_tracking",
     "connection_status",
     "error",
+    "simulate_result",
     "pong",
   ];
   return serverTypes.includes(msg.type);

@@ -240,6 +240,9 @@ class CricketWebSocketServer:
             # Send connection status
             await self._send_connection_status(client_id)
 
+            # Send initial session state
+            await self._send_initial_session_state(client_id)
+
             # Handle messages
             async for raw_message in websocket:
                 if not self._running:
@@ -287,6 +290,19 @@ class CricketWebSocketServer:
                 "uptime_seconds": uptime,
             }
         }
+
+        await self.connection_manager.send_to_client(client_id, message)
+
+    async def _send_initial_session_state(self, client_id: str) -> None:
+        """Send initial session state to a newly connected client."""
+        from server.handlers import build_session_state_response
+
+        message = build_session_state_response(
+            self.session_manager,
+            self.repository,
+            client_id,
+            in_reply_to=None,
+        )
 
         await self.connection_manager.send_to_client(client_id, message)
 

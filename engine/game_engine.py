@@ -115,6 +115,11 @@ GRAVITY = 9.81  # m/s^2
 # Ball starting height (bat contact point)
 BAT_HEIGHT = 1.0  # metres
 
+# Batter position offset from field center
+# The boundary is a circle centered on the pitch center, not the batter
+# Batter is 8.84m from pitch center (half pitch length minus crease)
+BATTER_OFFSET_FROM_CENTER = 8.84  # metres
+
 # =============================================================================
 # Catch Thresholds
 # =============================================================================
@@ -429,6 +434,38 @@ def _convert_field_config(field_config: list[dict]) -> list[Fielder]:
 def _normalize_angle(angle: float) -> float:
     """Normalize angle to -180 to 180 range using modulo (no loops)."""
     return ((angle + 180.0) % 360.0) - 180.0
+
+
+def get_boundary_distance_at_angle(horizontal_angle: float, boundary_radius: float = 70.0) -> float:
+    """
+    Calculate the actual boundary distance from the batter at a given shot angle.
+
+    The boundary is a circle centered on the pitch center, but the batter is
+    offset from the pitch center by BATTER_OFFSET_FROM_CENTER (8.84m).
+
+    This means:
+    - Shots toward the bowler (0°) travel further to reach boundary (~79m)
+    - Shots toward the keeper (180°) reach boundary sooner (~61m)
+    - Square shots (90°) are roughly the nominal boundary distance (~69m)
+
+    Args:
+        horizontal_angle: Shot angle in degrees (0° = toward bowler, ±90° = square)
+        boundary_radius: Nominal boundary radius from pitch center (default 70m)
+
+    Returns:
+        Actual distance from batter to boundary at this angle
+    """
+    angle_rad = math.radians(horizontal_angle)
+    cos_angle = math.cos(angle_rad)
+    sin_angle = math.sin(angle_rad)
+
+    offset = BATTER_OFFSET_FROM_CENTER
+    offset_sq = offset * offset
+
+    # Ray-circle intersection formula
+    # Batter at (0, -offset) from pitch center, boundary circle radius R
+    # Distance = offset * cos(θ) + √(R² - offset² * sin²(θ))
+    return offset * cos_angle + math.sqrt(boundary_radius * boundary_radius - offset_sq * sin_angle * sin_angle)
 
 
 def _distance(x1: float, y1: float, x2: float = 0.0, y2: float = 0.0) -> float:
@@ -2025,6 +2062,10 @@ def simulate_delivery(
 
     probs = DIFFICULTY_SETTINGS[difficulty]
 
+    # Calculate actual boundary distance at this shot angle
+    # The boundary is a circle centered on the pitch, not the batter
+    actual_boundary = get_boundary_distance_at_angle(horizontal_angle, boundary_distance)
+
     # Convert field config to efficient format
     fielders = _convert_field_config(field_config)
 
@@ -2037,20 +2078,23 @@ def simulate_delivery(
 
     logger.debug(f"Shot: {shot_name}, speed={exit_speed:.1f}km/h, "
                  f"h_angle={horizontal_angle:.1f}°, v_angle={vertical_angle:.1f}°, "
-                 f"distance={projected_distance:.1f}m, height={max_height:.1f}m")
+                 f"distance={projected_distance:.1f}m, height={max_height:.1f}m, "
+                 f"boundary={actual_boundary:.1f}m")
 
     # Check 1: Six
     result = _check_six(traj, projected_distance, max_height, vertical_angle,
-                        boundary_distance, is_aerial, shot_name, landing_x, landing_y)
+                        actual_boundary, is_aerial, shot_name, landing_x, landing_y)
     if result:
+        result['boundary_distance'] = actual_boundary
         logger.info(f"Result: SIX - {result['description']}")
         return result
 
     # Check 2: Catches
     result = _evaluate_catches(fielders, traj, projected_distance, max_height,
-                               landing_x, landing_y, boundary_distance, difficulty,
+                               landing_x, landing_y, actual_boundary, difficulty,
                                exit_speed, shot_name, is_aerial)
     if result:
+        result['boundary_distance'] = actual_boundary
         logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
@@ -2060,20 +2104,23 @@ def simulate_delivery(
     result = _evaluate_ground_fielding(fielders, projected_distance, landing_x, landing_y,
                                         exit_speed, is_aerial, shot_name, probs,
                                         traj.aerial_distance, traj.time_of_flight,
-                                        boundary_distance)
+                                        actual_boundary)
     if result:
+        result['boundary_distance'] = actual_boundary
         logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
     # Check 4: Four (only reached if no fielder intercepted boundary ball)
-    result = _check_boundary_four(projected_distance, boundary_distance,
+    result = _check_boundary_four(projected_distance, actual_boundary,
                                    landing_x, landing_y, is_aerial, shot_name)
     if result:
+        result['boundary_distance'] = actual_boundary
         logger.info(f"Result: FOUR - {result['description']}")
         return result
 
     # Fallback: Nearest fielder retrieves
     result = _fallback_nearest_fielder(fielders, landing_x, landing_y, projected_distance,
                                         exit_speed, is_aerial, shot_name)
+    result['boundary_distance'] = actual_boundary
     logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
     return result

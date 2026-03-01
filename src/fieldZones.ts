@@ -13,14 +13,14 @@
  * FIELD GEOMETRY (in meters, from batter at origin):
  * - Batter: (0, 0)
  * - Bowler: (0, 19)
- * - Field center: (0, 8.85) - batter is NOT at center of field
+ * - Field center: (0, 8.84) - batter is NOT at center of field
  * - Field radius: 70m
  *
  * SCREEN MAPPING:
  * - Visual circle center: (50%, 50%)
  * - Visual circle radius: 50%
  * - Scale: 50% screen = 70m, so 1% = 1.4m
- * - Batter is 8.85m from center, so 8.85/70*50 = 6.3% above center
+ * - Batter is 8.84m from center, so 8.84/70*50 = 6.3% above center
  * - Therefore batter is at (50%, 43.7%)
  */
 
@@ -36,7 +36,7 @@ const SCREEN_FIELD_RADIUS = 50    // The circle fills 0-100%
 // REAL WORLD DIMENSIONS (in meters)
 // ============================================
 const FIELD_RADIUS_METERS = 70
-const FIELD_CENTER_OFFSET_FROM_BATTER = 8.85  // Field center is 8.85m toward bowler from batter
+const FIELD_CENTER_OFFSET_FROM_BATTER = 8.84  // Field center is 8.84m toward bowler from batter
 
 // Scale: 1% screen = how many meters
 const METERS_PER_PERCENT = FIELD_RADIUS_METERS / SCREEN_FIELD_RADIUS  // 70/50 = 1.4
@@ -44,8 +44,8 @@ const METERS_PER_PERCENT = FIELD_RADIUS_METERS / SCREEN_FIELD_RADIUS  // 70/50 =
 // ============================================
 // DERIVED BATTER POSITION
 // ============================================
-// Batter is 8.85m from field center (toward the back/top of screen)
-// In screen terms: 8.85m / 1.4 (m/%) = 6.32%
+// Batter is 8.84m from field center (toward the back/top of screen)
+// In screen terms: 8.84m / 1.4 (m/%) = 6.32%
 const BATTER_OFFSET_FROM_CENTER = FIELD_CENTER_OFFSET_FROM_BATTER / METERS_PER_PERCENT
 const BATTER_SCREEN_X = SCREEN_FIELD_CENTER_X
 const BATTER_SCREEN_Y = SCREEN_FIELD_CENTER_Y - BATTER_OFFSET_FROM_CENTER  // 50 - 6.32 = 43.68%

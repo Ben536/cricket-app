@@ -30,6 +30,7 @@ export interface SimulationResult {
   priority_score?: number         // Combined weighted score used for fielder selection
   fielder_arrival_time?: number   // Seconds for fielder to reach intercept point
   ball_arrival_time?: number      // Seconds for ball to reach intercept point
+  boundary_distance?: number      // Actual boundary distance at this shot angle (metres)
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard'
