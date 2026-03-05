@@ -1,0 +1,35 @@
+[Unit]
+Description=CricketRadar - Static UI Server
+Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
+
+# Start after the WebSocket server
+After=cricket-server.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Run as application user
+User=bdrysdale
+Group=bdrysdale
+
+# Working directory
+WorkingDirectory=/home/bdrysdale/cricket-app
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+# Start the static file server
+ExecStart=/usr/bin/python3 /home/bdrysdale/cricket-app/scripts/static_server.py
+
+# Automatic restart on failure
+Restart=on-failure
+RestartSec=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cricket-ui
+
+[Install]
+WantedBy=multi-user.target
