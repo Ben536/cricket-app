@@ -29,6 +29,8 @@ class RadarPoint:
     y: float
     z: float
     doppler: float
+    snr: float = 0.0      # Signal-to-noise ratio (dB)
+    noise: float = 0.0    # Noise level (dB)
 
 
 @dataclass
@@ -43,7 +45,7 @@ class RadarFrame:
             "timestamp_ms": self.timestamp_ms,
             "point_count": len(self.points),
             "points": [
-                {"x": p.x, "y": p.y, "z": p.z, "v": p.doppler}
+                {"x": p.x, "y": p.y, "z": p.z, "v": p.doppler, "snr": p.snr, "noise": p.noise}
                 for p in self.points
             ],
         }
@@ -91,7 +93,10 @@ class TLVParser:
                 points=[],
             )
 
+            # First pass: collect all TLV data
             tlv_start = len(MAGIC_BYTES) + HEADER_SIZE
+            side_info_data = None
+
             while tlv_start + 8 <= len(packet):
                 tlv_type = struct.unpack('<I', packet[tlv_start:tlv_start + 4])[0]
                 tlv_length = struct.unpack('<I', packet[tlv_start + 4:tlv_start + 8])[0]
@@ -111,7 +116,21 @@ class TLVParser:
                         )
                         frame.points.append(RadarPoint(x=x, y=y, z=z, doppler=doppler))
 
+                elif tlv_type == 7:  # Side Info (SNR + Noise per point)
+                    side_info_data = tlv_data
+
                 tlv_start += 8 + tlv_length
+
+            # Second pass: add SNR/noise to points if available
+            if side_info_data and len(frame.points) > 0:
+                # Each point has: SNR (int16) + Noise (int16) = 4 bytes
+                num_side_info = len(side_info_data) // 4
+                for i in range(min(num_side_info, len(frame.points))):
+                    offset = i * 4
+                    snr_raw, noise_raw = struct.unpack('<hh', side_info_data[offset:offset + 4])
+                    # Convert from 0.1 dB units to dB
+                    frame.points[i].snr = snr_raw * 0.1
+                    frame.points[i].noise = noise_raw * 0.1
 
             frames.append(frame)
 
@@ -204,7 +223,7 @@ class RadarStreamer:
                         ball_x = math.sin(t) * 2
                         ball_y = 3 + math.cos(t * 0.5)
                         ball_v = 15 + math.sin(t) * 5
-                        mock_points.append({"x": ball_x, "y": ball_y, "z": 0.5, "v": ball_v})
+                        mock_points.append({"x": ball_x, "y": ball_y, "z": 0.5, "v": ball_v, "snr": 18.0, "noise": 5.0})
 
                     # Some noise points
                     import random
@@ -214,6 +233,8 @@ class RadarStreamer:
                             "y": random.uniform(0, 6),
                             "z": random.uniform(0, 2),
                             "v": random.uniform(-2, 2),
+                            "snr": random.uniform(8, 14),
+                            "noise": random.uniform(4, 8),
                         })
 
                     frame_data = {

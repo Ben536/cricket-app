@@ -36,6 +36,8 @@ class RadarPoint:
     y: float
     z: float
     doppler: float  # Velocity in m/s
+    snr: float = 0.0      # Signal-to-noise ratio (dB)
+    noise: float = 0.0    # Noise level (dB)
 
 
 @dataclass
@@ -52,7 +54,7 @@ class RadarFrame:
             "timestamp_ms": self.timestamp_ms,
             "num_points": self.num_points,
             "points": [
-                {"x": p.x, "y": p.y, "z": p.z, "doppler": p.doppler}
+                {"x": p.x, "y": p.y, "z": p.z, "doppler": p.doppler, "snr": p.snr, "noise": p.noise}
                 for p in self.points
             ],
         }
@@ -156,7 +158,10 @@ class TLVParser:
                 points=[],
             )
 
+            # First pass: collect all TLV data
             tlv_start = len(MAGIC_BYTES) + HEADER_SIZE
+            side_info_data = None
+
             while tlv_start + 8 <= len(packet):
                 tlv_type = struct.unpack('<I', packet[tlv_start:tlv_start + 4])[0]
                 tlv_length = struct.unpack('<I', packet[tlv_start + 4:tlv_start + 8])[0]
@@ -179,7 +184,22 @@ class TLVParser:
                         frame.points.append(RadarPoint(x=x, y=y, z=z, doppler=doppler))
                     frame.num_points = len(frame.points)
 
+                # Type 7 = Side Info (SNR + Noise per point)
+                elif tlv_type == 7:
+                    side_info_data = tlv_data
+
                 tlv_start += 8 + tlv_length
+
+            # Second pass: add SNR/noise to points if available
+            if side_info_data and len(frame.points) > 0:
+                # Each point has: SNR (int16) + Noise (int16) = 4 bytes
+                num_side_info = len(side_info_data) // 4
+                for i in range(min(num_side_info, len(frame.points))):
+                    offset = i * 4
+                    snr_raw, noise_raw = struct.unpack('<hh', side_info_data[offset:offset + 4])
+                    # Convert from 0.1 dB units to dB
+                    frame.points[i].snr = snr_raw * 0.1
+                    frame.points[i].noise = noise_raw * 0.1
 
             frames.append(frame)
 
