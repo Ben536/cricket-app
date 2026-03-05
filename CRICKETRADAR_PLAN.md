@@ -73,7 +73,9 @@
 | **Radar Recording UI** | ✅ Built | Record bowling/batting/both, 15s max |
 | **Radar → Game Engine** | ❌ Not built | Ball detection algorithm |
 | **WiFi Access Point** | ❌ Not configured | hostapd/dnsmasq setup |
-| **Boot Scripts** | ❌ Not built | Auto-start on power |
+| **Boot Automation** | ✅ Built | systemd services, health monitor, auto-recovery |
+| **Auto-Discovery** | ✅ Built | mDNS (cricketradar.local), fallback chain |
+| **PWA** | ✅ Built | manifest, service worker, installable |
 | **Profile Switching UI** | ⚠️ Partial | Exists but needs polish |
 
 ### Tested & Working
@@ -86,6 +88,11 @@
 - ✅ UI displays scores and wagon wheel
 - ✅ Frontend → Pi → Frontend round-trip (Phase 0 complete)
 - ✅ Server simulation via WebSocket (simulateAsync uses Pi when connected)
+- ✅ Boot automation: Pi auto-configures radar and starts server on power-on
+- ✅ Server crash recovery: systemd auto-restarts within 3 seconds
+- ✅ Health monitor: detects failures, triggers recovery
+- ✅ Auto-discovery: app finds Pi via cricketradar.local
+- ✅ Boot time: ~35 seconds from power to ready
 
 ### Not Yet Tested
 
@@ -455,11 +462,11 @@ Feed these to game engine → Get outcome → Update UI.
 *Goal: Portable, self-contained unit*
 
 - [ ] Configure Pi as WiFi access point
-- [ ] Create boot scripts (auto-start everything)
+- [x] Create boot scripts (auto-start everything) ✅ systemd services + health monitor
 - [ ] Design and 3D print enclosure
 - [ ] Add mounting clip mechanism
 - [ ] Test battery life
-- [ ] **Success criteria:** Plug in, power on, works
+- [x] **Success criteria:** Plug in, power on, works ✅ 35s boot, auto-recovery tested
 
 ### Phase 4: UX Polish
 *Goal: Smooth experience for friends*
@@ -473,8 +480,8 @@ Feed these to game engine → Get outcome → Update UI.
 ### Phase 5: PWA Conversion
 *Goal: App-like experience without app store*
 
-- [ ] Add service worker for offline caching
-- [ ] Add web manifest for "install to home screen"
+- [x] Add service worker for offline caching ✅
+- [x] Add web manifest for "install to home screen" ✅
 - [ ] Optimise for mobile
 - [ ] **Success criteria:** Feels like a native app
 
@@ -1270,4 +1277,4 @@ The fielding UI, scoring display, wagon wheel, and shot simulator have been care
 
 ---
 
-*Last updated: 2026-03-01 - Phase 0 complete, radar recording system built for Phase 1 testing*
+*Last updated: 2026-03-05 - Boot automation complete (Phase 3 partial), PWA infrastructure done (Phase 5 partial)*
