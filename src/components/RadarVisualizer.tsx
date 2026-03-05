@@ -100,12 +100,12 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
     ctx.textAlign = 'center'
     ctx.fillText('R', width / 2, height - 6)
 
-    // Draw points from recent frames
-    const recentFrames = frameBufferRef.current.slice(-5)  // Last 5 frames
+    // Draw points from recent frames (reduced from 5 to 2 for cleaner display)
+    const recentFrames = frameBufferRef.current.slice(-2)
 
     recentFrames.forEach((frame, frameIdx) => {
       const age = recentFrames.length - frameIdx - 1
-      const alpha = 1 - (age * 0.15)  // Older frames fade
+      const alpha = 1 - (age * 0.4)  // Faster fade for cleaner look
 
       frame.points.forEach(point => {
         // Convert radar coords to screen coords
@@ -116,68 +116,28 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
         // Skip points outside view
         if (screenX < 0 || screenX > width || screenY < 0 || screenY > height) return
 
-        // Color by velocity (doppler)
-        // Positive = moving away (red), Negative = moving toward (blue)
-        const velocity = point.v || 0
-        const absV = Math.abs(velocity)
-        const intensity = Math.min(1, absV / 20)  // Max at 20 m/s
+        // Clean, uniform appearance - theme green with subtle glow
+        const size = 5
 
-        let r: number, g: number, b: number
-        if (velocity > 0.5) {
-          // Moving away - red/orange
-          r = 255
-          g = Math.floor(100 * (1 - intensity))
-          b = 50
-        } else if (velocity < -0.5) {
-          // Moving toward - blue/cyan
-          r = 50
-          g = Math.floor(200 * intensity)
-          b = 255
-        } else {
-          // Slow/stationary - white/grey
-          r = 200
-          g = 200
-          b = 200
-        }
-
-        // Size based on velocity
-        const size = 4 + absV * 0.3
-
-        // Save state before drawing point
         ctx.save()
         ctx.globalAlpha = alpha
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
+        ctx.fillStyle = '#4ade80'  // Soft green matching theme
         ctx.beginPath()
         ctx.arc(screenX, screenY, size, 0, Math.PI * 2)
         ctx.fill()
         ctx.restore()
-
-        // Add border ring for fast-moving points instead of shadow
-        if (absV > 10) {
-          ctx.save()
-          ctx.globalAlpha = alpha
-          ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`
-          ctx.lineWidth = 2
-          ctx.beginPath()
-          ctx.arc(screenX, screenY, size + 4, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
-        }
       })
     })
 
-    // Draw legend
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+    // Draw legend - simplified single color
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
     ctx.font = '11px sans-serif'
     ctx.textAlign = 'left'
-    ctx.fillText('Away →', 10, 20)
-    ctx.fillStyle = '#ff6432'
-    ctx.fillRect(60, 12, 12, 12)
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-    ctx.fillText('← Toward', 10, 38)
-    ctx.fillStyle = '#32c8ff'
-    ctx.fillRect(70, 30, 12, 12)
+    ctx.fillText('Detected', 10, 20)
+    ctx.fillStyle = '#4ade80'
+    ctx.beginPath()
+    ctx.arc(70, 16, 5, 0, Math.PI * 2)
+    ctx.fill()
 
     // Distance markers
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
