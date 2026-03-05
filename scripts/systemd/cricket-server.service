@@ -1,0 +1,60 @@
+[Unit]
+Description=CricketRadar - WebSocket Server
+Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
+
+# Start after radar is configured (or after timeout)
+After=cricket-radar.service network-online.target
+Wants=network-online.target
+
+# Weak dependency - start even if radar config failed
+# This allows manual mode operation
+Wants=cricket-radar.service
+
+[Service]
+Type=simple
+
+# Run as application user, not root
+User=bdrysdale
+Group=bdrysdale
+
+# Working directory
+WorkingDirectory=/home/bdrysdale/cricket-app
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/home/bdrysdale/cricket-app
+
+# Start the WebSocket server
+ExecStart=/usr/bin/python3 -m server.websocket_server
+
+# Automatic restart on failure
+Restart=on-failure
+RestartSec=3
+
+# Rate limiting: max 5 restarts in 60 seconds
+# Prevents crash loops from exhausting resources
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# If we hit the limit, wait 5 minutes before trying again
+StartLimitAction=none
+
+# Graceful shutdown
+TimeoutStopSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cricket-server
+
+# Security hardening (non-essential but good practice)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/bdrysdale/cricket-app/db
+ReadWritePaths=/home/bdrysdale/cricket-app/recordings
+
+[Install]
+WantedBy=multi-user.target

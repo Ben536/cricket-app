@@ -118,17 +118,17 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
 
         // Color by velocity (doppler)
         // Positive = moving away (red), Negative = moving toward (blue)
-        // High velocity = brighter
-        const absV = Math.abs(point.v)
+        const velocity = point.v || 0
+        const absV = Math.abs(velocity)
         const intensity = Math.min(1, absV / 20)  // Max at 20 m/s
 
-        let r, g, b
-        if (point.v > 2) {
+        let r: number, g: number, b: number
+        if (velocity > 0.5) {
           // Moving away - red/orange
           r = 255
           g = Math.floor(100 * (1 - intensity))
           b = 50
-        } else if (point.v < -2) {
+        } else if (velocity < -0.5) {
           // Moving toward - blue/cyan
           r = 50
           g = Math.floor(200 * intensity)
@@ -143,26 +143,28 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
         // Size based on velocity
         const size = 4 + absV * 0.3
 
+        // Save state before drawing point
+        ctx.save()
         ctx.globalAlpha = alpha
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`
         ctx.beginPath()
         ctx.arc(screenX, screenY, size, 0, Math.PI * 2)
         ctx.fill()
+        ctx.restore()
 
-        // Add glow for fast-moving points
+        // Add border ring for fast-moving points instead of shadow
         if (absV > 10) {
-          ctx.shadowColor = `rgb(${r}, ${g}, ${b})`
-          ctx.shadowBlur = 10
+          ctx.save()
+          ctx.globalAlpha = alpha
+          ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`
+          ctx.lineWidth = 2
           ctx.beginPath()
-          ctx.arc(screenX, screenY, size, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.shadowBlur = 0
-          ctx.shadowColor = 'transparent'
+          ctx.arc(screenX, screenY, size + 4, 0, Math.PI * 2)
+          ctx.stroke()
+          ctx.restore()
         }
       })
     })
-
-    ctx.globalAlpha = 1
 
     // Draw legend
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'

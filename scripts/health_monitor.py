@@ -1,0 +1,381 @@
+#!/usr/bin/env python3
+"""
+CricketRadar Health Monitor
+
+Watches critical services and triggers recovery actions:
+1. Checks radar serial port is accessible
+2. Checks WebSocket server accepts connections
+3. Restarts services on failure
+4. Escalates to reboot after repeated failures
+
+Run as systemd service for continuous monitoring.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+import os
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stderr)]
+)
+logger = logging.getLogger("cricket.health")
+
+
+class HealthStatus(Enum):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+
+
+@dataclass
+class CheckResult:
+    """Result of a health check."""
+    name: str
+    healthy: bool
+    message: str
+    duration_ms: int = 0
+
+
+@dataclass
+class HealthState:
+    """Tracks health state over time."""
+    consecutive_failures: int = 0
+    last_check_time: float = 0
+    last_healthy_time: float = field(default_factory=time.time)
+    total_checks: int = 0
+    total_failures: int = 0
+    recovery_actions_taken: int = 0
+
+
+class HealthMonitor:
+    """
+    Monitors CricketRadar system health and triggers recovery.
+    """
+
+    def __init__(
+        self,
+        check_interval: float = 30.0,
+        radar_device: str = "/dev/ttyUSB0",
+        websocket_port: int = 5002,
+        max_failures_before_restart: int = 2,
+        max_restarts_before_reboot: int = 3,
+    ):
+        self.check_interval = check_interval
+        self.radar_device = radar_device
+        self.websocket_port = websocket_port
+        self.max_failures_before_restart = max_failures_before_restart
+        self.max_restarts_before_reboot = max_restarts_before_reboot
+
+        self.radar_state = HealthState()
+        self.server_state = HealthState()
+        self.restart_count = 0
+        self.running = False
+
+    def check_radar(self) -> CheckResult:
+        """
+        Check if radar serial port is accessible.
+
+        Returns:
+            CheckResult with health status
+        """
+        start = time.time()
+
+        # Check device exists
+        if not os.path.exists(self.radar_device):
+            return CheckResult(
+                name="radar",
+                healthy=False,
+                message=f"Device {self.radar_device} not found",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
+        # Try to open device
+        try:
+            import serial
+            ser = serial.Serial(self.radar_device, 115200, timeout=1)
+            ser.close()
+            return CheckResult(
+                name="radar",
+                healthy=True,
+                message="Radar device accessible",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except serial.SerialException as e:
+            return CheckResult(
+                name="radar",
+                healthy=False,
+                message=f"Cannot open radar device: {e}",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except ImportError:
+            # pyserial not installed, just check file exists
+            return CheckResult(
+                name="radar",
+                healthy=True,
+                message="Radar device exists (pyserial not available for deep check)",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
+    async def check_websocket(self) -> CheckResult:
+        """
+        Check if WebSocket server accepts connections.
+
+        Returns:
+            CheckResult with health status
+        """
+        start = time.time()
+
+        try:
+            # Try to connect to WebSocket
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection('127.0.0.1', self.websocket_port),
+                timeout=5.0
+            )
+            writer.close()
+            await writer.wait_closed()
+
+            return CheckResult(
+                name="websocket",
+                healthy=True,
+                message=f"WebSocket server accepting connections on port {self.websocket_port}",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except asyncio.TimeoutError:
+            return CheckResult(
+                name="websocket",
+                healthy=False,
+                message=f"WebSocket connection timeout on port {self.websocket_port}",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except ConnectionRefusedError:
+            return CheckResult(
+                name="websocket",
+                healthy=False,
+                message=f"WebSocket connection refused on port {self.websocket_port}",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except Exception as e:
+            return CheckResult(
+                name="websocket",
+                healthy=False,
+                message=f"WebSocket check failed: {e}",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
+    def restart_service(self, service_name: str) -> bool:
+        """
+        Restart a systemd service.
+
+        Returns:
+            True if restart command succeeded
+        """
+        logger.warning(f"Restarting service: {service_name}")
+
+        try:
+            result = subprocess.run(
+                ["sudo", "systemctl", "restart", service_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode == 0:
+                logger.info(f"Service {service_name} restarted successfully")
+                return True
+            else:
+                logger.error(f"Failed to restart {service_name}: {result.stderr}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout restarting {service_name}")
+            return False
+        except Exception as e:
+            logger.error(f"Error restarting {service_name}: {e}")
+            return False
+
+    def trigger_reboot(self) -> None:
+        """
+        Trigger system reboot as last resort.
+        """
+        logger.critical("Triggering system reboot due to repeated failures")
+
+        try:
+            subprocess.run(
+                ["sudo", "systemctl", "reboot"],
+                timeout=10,
+            )
+        except Exception as e:
+            logger.error(f"Failed to trigger reboot: {e}")
+
+    def update_state(self, state: HealthState, healthy: bool) -> None:
+        """Update health state tracking."""
+        state.total_checks += 1
+        state.last_check_time = time.time()
+
+        if healthy:
+            state.consecutive_failures = 0
+            state.last_healthy_time = time.time()
+        else:
+            state.consecutive_failures += 1
+            state.total_failures += 1
+
+    async def check_and_recover(self) -> HealthStatus:
+        """
+        Run all health checks and trigger recovery if needed.
+
+        Returns:
+            Overall health status
+        """
+        # Run checks
+        radar_result = self.check_radar()
+        server_result = await self.check_websocket()
+
+        # Update state
+        self.update_state(self.radar_state, radar_result.healthy)
+        self.update_state(self.server_state, server_result.healthy)
+
+        # Log results
+        if radar_result.healthy and server_result.healthy:
+            logger.debug(f"Health check passed: radar={radar_result.duration_ms}ms, server={server_result.duration_ms}ms")
+            self.restart_count = 0  # Reset restart count on healthy check
+            return HealthStatus.HEALTHY
+
+        # Handle failures
+        overall_status = HealthStatus.HEALTHY
+
+        if not radar_result.healthy:
+            logger.warning(f"Radar unhealthy: {radar_result.message} (failures: {self.radar_state.consecutive_failures})")
+            overall_status = HealthStatus.DEGRADED
+
+            if self.radar_state.consecutive_failures >= self.max_failures_before_restart:
+                self.restart_service("cricket-radar.service")
+                self.radar_state.recovery_actions_taken += 1
+                self.restart_count += 1
+
+        if not server_result.healthy:
+            logger.warning(f"Server unhealthy: {server_result.message} (failures: {self.server_state.consecutive_failures})")
+            overall_status = HealthStatus.UNHEALTHY
+
+            if self.server_state.consecutive_failures >= self.max_failures_before_restart:
+                self.restart_service("cricket-server.service")
+                self.server_state.recovery_actions_taken += 1
+                self.restart_count += 1
+
+        # Check if we should reboot
+        if self.restart_count >= self.max_restarts_before_reboot:
+            logger.critical(f"Too many restart attempts ({self.restart_count}), escalating to reboot")
+            self.trigger_reboot()
+
+        return overall_status
+
+    async def run(self) -> None:
+        """
+        Main monitoring loop.
+        """
+        logger.info(f"Health monitor starting (interval: {self.check_interval}s)")
+        logger.info(f"Monitoring: radar={self.radar_device}, websocket=:{self.websocket_port}")
+
+        self.running = True
+
+        # Initial delay to let services start
+        await asyncio.sleep(10)
+
+        while self.running:
+            try:
+                status = await self.check_and_recover()
+
+                # Log periodic summary
+                if self.radar_state.total_checks % 10 == 0:
+                    logger.info(
+                        f"Health summary: checks={self.radar_state.total_checks}, "
+                        f"radar_failures={self.radar_state.total_failures}, "
+                        f"server_failures={self.server_state.total_failures}, "
+                        f"restarts={self.restart_count}"
+                    )
+
+            except Exception as e:
+                logger.error(f"Health check error: {e}")
+
+            await asyncio.sleep(self.check_interval)
+
+    def stop(self) -> None:
+        """Stop the monitoring loop."""
+        self.running = False
+
+
+def main() -> int:
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="CricketRadar health monitor and recovery service"
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=30.0,
+        help="Check interval in seconds (default: 30)",
+    )
+    parser.add_argument(
+        "--radar-device",
+        default="/dev/ttyUSB0",
+        help="Radar serial device path",
+    )
+    parser.add_argument(
+        "--websocket-port",
+        type=int,
+        default=5002,
+        help="WebSocket server port",
+    )
+    parser.add_argument(
+        "--max-failures",
+        type=int,
+        default=2,
+        help="Failures before restart (default: 2)",
+    )
+    parser.add_argument(
+        "--max-restarts",
+        type=int,
+        default=3,
+        help="Restarts before reboot (default: 3)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
+    args = parser.parse_args()
+
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    monitor = HealthMonitor(
+        check_interval=args.interval,
+        radar_device=args.radar_device,
+        websocket_port=args.websocket_port,
+        max_failures_before_restart=args.max_failures,
+        max_restarts_before_reboot=args.max_restarts,
+    )
+
+    try:
+        asyncio.run(monitor.run())
+    except KeyboardInterrupt:
+        logger.info("Health monitor stopped by user")
+        monitor.stop()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

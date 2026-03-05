@@ -1,0 +1,45 @@
+[Unit]
+Description=CricketRadar - Configure IWR6843 Radar
+Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
+
+# Start after network is available and USB devices are ready
+After=network-online.target
+Wants=network-online.target
+
+# This service must complete before the WebSocket server starts
+Before=cricket-server.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Run as application user, not root
+User=bdrysdale
+Group=bdrysdale
+
+# Working directory
+WorkingDirectory=/home/bdrysdale/cricket-app
+
+# The configuration script with appropriate timeouts
+# --device-timeout: Wait up to 2 minutes for radar USB
+# --max-retries: Try up to 5 times with backoff
+ExecStart=/usr/bin/python3 /home/bdrysdale/cricket-app/scripts/configure_radar.py \
+    /home/bdrysdale/profile_cricket.cfg \
+    --device /dev/ttyUSB0 \
+    --device-timeout 120 \
+    --max-retries 5
+
+# Give the script plenty of time to complete (device wait + retries)
+TimeoutStartSec=300
+
+# Restart handling - if config fails, try again after delay
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cricket-radar
+
+[Install]
+WantedBy=multi-user.target

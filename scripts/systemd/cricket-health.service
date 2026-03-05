@@ -1,0 +1,41 @@
+[Unit]
+Description=CricketRadar - Health Monitor
+Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
+
+# Start after the main services are up
+After=cricket-server.service
+Wants=cricket-server.service
+
+[Service]
+Type=simple
+
+# Run as application user
+User=bdrysdale
+Group=bdrysdale
+
+# Working directory
+WorkingDirectory=/home/bdrysdale/cricket-app
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+# Start the health monitor
+# --interval 30: Check every 30 seconds
+# --max-failures 2: Restart after 2 consecutive failures
+# --max-restarts 3: Reboot after 3 restart attempts
+ExecStart=/usr/bin/python3 /home/bdrysdale/cricket-app/scripts/health_monitor.py \
+    --interval 30 \
+    --max-failures 2 \
+    --max-restarts 3
+
+# Restart the monitor itself if it crashes
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cricket-health
+
+[Install]
+WantedBy=multi-user.target

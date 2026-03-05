@@ -5,11 +5,19 @@
  * 1. URL query parameter: ?server=192.168.0.191:5002
  * 2. localStorage: cricket-app-server-url
  * 3. Environment variable: VITE_WS_URL (build time)
- * 4. Default fallback
+ * 4. Auto-discovery: tries cricketradar.local, raspberrypi.local, etc.
+ * 5. Default fallback
  */
 
 const STORAGE_KEY = 'cricket-app-server-url';
+const LAST_WORKING_KEY = 'cricket-app-last-working-url';
 const DEFAULT_PORT = 5002;
+
+// Discovery URLs to try, in order
+const DISCOVERY_URLS = [
+  `ws://cricketradar.local:${DEFAULT_PORT}`,
+  `ws://raspberrypi.local:${DEFAULT_PORT}`,
+];
 
 /**
  * Get the WebSocket server URL from various sources.
@@ -91,4 +99,117 @@ export function isServerConfigured(): boolean {
   return getSavedServerUrl() !== null ||
          new URLSearchParams(window.location.search).has('server') ||
          !!import.meta.env.VITE_WS_URL;
+}
+
+/**
+ * Get the last working server URL.
+ */
+export function getLastWorkingUrl(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(LAST_WORKING_KEY);
+  }
+  return null;
+}
+
+/**
+ * Save the last working server URL.
+ */
+export function saveLastWorkingUrl(url: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(LAST_WORKING_KEY, url);
+  }
+}
+
+/**
+ * Get the list of URLs to try for auto-discovery.
+ * Includes: configured URL, last working URL, and discovery URLs.
+ */
+export function getDiscoveryUrls(): string[] {
+  const urls: string[] = [];
+
+  // 1. Explicit configuration (highest priority)
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const serverParam = params.get('server');
+    if (serverParam) {
+      const url = serverParam.startsWith('ws://') || serverParam.startsWith('wss://')
+        ? serverParam
+        : `ws://${serverParam}`;
+      urls.push(url);
+    }
+  }
+
+  // 2. Saved server URL
+  const saved = getSavedServerUrl();
+  if (saved && !urls.includes(saved)) {
+    urls.push(saved);
+  }
+
+  // 3. Last working URL
+  const lastWorking = getLastWorkingUrl();
+  if (lastWorking && !urls.includes(lastWorking)) {
+    urls.push(lastWorking);
+  }
+
+  // 4. Discovery URLs
+  for (const url of DISCOVERY_URLS) {
+    if (!urls.includes(url)) {
+      urls.push(url);
+    }
+  }
+
+  return urls;
+}
+
+/**
+ * Attempt to connect to a WebSocket URL with timeout.
+ * Returns the URL if successful, null if failed.
+ */
+export async function tryConnect(url: string, timeoutMs: number = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const ws = new WebSocket(url);
+      const timeout = setTimeout(() => {
+        ws.close();
+        resolve(false);
+      }, timeoutMs);
+
+      ws.onopen = () => {
+        clearTimeout(timeout);
+        ws.close();
+        resolve(true);
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/**
+ * Auto-discover the server by trying multiple URLs.
+ * Returns the first working URL, or null if none work.
+ */
+export async function discoverServer(
+  onStatus?: (message: string) => void
+): Promise<string | null> {
+  const urls = getDiscoveryUrls();
+
+  for (const url of urls) {
+    onStatus?.(`Trying ${url}...`);
+
+    const success = await tryConnect(url, 3000);
+    if (success) {
+      onStatus?.(`Connected to ${url}`);
+      saveLastWorkingUrl(url);
+      return url;
+    }
+  }
+
+  onStatus?.('No server found');
+  return null;
 }

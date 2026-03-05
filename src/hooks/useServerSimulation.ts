@@ -8,9 +8,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { simulateDelivery as localSimulate, calculateTrajectory, type SimulationResult } from '../gameEngine'
 import type { FielderConfig } from '../gameEngine'
-import { getServerUrl } from '../api/config'
+import { getServerUrl, discoverServer, saveLastWorkingUrl } from '../api/config'
 
-type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'discovering'
 
 // Pending request waiting for server response
 interface PendingRequest {
@@ -46,10 +46,14 @@ interface UseServerSimulationResult {
   isConnected: boolean
   /** Current connection state */
   connectionState: ConnectionState
+  /** Discovery/connection status message */
+  statusMessage: string | null
   /** Error message if any */
   error: string | null
   /** Manually reconnect */
   reconnect: () => void
+  /** Connected server URL */
+  serverUrl: string | null
 }
 
 function generateMessageId(): string {
@@ -62,31 +66,31 @@ function generateMessageId(): string {
 
 export function useServerSimulation(): UseServerSimulationResult {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [serverUrl, setServerUrl] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
   const pendingRequestsRef = useRef<Map<string, PendingRequest>>(new Map())
   const genericPendingRef = useRef<Map<string, GenericPendingRequest>>(new Map())
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
-
-    const url = getServerUrl()
-    setConnectionState('connecting')
-    setError(null)
-
+  const connectToUrl = useCallback((url: string) => {
     try {
       const ws = new WebSocket(url)
       wsRef.current = ws
 
       ws.onopen = () => {
         setConnectionState('connected')
+        setStatusMessage(`Connected to ${url}`)
+        setServerUrl(url)
         setError(null)
+        saveLastWorkingUrl(url)
       }
 
       ws.onclose = () => {
         setConnectionState('disconnected')
         wsRef.current = null
+        setServerUrl(null)
 
         // Reject all pending requests
         pendingRequestsRef.current.forEach((req) => {
@@ -174,6 +178,42 @@ export function useServerSimulation(): UseServerSimulationResult {
       setError(e instanceof Error ? e.message : 'Connection failed')
     }
   }, [])
+
+  const connect = useCallback(async () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return
+
+    // First try direct URL if configured
+    const directUrl = getServerUrl()
+
+    // Check if we have a URL param (skip discovery)
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('server')) {
+      setConnectionState('connecting')
+      setStatusMessage(`Connecting to ${directUrl}...`)
+      connectToUrl(directUrl)
+      return
+    }
+
+    // Auto-discover
+    setConnectionState('discovering')
+    setError(null)
+
+    const discoveredUrl = await discoverServer((msg) => setStatusMessage(msg))
+
+    if (discoveredUrl) {
+      setConnectionState('connecting')
+      connectToUrl(discoveredUrl)
+    } else {
+      setConnectionState('disconnected')
+      setError('No server found. Check that CricketRadar is powered on.')
+      setStatusMessage(null)
+
+      // Retry discovery after 10s
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        connect()
+      }, 10000)
+    }
+  }, [connectToUrl])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -319,7 +359,9 @@ export function useServerSimulation(): UseServerSimulationResult {
     sendMessage,
     isConnected: connectionState === 'connected',
     connectionState,
+    statusMessage,
     error,
     reconnect: connect,
+    serverUrl,
   }
 }
