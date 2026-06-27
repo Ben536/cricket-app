@@ -33,3 +33,9 @@ dist-ssr
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Local secrets (device credentials, tokens) - NEVER commit
+secrets.local.md
+*.secret
+.env
+.env.*

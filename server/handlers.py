@@ -744,18 +744,15 @@ class MessageHandlers:
         """
         Handle manual ball input.
 
-        Two modes:
-        1. type="runs" (simple): Just add runs to session, send session_state
-        2. type="simulate": Call game engine, store delivery in DB,
-           send shot_result + wagon_wheel_update + session_state
+        Records exactly the outcome the user tapped (dot/1/2/3/4/6/W/wd/nb)
+        with the corresponding runs. Trajectory/kinematic fields (exit speed,
+        angles, landing, etc.) are left NULL: a manual tap carries no radar
+        measurement, and fabricating one would store data indistinguishable
+        from a real reading. The row is flagged is_manual_input=True.
 
-        The payload.result determines the type:
-        - "dot", "1", "2", "3": Manual runs (no simulation)
-        - "4", "6": Can be either manual boundary or simulated
-        - "W", "wd", "nb": Special results (manual)
-
-        For simulation, we need radar data or synthetic trajectory data.
-        Since this is manual input, we simulate based on the result.
+        Because there is no trajectory, only a session_state update is sent
+        (no shot_result / wagon_wheel_update). Radar- and simulator-driven
+        deliveries populate kinematics and the wagon wheel via their own paths.
         """
         payload = message["payload"]
         message_id = message["message_id"]
@@ -776,94 +773,25 @@ class MessageHandlers:
             f"result={result}, is_boundary={is_boundary}"
         )
 
-        # Determine runs from result
-        if result == "dot":
-            runs = 0
-        elif result in ["1", "2", "3", "4", "6"]:
+        # Determine runs from result. Manual input is recorded verbatim - we do
+        # NOT run the fielding simulation or synthesise radar kinematics here.
+        if result in ["1", "2", "3", "4", "6"]:
             runs = int(result)
             if result in ["4", "6"]:
                 is_boundary = True
-        elif result == "W":
-            runs = 0
         else:
-            runs = 0  # Wides, no-balls, etc.
+            # dot, W (wicket), wd (wide), nb (no-ball) all score 0 runs
+            runs = 0
 
         # Get next ball number
         last_delivery = self.repository.get_last_delivery(active_session.session_id)
         ball_number = (last_delivery.ball_number + 1) if last_delivery else 1
 
-        # Determine if we should simulate
-        # For boundaries (4, 6), we can simulate a shot
-        # For other results, we just record manually
-        should_simulate = is_boundary and result in ["4", "6"]
+        outcome = result
+        description = f"Manual input: {result}"
 
-        if should_simulate:
-            # Generate synthetic trajectory for simulation
-            # These are reasonable values for the given result
-            if result == "6":
-                exit_speed = 120.0 + (ball_number % 20)  # 120-140 km/h
-                vertical_angle = 35.0 + (ball_number % 10)  # 35-45 degrees
-                horizontal_angle = (ball_number * 15) % 180 - 90  # -90 to 90
-                projected_distance = 75.0 + (ball_number % 15)
-                max_height = 15.0 + (ball_number % 5)
-            else:  # 4
-                exit_speed = 90.0 + (ball_number % 30)  # 90-120 km/h
-                vertical_angle = 5.0 + (ball_number % 15)  # 5-20 degrees
-                horizontal_angle = (ball_number * 20) % 180 - 90
-                projected_distance = 70.0 + (ball_number % 10)
-                max_height = 2.0 + (ball_number % 3)
-
-            # Calculate landing coordinates
-            import math
-            h_rad = math.radians(horizontal_angle)
-            landing_x = -projected_distance * math.sin(h_rad)
-            landing_y = projected_distance * math.cos(h_rad)
-
-            # Run simulation
-            try:
-                sim_result = simulate_delivery(
-                    exit_speed=exit_speed,
-                    horizontal_angle=horizontal_angle,
-                    vertical_angle=vertical_angle,
-                    landing_x=landing_x,
-                    landing_y=landing_y,
-                    projected_distance=projected_distance,
-                    max_height=max_height,
-                    field_config=active_session.field_config,
-                    boundary_distance=active_session.boundary_distance,
-                    difficulty=active_session.difficulty,
-                )
-
-                # Use simulation result
-                outcome = sim_result["outcome"]
-                runs = sim_result["runs"]
-                is_boundary = sim_result["is_boundary"]
-                description = sim_result.get("description", "")
-                end_position = sim_result.get("end_position", {"x": landing_x, "y": landing_y})
-
-            except Exception as e:
-                logger.error(f"Simulation failed: {e}")
-                # Fall back to manual recording
-                sim_result = None
-                outcome = result
-                description = f"Manual input: {result}"
-                end_position = {"x": 0, "y": 0}
-
-        else:
-            # Pure manual input - no simulation
-            sim_result = None
-            outcome = result
-            description = f"Manual input: {result}"
-            end_position = {"x": 0, "y": 0}
-            exit_speed = None
-            horizontal_angle = None
-            vertical_angle = None
-            landing_x = None
-            landing_y = None
-            projected_distance = None
-            max_height = None
-
-        # Create delivery in database
+        # Create delivery in database. Trajectory/kinematic columns are left NULL
+        # because a manual tap has no measured trajectory.
         timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
@@ -873,26 +801,8 @@ class MessageHandlers:
                 timestamp=timestamp,
                 outcome=outcome,
                 runs=runs,
-                exit_speed=exit_speed if should_simulate else None,
-                horizontal_angle=horizontal_angle if should_simulate else None,
-                vertical_angle=vertical_angle if should_simulate else None,
-                landing_x=landing_x if should_simulate else None,
-                landing_y=landing_y if should_simulate else None,
-                projected_distance=projected_distance if should_simulate else None,
-                max_height=max_height if should_simulate else None,
-                fielder_position=sim_result.get("fielder_position") if sim_result else None,
-                fielding_position=sim_result.get("fielding_position") if sim_result else None,
-                end_position=end_position,
                 is_boundary=is_boundary,
-                is_aerial=sim_result.get("is_aerial", False) if sim_result else False,
                 description=description,
-                catch_analysis=sim_result.get("catch_analysis") if sim_result else None,
-                fielding_time=sim_result.get("fielding_time") if sim_result else None,
-                collection_difficulty=sim_result.get("collection_difficulty") if sim_result else None,
-                alignment_score=sim_result.get("alignment_score") if sim_result else None,
-                priority_score=sim_result.get("priority_score") if sim_result else None,
-                fielder_arrival_time=sim_result.get("fielder_arrival_time") if sim_result else None,
-                ball_arrival_time=sim_result.get("ball_arrival_time") if sim_result else None,
                 is_manual_input=True,
             )
 
@@ -912,57 +822,22 @@ class MessageHandlers:
         # Update in-memory session state
         active_session.add_delivery(outcome, runs, is_boundary)
 
-        # Build responses
-        responses = []
-
-        # 1. Shot result (if simulated)
-        if sim_result:
-            shot_result = build_shot_result_response(
-                session_id=active_session.session_id,
-                ball_number=ball_number,
-                simulation_result=sim_result,
-                in_reply_to=message_id,
-            )
-            responses.append(("shot_result", shot_result))
-
-            # 2. Wagon wheel update
-            wagon_wheel = build_wagon_wheel_update(
-                session_id=active_session.session_id,
-                shot_id=str(delivery.id),
-                end_x=end_position.get("x", 0),
-                end_y=end_position.get("y", 0),
-                outcome=outcome,
-                distance=projected_distance or 0,
-            )
-            responses.append(("wagon_wheel", wagon_wheel))
-
-        # 3. Session state (always)
+        # Manual input has no trajectory, so only a session_state update is sent.
         session_state = build_session_state_response(
             self.session_manager,
             self.repository,
             client_id,
             in_reply_to=message_id,
         )
-        responses.append(("session_state", session_state))
 
-        # Broadcast all responses to session clients
-        for msg_type, msg in responses:
-            await self.connection_manager.broadcast_to_session(
-                str(active_session.session_id),
-                msg,
-                exclude_client=client_id,  # Sender gets direct response
-            )
+        # Broadcast to other clients in the session; sender gets the return value.
+        await self.connection_manager.broadcast_to_session(
+            str(active_session.session_id),
+            session_state,
+            exclude_client=client_id,
+        )
 
-        # Send all to sender
-        # For the sender, we need to return one response directly
-        # and send others via the connection manager
-        if len(responses) == 1:
-            return responses[0][1]
-        else:
-            # Send first N-1 via connection manager, return last
-            for msg_type, msg in responses[:-1]:
-                await self.connection_manager.send_to_client(client_id, msg)
-            return responses[-1][1]
+        return session_state
 
     # =========================================================================
     # UNDO HANDLER

@@ -69,7 +69,12 @@ class ActiveSessionState:
             runs: Runs scored
             is_boundary: Whether it was a boundary
         """
-        self.balls += 1
+        # Wides and no-balls are extras: they score runs but do not count as a
+        # legal ball faced, nor as a ball in the over.
+        is_extra = result in ("wd", "nb")
+
+        if not is_extra:
+            self.balls += 1
         self.runs += runs
 
         if is_boundary:
@@ -81,10 +86,13 @@ class ActiveSessionState:
         if result == "W":
             self.wickets += 1
 
-        # Track in current over
+        if is_extra:
+            return
+
+        # Track legal balls in current over
         self.current_over.append(result)
 
-        # Complete over if 6 balls
+        # Complete over if 6 legal balls
         if len(self.current_over) >= 6:
             over_runs = sum(
                 int(r) if r.isdigit() else 0
@@ -105,10 +113,14 @@ class ActiveSessionState:
             runs: Runs that were scored
             is_boundary: Whether it was a boundary
         """
-        if self.balls <= 0:
+        # Mirror add_delivery: extras did not consume a legal ball.
+        is_extra = result in ("wd", "nb")
+
+        if not is_extra and self.balls <= 0:
             return
 
-        self.balls -= 1
+        if not is_extra:
+            self.balls -= 1
         self.runs -= runs
 
         if is_boundary:
@@ -119,6 +131,9 @@ class ActiveSessionState:
 
         if result == "W":
             self.wickets = max(0, self.wickets - 1)
+
+        if is_extra:
+            return
 
         # Remove from current over
         if self.current_over:

@@ -40,6 +40,17 @@ from db.repository import (
 # Default port
 DEFAULT_PORT = 5003
 
+# Outcomes that represent a dismissal (any of these counts as a wicket).
+# 'caught'/'dropped'/'misfield' come from the game engine; 'W' and the named
+# dismissals come from manual input. Keep in sync with the deliveries.outcome
+# CHECK constraint (db/migrations/003_delivery_outcomes.sql).
+WICKET_OUTCOMES = frozenset({
+    'W', 'caught', 'bowled', 'lbw', 'run_out', 'stumped', 'hit_wicket'
+})
+
+# Extras: not counted as a ball faced and excluded from strike rate.
+EXTRA_OUTCOMES = frozenset({'wd', 'nb'})
+
 
 def dataclass_to_dict(obj: Any) -> Any:
     """Convert dataclass instances to dictionaries recursively."""
@@ -311,22 +322,32 @@ class RestAPIHandler(BaseHTTPRequestHandler):
         total_sixes = 0
         total_dots = 0
         total_wickets = 0
+        total_extras = 0
         wagon_wheel_data = []
 
         for session in sessions:
             deliveries = self.repository.get_deliveries_by_session(session.id)
 
             for delivery in deliveries:
+                outcome = delivery.outcome
+
+                # Extras (wides/no-balls) score runs but are not a ball faced.
+                if outcome in EXTRA_OUTCOMES:
+                    total_extras += 1
+                    total_runs += delivery.runs
+                    continue
+
                 total_balls += 1
                 total_runs += delivery.runs
 
-                if delivery.outcome == '4':
+                if outcome == '4':
                     total_fours += 1
-                elif delivery.outcome == '6':
+                elif outcome == '6':
                     total_sixes += 1
-                elif delivery.outcome == 'dot':
+                elif outcome == 'dot':
                     total_dots += 1
-                elif delivery.outcome == 'caught':
+
+                if outcome in WICKET_OUTCOMES:
                     total_wickets += 1
 
                 # Add to wagon wheel if we have position data
@@ -355,6 +376,7 @@ class RestAPIHandler(BaseHTTPRequestHandler):
                 "total_sessions": len(sessions),
                 "total_runs": total_runs,
                 "total_balls": total_balls,
+                "total_extras": total_extras,
                 "average": round(average, 2),
                 "strike_rate": round(strike_rate, 2),
                 "fours": total_fours,

@@ -641,9 +641,16 @@ Feed these to game engine → Get outcome → Update UI.
 | Hostname | `raspberrypi` |
 | mDNS Address | `raspberrypi.local` |
 | Current IP | `192.168.0.191` (may change on network) |
-| Username | `bdrysdale` |
-| Password | `Radarcricket12$` |
-| SSH Command | `ssh bdrysdale@raspberrypi.local` |
+| Username | see `secrets.local.md` (git-ignored) |
+| Password | see `secrets.local.md` (git-ignored) |
+| SSH Command | `ssh <user>@raspberrypi.local` |
+
+> **⚠️ Security:** Device credentials must never be committed. Keep them in
+> `secrets.local.md` (already git-ignored). A real Pi login password was
+> previously committed here — it has been removed from the working tree, but it
+> **still exists in this public repo's git history**. You must:
+> 1. **Rotate the Pi password** (`passwd` on the device) — assume it is compromised.
+> 2. **Scrub it from history** and force-push (see `README.md` → Security).
 
 ### Ports & Services
 

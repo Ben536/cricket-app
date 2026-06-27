@@ -161,7 +161,7 @@ async def test_client(db_path: Path):
             assert msg['payload']['session']['balls'] == 1, f"Expected 1 ball"
             print("[Client] PASS: Manual input recorded 2 runs")
 
-            # Test manual_input (boundary 4 - triggers simulation)
+            # Test manual_input (boundary 4 - recorded verbatim, no simulation)
             manual_input_msg = {
                 "type": "manual_input",
                 "message_id": generate_message_id(),
@@ -174,7 +174,7 @@ async def test_client(db_path: Path):
             print(f"[Client] Sending manual_input (boundary 4)...")
             await websocket.send(json.dumps(manual_input_msg))
 
-            # May receive shot_result, wagon_wheel_update, then session_state
+            # Manual input is recorded verbatim and only returns session_state
             responses = []
             while True:
                 response = await asyncio.wait_for(websocket.recv(), timeout=2.0)
@@ -189,7 +189,7 @@ async def test_client(db_path: Path):
             assert 'session_state' in msg_types, "Expected session_state"
             session_state = next(m for m in responses if m['type'] == 'session_state')
             assert session_state['payload']['session']['runs'] >= 4, f"Expected at least 4 runs"
-            print("[Client] PASS: Boundary 4 simulation worked")
+            print("[Client] PASS: Boundary 4 recorded")
 
             # Test undo
             undo_msg = {
