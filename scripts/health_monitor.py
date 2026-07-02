@@ -87,50 +87,80 @@ class HealthMonitor:
         self.radar_restart_count = 0
         self.server_restart_count = 0
         self.max_radar_restarts = 3  # cap radar-service restarts; never reboots
+        self.min_free_disk_mb = 500  # warn below this; gathering sessions are ~0.5-1GB
         self.running = False
 
     def check_radar(self) -> CheckResult:
         """
-        Check if radar serial port is accessible.
+        Check the radar serial device is present, WITHOUT opening it.
 
-        Returns:
-            CheckResult with health status
+        Opening the port asserts/drops DTR, and on this board the CP2105 DTR
+        line is wired to the IWR6843's reset - a periodic "health" probe that
+        can hard-stop the sensor is worse than no probe (this exact failure
+        already cost a field session). Presence of the device node catches the
+        dominant failure (USB unplug / power); data-flow health is the job of
+        the process that owns the port.
         """
         start = time.time()
 
-        # Check device exists
-        if not os.path.exists(self.radar_device):
+        try:
+            st = os.stat(self.radar_device)
+        except FileNotFoundError:
             return CheckResult(
                 name="radar",
                 healthy=False,
                 message=f"Device {self.radar_device} not found",
                 duration_ms=int((time.time() - start) * 1000),
             )
-
-        # Try to open device
-        try:
-            import serial
-            ser = serial.Serial(self.radar_device, 115200, timeout=1)
-            ser.close()
-            return CheckResult(
-                name="radar",
-                healthy=True,
-                message="Radar device accessible",
-                duration_ms=int((time.time() - start) * 1000),
-            )
-        except serial.SerialException as e:
+        except OSError as e:
             return CheckResult(
                 name="radar",
                 healthy=False,
-                message=f"Cannot open radar device: {e}",
+                message=f"Cannot stat radar device: {e}",
                 duration_ms=int((time.time() - start) * 1000),
             )
-        except ImportError:
-            # pyserial not installed, just check file exists
+
+        import stat as stat_mod
+        if not stat_mod.S_ISCHR(st.st_mode):
             return CheckResult(
                 name="radar",
-                healthy=True,
-                message="Radar device exists (pyserial not available for deep check)",
+                healthy=False,
+                message=f"{self.radar_device} exists but is not a character device",
+                duration_ms=int((time.time() - start) * 1000),
+            )
+
+        return CheckResult(
+            name="radar",
+            healthy=True,
+            message="Radar device present",
+            duration_ms=int((time.time() - start) * 1000),
+        )
+
+    def check_disk_space(self) -> CheckResult:
+        """
+        Check free disk space. Long data-gathering sessions write ~0.5-1GB of
+        JSONL; a full SD card takes down SQLite and journald with it.
+        """
+        start = time.time()
+        try:
+            import shutil
+            usage = shutil.disk_usage("/")
+            free_mb = usage.free // (1024 * 1024)
+            healthy = free_mb >= self.min_free_disk_mb
+            return CheckResult(
+                name="disk",
+                healthy=healthy,
+                message=f"{free_mb}MB free" if healthy else (
+                    f"LOW DISK: {free_mb}MB free (< {self.min_free_disk_mb}MB) - "
+                    f"recordings and database writes at risk"
+                ),
+                duration_ms=int((time.time() - start) * 1000),
+            )
+        except Exception as e:
+            return CheckResult(
+                name="disk",
+                healthy=True,  # don't take recovery action on a broken check
+                message=f"Disk check failed: {e}",
                 duration_ms=int((time.time() - start) * 1000),
             )
 
@@ -190,6 +220,13 @@ class HealthMonitor:
         logger.warning(f"Restarting service: {service_name}")
 
         try:
+            # reset-failed first: if the unit hit its StartLimitBurst, a plain
+            # restart is refused until the failure state is cleared.
+            subprocess.run(
+                ["sudo", "systemctl", "reset-failed", service_name],
+                capture_output=True,
+                timeout=10,
+            )
             result = subprocess.run(
                 ["sudo", "systemctl", "restart", service_name],
                 capture_output=True,
@@ -247,6 +284,9 @@ class HealthMonitor:
         # Run checks
         radar_result = self.check_radar()
         server_result = await self.check_websocket()
+        disk_result = self.check_disk_space()
+        if not disk_result.healthy:
+            logger.warning(f"Disk unhealthy: {disk_result.message}")
 
         # Update state
         self.update_state(self.radar_state, radar_result.healthy)
@@ -258,11 +298,12 @@ class HealthMonitor:
         if server_result.healthy:
             self.server_restart_count = 0
 
-        if radar_result.healthy and server_result.healthy:
+        if radar_result.healthy and server_result.healthy and disk_result.healthy:
             logger.debug(f"Health check passed: radar={radar_result.duration_ms}ms, server={server_result.duration_ms}ms")
             return HealthStatus.HEALTHY
 
-        overall_status = HealthStatus.HEALTHY
+        # Low disk is degraded (no recovery action - operator must free space)
+        overall_status = HealthStatus.DEGRADED if not disk_result.healthy else HealthStatus.HEALTHY
 
         # ---- Radar: degraded only. NEVER reboots. ----
         if not radar_result.healthy:
@@ -328,7 +369,8 @@ class HealthMonitor:
                         f"Health summary: checks={self.radar_state.total_checks}, "
                         f"radar_failures={self.radar_state.total_failures}, "
                         f"server_failures={self.server_state.total_failures}, "
-                        f"restarts={self.restart_count}"
+                        f"radar_restarts={self.radar_restart_count}, "
+                        f"server_restarts={self.server_restart_count}"
                     )
 
             except Exception as e:

@@ -44,7 +44,9 @@ def open_radar_serial(port: str, baud_rate: int, timeout: float = 0.1):
         return None
 
     try:
-        ser = serial.Serial(port, baud_rate, timeout=timeout)
+        # exclusive=True (TIOCEXCL): a second open of the data UART corrupts
+        # both TLV streams silently - fail loudly instead.
+        ser = serial.Serial(port, baud_rate, timeout=timeout, exclusive=True)
     except Exception as e:
         logger.warning(f"Could not open serial port {port}: {e}")
         return None

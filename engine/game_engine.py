@@ -218,7 +218,7 @@ COLLECTION_TIME_MOVING = 1.0  # seconds - fielder moves to collect
 COLLECTION_TIME_DIVING = 1.5  # seconds - diving stop, recover, release
 PICKUP_TIME_STOPPED = 0.4     # seconds - picking up stationary ball
 GROUND_FRICTION = 0.05        # deceleration factor per metre - cricket outfield  # Matched to TypeScript
-MISFIELD_TIME_PENALTY = 2.5   # seconds added when ball gets past fielder
+MISFIELD_TIME_PENALTY = 2.0   # seconds added when ball gets past fielder (spec + TS parity)
 FUMBLE_TIME_PENALTY = 1.0     # seconds added on fumble/bobble
 
 # =============================================================================
@@ -299,7 +299,7 @@ DIFFICULTY_SETTINGS = {
 CATCH_DIFFICULTY_MODIFIER = {
     'easy': 0.85,    # More drops - amateur fielders
     'medium': 1.0,   # Standard - professional level
-    'hard': 1.15,    # Fewer drops - elite fielders
+    'hard': 1.10,    # Fewer drops - elite fielders (spec + TS parity)
 }
 
 
@@ -1134,9 +1134,13 @@ def _get_ball_travel_time(exit_speed_kmh: float, distance: float) -> float:
 
 
 def _get_throw_distance(x: float, y: float) -> float:
-    """Distance to nearest set of stumps."""
+    """Distance to nearest set of stumps.
+
+    Batting-end stumps at the origin; bowler's-end stumps at (0, +PITCH_LENGTH)
+    (+Y = toward bowler, per the CLAUDE.md coordinate system).
+    """
     dist_batting = _distance(x, y)
-    dist_bowling = _distance(x, y + PITCH_LENGTH)
+    dist_bowling = _distance(x, y - PITCH_LENGTH)
     return max(0.1, min(dist_batting, dist_bowling))  # Avoid zero
 
 
@@ -1228,9 +1232,9 @@ def _calculate_alignment_score(
     Returns:
         0-1 score where 1.0 = perfect alignment (ball going straight at stumps)
     """
-    # Calculate throw distance to both ends
+    # Calculate throw distance to both ends (bowler's stumps at (0, +PITCH_LENGTH))
     dist_to_batting = _distance(intercept_x, intercept_y)
-    dist_to_bowling = _distance(intercept_x, intercept_y + PITCH_LENGTH)
+    dist_to_bowling = _distance(intercept_x, intercept_y - PITCH_LENGTH)
 
     # Use the closer stumps
     throw_dist = min(dist_to_batting, dist_to_bowling)
@@ -1251,7 +1255,7 @@ def _calculate_alignment_score(
         throw_dir_y = -intercept_y
     else:
         throw_dir_x = -intercept_x
-        throw_dir_y = -(intercept_y + PITCH_LENGTH)
+        throw_dir_y = PITCH_LENGTH - intercept_y
 
     throw_dir_length = math.sqrt(throw_dir_x * throw_dir_x + throw_dir_y * throw_dir_y)
     if throw_dir_length < 0.1:

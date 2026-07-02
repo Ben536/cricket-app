@@ -65,35 +65,33 @@ echo ""
 echo "[3/6] Installing Python dependencies..."
 ssh "$PI_USER@$PI_HOST" "sudo apt-get install -y python3-websockets"
 
-# Install/refresh systemd units shipped in scripts/systemd/
+# Install/refresh ALL systemd units shipped in scripts/systemd/
 echo ""
 echo "[4/6] Installing systemd units..."
 ssh "$PI_USER@$PI_HOST" "chmod +x $PI_DIR/scripts/*.sh && \
-    sudo cp $PI_DIR/scripts/systemd/cricket-autohotspot.service /etc/systemd/system/ && \
+    sudo cp $PI_DIR/scripts/systemd/*.service /etc/systemd/system/ && \
     sudo systemctl daemon-reload && \
-    sudo systemctl enable cricket-autohotspot.service"
+    sudo systemctl enable cricket-autohotspot.service cricket-radar.service \
+        cricket-server.service cricket-health.service cricket-ui.service"
 
-# Run migrations
+# Warn if the radar profile (not in the repo) is missing on the Pi - the radar
+# is unconfigured without it and only the single SD-card copy exists.
+ssh "$PI_USER@$PI_HOST" "test -f /home/$PI_USER/profile_cricket.cfg" \
+    || echo "  WARNING: /home/$PI_USER/profile_cricket.cfg missing on Pi (radar will not configure)"
+
+# Run migrations against the DB the server actually uses (db/cricket.db - see
+# db/repository.py DEFAULT_DB_PATH), with a timestamped backup first.
 echo ""
-echo "[5/6] Running database migrations..."
-ssh "$PI_USER@$PI_HOST" "cd $PI_DIR && python3 -c '
-import sys
-sys.path.insert(0, \".\")
-from db.migrate import MigrationRunner
-from pathlib import Path
+echo "[5/6] Backing up and migrating database..."
+ssh "$PI_USER@$PI_HOST" "cd $PI_DIR && \
+    if [ -f db/cricket.db ]; then cp db/cricket.db db/cricket.db.backup-\$(date +%Y%m%d-%H%M%S); fi && \
+    python3 -m db.migrate"
 
-runner = MigrationRunner(Path(\"cricket.db\"))
-runner.connect()
-runner.ensure_migrations_table()
-count = runner.run_all_pending()
-runner.close()
-print(f\"Ran {count} migration(s)\")
-'"
-
-# Restart server
+# Restart server via systemd (never pkill/nohup - that races the unit's
+# Restart= policy and leaves an unmanaged duplicate serving port 5002)
 echo ""
 echo "[6/6] Restarting server..."
-ssh "$PI_USER@$PI_HOST" "pkill -f 'python3.*websocket_server' || true; sleep 1; cd $PI_DIR && nohup python3 -m server.websocket_server > server.log 2>&1 &"
+ssh "$PI_USER@$PI_HOST" "sudo systemctl reset-failed cricket-server.service 2>/dev/null; sudo systemctl restart cricket-server.service"
 sleep 2
 
 # Verify
