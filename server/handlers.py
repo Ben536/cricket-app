@@ -834,21 +834,19 @@ class MessageHandlers:
             # dot, W (wicket), wd (wide), nb (no-ball) all score 0 runs
             runs = 0
 
-        # Get next ball number
-        last_delivery = await asyncio.to_thread(self.repository.get_last_delivery, active_session.session_id)
-        ball_number = (last_delivery.ball_number + 1) if last_delivery else 1
-
         outcome = result
         description = f"Manual input: {result}"
 
         # Create delivery in database. Trajectory/kinematic columns are left NULL
-        # because a manual tap has no measured trajectory.
+        # because a manual tap has no measured trajectory. ball_number=None ->
+        # assigned atomically inside the INSERT (read-then-insert raced with
+        # other clients in the same session).
         timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
-            delivery = await asyncio.to_thread(self.repository.create_delivery, 
+            delivery = await asyncio.to_thread(self.repository.create_delivery,
                 session_id=active_session.session_id,
-                ball_number=ball_number,
+                ball_number=None,
                 timestamp=timestamp,
                 outcome=outcome,
                 runs=runs,
@@ -859,7 +857,7 @@ class MessageHandlers:
 
             logger.info(
                 f"Created delivery {delivery.id} for session {active_session.session_id}: "
-                f"ball={ball_number}, outcome={outcome}, runs={runs}"
+                f"ball={delivery.ball_number}, outcome={outcome}, runs={runs}"
             )
 
         except RepositoryError as e:

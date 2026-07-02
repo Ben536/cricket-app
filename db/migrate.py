@@ -170,40 +170,52 @@ class MigrationRunner:
         """
         Split SQL content into individual statements.
         Handles triggers with BEGIN/END blocks.
+
+        Comment lines are dropped BEFORE splitting - a ';' inside a comment
+        used to be treated as a statement boundary, turning the rest of the
+        comment into a bogus "statement" that failed with a syntax error.
+        (Inline trailing comments after code are also stripped; string
+        literals in our migrations never contain '--'.)
         """
         statements = []
         current = []
         in_trigger = False
 
         for line in content.split('\n'):
-            stripped = line.strip().upper()
+            # Drop whole-line comments; strip trailing comments
+            code = line.split('--', 1)[0].rstrip()
+            if not code.strip():
+                continue
+            stripped = code.strip().upper()
 
             # Track if we're inside a trigger definition
             if 'CREATE TRIGGER' in stripped:
                 in_trigger = True
             elif in_trigger and stripped == 'END;':
-                current.append(line)
+                current.append(code)
                 statements.append('\n'.join(current))
                 current = []
                 in_trigger = False
                 continue
 
             if in_trigger:
-                current.append(line)
+                current.append(code)
                 continue
 
             # For non-trigger statements, split by semicolon
-            if ';' in line and not in_trigger:
-                parts = line.split(';')
+            if ';' in code:
+                parts = code.split(';')
                 for i, part in enumerate(parts):
                     if i < len(parts) - 1:
                         current.append(part)
-                        statements.append('\n'.join(current))
+                        statement = '\n'.join(current)
+                        if statement.strip():
+                            statements.append(statement)
                         current = []
                     elif part.strip():
                         current.append(part)
             else:
-                current.append(line)
+                current.append(code)
 
         if current and ''.join(current).strip():
             statements.append('\n'.join(current))
@@ -253,10 +265,11 @@ class MigrationRunner:
             name = migration['name']
             logger.info(f"Rolling back: {name}")
 
-            # Remove migration record
-            self.conn.execute("DELETE FROM _migrations WHERE name = ?", (name,))
-
-            # Check for corresponding rollback file
+            # Run the rollback script FIRST, remove the ledger record after.
+            # executescript() implicitly COMMITs any pending transaction, so
+            # deleting the record first would persist even when the script
+            # then failed - leaving the schema migrated but recorded as
+            # not-applied, and the next run would re-apply over it.
             rollback_file = MIGRATIONS_DIR / name.replace('.sql', '_rollback.sql')
             if rollback_file.exists():
                 logger.info(f"Executing rollback script: {rollback_file.name}")
@@ -268,7 +281,9 @@ class MigrationRunner:
                     self.conn.rollback()
                     raise MigrationError(f"Rollback failed: {e}")
 
-        self.conn.commit()
+            # Schema reverted (or no script) - now update the ledger
+            self.conn.execute("DELETE FROM _migrations WHERE name = ?", (name,))
+            self.conn.commit()
         logger.info(f"Rolled back {len(to_rollback)} migration(s)")
 
         return len(to_rollback)

@@ -376,10 +376,21 @@ class Repository:
             params.extend([user_id, version])
 
             # Update with version check (trigger will increment version)
-            conn.execute(
+            cursor = conn.execute(
                 f"UPDATE users SET {', '.join(updates)} WHERE id = ? AND version = ?",
                 params
             )
+            if cursor.rowcount == 0:
+                # Guarded UPDATE matched nothing: another writer bumped the
+                # version between our read and this write. Without this check
+                # the method returned the OTHER writer's row as if our update
+                # had succeeded - a silently lost update.
+                row = conn.execute(
+                    "SELECT version FROM users WHERE id = ?", (user_id,)
+                ).fetchone()
+                raise VersionConflictError(
+                    "User", user_id, version, row["version"] if row else -1
+                )
 
             # Fetch and return updated user
             cursor = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -575,10 +586,21 @@ class Repository:
 
             params.extend([player_id, version])
 
-            conn.execute(
+            cursor = conn.execute(
                 f"UPDATE players SET {', '.join(updates)} WHERE id = ? AND version = ?",
                 params
             )
+            if cursor.rowcount == 0:
+                # Guarded UPDATE matched nothing: another writer bumped the
+                # version between our read and this write. Without this check
+                # the method returned the OTHER writer's row as if our update
+                # had succeeded - a silently lost update.
+                row = conn.execute(
+                    "SELECT version FROM players WHERE id = ?", (player_id,)
+                ).fetchone()
+                raise VersionConflictError(
+                    "Player", player_id, version, row["version"] if row else -1
+                )
 
             cursor = conn.execute("SELECT * FROM players WHERE id = ?", (player_id,))
             return self._row_to_player(cursor.fetchone())
@@ -711,10 +733,21 @@ class Repository:
 
             params.extend([session_id, version])
 
-            conn.execute(
+            cursor = conn.execute(
                 f"UPDATE sessions SET {', '.join(updates)} WHERE id = ? AND version = ?",
                 params
             )
+            if cursor.rowcount == 0:
+                # Guarded UPDATE matched nothing: another writer bumped the
+                # version between our read and this write. Without this check
+                # the method returned the OTHER writer's row as if our update
+                # had succeeded - a silently lost update.
+                row = conn.execute(
+                    "SELECT version FROM sessions WHERE id = ?", (session_id,)
+                ).fetchone()
+                raise VersionConflictError(
+                    "Session", session_id, version, row["version"] if row else -1
+                )
 
             cursor = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
             return self._row_to_session(cursor.fetchone())
@@ -874,7 +907,7 @@ class Repository:
     def create_delivery(
         self,
         session_id: int,
-        ball_number: int,
+        ball_number: Optional[int],
         timestamp: str,
         outcome: str,
         runs: int,
@@ -903,7 +936,13 @@ class Repository:
         ball_arrival_time: Optional[float] = None,
         is_manual_input: bool = False
     ) -> Delivery:
-        """Create a new delivery record."""
+        """Create a new delivery record.
+
+        Pass ball_number=None to assign the next number atomically inside the
+        INSERT. Computing it in the caller (read-then-insert) races with other
+        writers; the UNIQUE(session_id, ball_number) index would then reject
+        one of them arbitrarily.
+        """
         with self.transaction() as conn:
             cursor = conn.execute(
                 """
@@ -917,10 +956,14 @@ class Repository:
                     fielding_time, collection_difficulty, alignment_score,
                     priority_score, fielder_arrival_time, ball_arrival_time,
                     is_manual_input
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (
+                    ?,
+                    COALESCE(?, (SELECT COALESCE(MAX(ball_number), 0) + 1
+                                 FROM deliveries WHERE session_id = ?)),
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    session_id, ball_number, timestamp, outcome, runs,
+                    session_id, ball_number, session_id, timestamp, outcome, runs,
                     bowling_speed, exit_speed, horizontal_angle, vertical_angle,
                     landing_x, landing_y, projected_distance, max_height,
                     radar_frames_captured, detection_confidence,
