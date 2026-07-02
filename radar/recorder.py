@@ -1,36 +1,43 @@
 """
-Radar Recorder - Captures and stores raw radar TLV data.
+Radar Recorder - captures radar frames to crash-safe JSONL files.
 
-Records radar frames to JSON files organized by session type
-(bowling, batting, both) for later analysis.
+The recorder does NOT own the serial port: it subscribes to the shared
+RadarSource (radar/reader.py), so recording and the live stream can run at
+the same time without corrupting each other's TLV streams.
+
+File format (one JSON object per line, recordings/<type>/<timestamp>.jsonl):
+  {"type":"meta", session_type, start_time, max_duration_seconds, mock}
+  {"type":"frame", t_ms, frame_number, cpu_time_ms, num_points, points}
+  {"type":"annotation", t_ms, ...ground-truth fields from the UI...}
+  {"type":"mode_change", t_ms, mock}        # radar (un)plugged mid-session
+  {"type":"end", end_time, duration_seconds, frame_count, annotation_count}
+
+Timing: t_ms is milliseconds on the HOST recording clock (annotations use the
+same clock, so marks align to frames trivially). frame_number and cpu_time_ms
+are the radar hardware's own counter/clock - authoritative for tracking,
+since host receive time jitters by a whole serial read batch.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import math
 import os
-import struct
 import threading
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional
 
-from radar.serial_utils import open_radar_serial
+from radar.reader import get_radar_source, RadarSource
+from radar.tlv import RadarFrame, RadarPoint, TLVParser  # re-exported for compat
 
 logger = logging.getLogger(__name__)
-
-# TLV Magic bytes for IWR6843
-MAGIC_BYTES = bytes([0x02, 0x01, 0x04, 0x03, 0x06, 0x05, 0x08, 0x07])
-HEADER_SIZE = 32  # 8 fields × 4 bytes each
 
 # Recording limits
 MAX_RECORDING_SECONDS = 15          # default for short clips (legacy modal)
 MAX_GATHERING_SECONDS = 7200        # 2h safety backstop; gathering sessions are stopped manually
-FRAME_RATE_HZ = 10  # Radar outputs at 10Hz
 
 # Capture types -> recordings/<type>/ subdirectories. Cricket types plus
 # radar-signature test proxies (foil-wrapped ball, tennis racket, racket+foil).
@@ -38,37 +45,6 @@ SESSION_TYPES = [
     "bowling", "batting", "both",
     "foil_ball", "racket", "racket_foil",
 ]
-
-
-@dataclass
-class RadarPoint:
-    """A single detected point from the radar."""
-    x: float
-    y: float
-    z: float
-    doppler: float  # Velocity in m/s
-    snr: float = 0.0      # Signal-to-noise ratio (dB)
-    noise: float = 0.0    # Noise level (dB)
-
-
-@dataclass
-class RadarFrame:
-    """A single frame of radar data."""
-    frame_number: int
-    timestamp_ms: int
-    num_points: int
-    points: list[RadarPoint] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "frame_number": self.frame_number,
-            "timestamp_ms": self.timestamp_ms,
-            "num_points": self.num_points,
-            "points": [
-                {"x": p.x, "y": p.y, "z": p.z, "doppler": p.doppler, "snr": p.snr, "noise": p.noise}
-                for p in self.points
-            ],
-        }
 
 
 @dataclass
@@ -82,7 +58,7 @@ class RecordingSession:
     frame_count: int = 0
     max_duration_seconds: float = MAX_RECORDING_SECONDS
     annotation_count: int = 0
-    is_mock: bool = False  # True = radar absent, frames are FABRICATED test data
+    is_mock: bool = False  # True = radar absent at start, frames are FABRICATED
     annotations: list[dict] = field(default_factory=list)
     file_path: Optional[str] = None
 
@@ -99,171 +75,39 @@ class RecordingSession:
         }
 
 
-class TLVParser:
-    """
-    Parser for TI radar TLV (Type-Length-Value) frames.
-
-    Frame structure:
-    - Magic (8 bytes): 02 01 04 03 06 05 08 07
-    - Header (40 bytes):
-      - Bytes 0-3: Version
-      - Bytes 4-7: Total packet length
-      - Bytes 8-11: Platform (0x6843 for IWR6843)
-      - Bytes 12-15: Frame number
-      - Bytes 16-19: CPU time
-      - Bytes 20-23: Number of detected objects
-      - Bytes 24-27: Number of TLVs
-    - TLVs (variable):
-      - Type (4 bytes)
-      - Length (4 bytes)
-      - Data (Length bytes)
-
-    TLV Type 1 = Detected Points (each point is 16 bytes: x, y, z, doppler as floats)
-    """
-
-    def __init__(self):
-        self.buffer = bytearray()
-
-    def add_data(self, data: bytes) -> list[RadarFrame]:
-        """Add data to buffer and extract complete frames."""
-        self.buffer.extend(data)
-        frames = []
-
-        while True:
-            # Find magic bytes
-            magic_idx = self.buffer.find(MAGIC_BYTES)
-            if magic_idx == -1:
-                # No magic found, keep last 7 bytes (partial magic possible)
-                if len(self.buffer) > 7:
-                    self.buffer = self.buffer[-7:]
-                break
-
-            # Discard data before magic
-            if magic_idx > 0:
-                self.buffer = self.buffer[magic_idx:]
-
-            # Check if we have enough for header
-            if len(self.buffer) < len(MAGIC_BYTES) + HEADER_SIZE:
-                break
-
-            # Parse header
-            header_start = len(MAGIC_BYTES)
-            header = self.buffer[header_start:header_start + HEADER_SIZE]
-
-            # Extract header fields (little-endian)
-            version = struct.unpack('<I', header[0:4])[0]
-            total_length = struct.unpack('<I', header[4:8])[0]
-            platform = struct.unpack('<I', header[8:12])[0]
-            frame_number = struct.unpack('<I', header[12:16])[0]
-            cpu_time = struct.unpack('<I', header[16:20])[0]
-            num_detected = struct.unpack('<I', header[20:24])[0]
-            num_tlvs = struct.unpack('<I', header[24:28])[0]
-
-            # Check if we have complete packet
-            if len(self.buffer) < total_length:
-                break
-
-            # Extract complete packet
-            packet = bytes(self.buffer[:total_length])
-            self.buffer = self.buffer[total_length:]
-
-            # Parse TLVs
-            frame = RadarFrame(
-                frame_number=frame_number,
-                timestamp_ms=cpu_time,
-                num_points=0,
-                points=[],
-            )
-
-            # First pass: collect all TLV data
-            tlv_start = len(MAGIC_BYTES) + HEADER_SIZE
-            side_info_data = None
-
-            while tlv_start + 8 <= len(packet):
-                tlv_type = struct.unpack('<I', packet[tlv_start:tlv_start + 4])[0]
-                tlv_length = struct.unpack('<I', packet[tlv_start + 4:tlv_start + 8])[0]
-
-                if tlv_start + 8 + tlv_length > len(packet):
-                    break
-
-                tlv_data = packet[tlv_start + 8:tlv_start + 8 + tlv_length]
-
-                # Type 1 = Detected Points
-                if tlv_type == 1:
-                    # Each point is 16 bytes: x, y, z, doppler (4 floats)
-                    num_points = tlv_length // 16
-                    for i in range(num_points):
-                        offset = i * 16
-                        x, y, z, doppler = struct.unpack(
-                            '<ffff',
-                            tlv_data[offset:offset + 16]
-                        )
-                        frame.points.append(RadarPoint(x=x, y=y, z=z, doppler=doppler))
-                    frame.num_points = len(frame.points)
-
-                # Type 7 = Side Info (SNR + Noise per point)
-                elif tlv_type == 7:
-                    side_info_data = tlv_data
-
-                tlv_start += 8 + tlv_length
-
-            # Second pass: add SNR/noise to points if available
-            if side_info_data and len(frame.points) > 0:
-                # Each point has: SNR (int16) + Noise (int16) = 4 bytes
-                num_side_info = len(side_info_data) // 4
-                for i in range(min(num_side_info, len(frame.points))):
-                    offset = i * 4
-                    snr_raw, noise_raw = struct.unpack('<hh', side_info_data[offset:offset + 4])
-                    # Convert from 0.1 dB units to dB
-                    frame.points[i].snr = snr_raw * 0.1
-                    frame.points[i].noise = noise_raw * 0.1
-
-            frames.append(frame)
-
-        return frames
-
-
 class RadarRecorder:
     """
-    Records radar data to files.
+    Records radar frames from the shared RadarSource to JSONL files.
 
-    Manages recording sessions with start/stop control and auto-stop
-    after MAX_RECORDING_SECONDS.
+    Manages recording sessions with start/stop control and auto-stop after
+    the configured max duration.
     """
 
     def __init__(
         self,
         recordings_dir: str = "recordings",
-        serial_port: str = "/dev/ttyUSB1",
-        baud_rate: int = 921600,
+        source: Optional[RadarSource] = None,
     ):
         self.recordings_dir = Path(recordings_dir)
-        self.serial_port = serial_port
-        self.baud_rate = baud_rate
+        self._source = source or get_radar_source()
 
         # Ensure directories exist
         for session_type in SESSION_TYPES:
             (self.recordings_dir / session_type).mkdir(parents=True, exist_ok=True)
 
-        # Recording state
-        self._current_session: Optional[RecordingSession] = None
-        self._recording_thread: Optional[threading.Thread] = None
-        self._stop_event = threading.Event()
-        self._start_time: Optional[float] = None
-        self._serial = None
-        self._parser = TLVParser()
-
-        # Crash-safe incremental output + thread-safe annotation marking
+        # Recording state (all mutations under _lock; stop is serialized by
+        # _stop_lock so a manual stop racing the auto-stop timer is safe)
         self._lock = threading.Lock()
+        self._stop_lock = threading.Lock()
+        self._current_session: Optional[RecordingSession] = None
+        self._last_session: Optional[RecordingSession] = None
+        self._start_time: Optional[float] = None
         self._jsonl = None                      # open file handle during recording
         self._frame_count = 0
         self._annotation_count = 0
         self._max_duration = float(MAX_RECORDING_SECONDS)
-        self._is_mock = False                   # True when recording without a radar
-
-        # Callbacks
-        self._on_progress: Optional[Callable[[int, int], None]] = None
-        self._on_stopped: Optional[Callable[[RecordingSession], None]] = None
+        self._last_mock: bool = False
+        self._auto_stop_timer: Optional[threading.Timer] = None
 
         logger.info(f"RadarRecorder initialized, recordings_dir={self.recordings_dir}")
 
@@ -275,15 +119,6 @@ class RadarRecorder:
     def current_session(self) -> Optional[RecordingSession]:
         return self._current_session
 
-    def set_callbacks(
-        self,
-        on_progress: Optional[Callable[[int, int], None]] = None,
-        on_stopped: Optional[Callable[[RecordingSession], None]] = None,
-    ):
-        """Set callbacks for recording events."""
-        self._on_progress = on_progress
-        self._on_stopped = on_stopped
-
     def start_recording(
         self,
         session_type: str,
@@ -293,14 +128,14 @@ class RadarRecorder:
         Start a new recording session.
 
         Args:
-            session_type: One of "bowling", "batting", or "both"
+            session_type: One of SESSION_TYPES
             max_duration_seconds: Hard cap before auto-stop. Defaults to the
                 short-clip limit (MAX_RECORDING_SECONDS). For data gathering pass
                 a larger value; it is clamped to MAX_GATHERING_SECONDS.
 
         Returns:
-            The new RecordingSession. Check its is_mock flag: if the radar
-            could not be opened the session records FABRICATED mock frames.
+            The new RecordingSession. Check its is_mock flag: if the radar is
+            absent the session records FABRICATED mock frames.
 
         Raises:
             ValueError: If already recording or invalid session type
@@ -317,17 +152,12 @@ class RadarRecorder:
         else:
             self._max_duration = max(1.0, min(float(max_duration_seconds), MAX_GATHERING_SECONDS))
 
-        # Open the radar BEFORE responding so the caller knows immediately
-        # whether this session captures real data. Without this, a missing
-        # radar silently records mock frames that look like a successful
-        # session - useless (and misleading) as a field dataset.
-        self._serial = open_radar_serial(self.serial_port, self.baud_rate)
-        self._is_mock = self._serial is None
-        if self._is_mock:
-            logger.warning(
-                "Radar unavailable - this session records MOCK data "
-                "(flagged in the file and the start_recording response)"
-            )
+        # Resolve mock/real BEFORE subscribing, so the meta line and the first
+        # frames agree. A missing radar must never silently produce a
+        # plausible-looking dataset - it is flagged in the file and response.
+        self._source.ensure_running()
+        self._source.wait_until_ready(timeout=2.0)
+        is_mock = self._source.is_mock
 
         # Create session
         start_time = datetime.now(timezone.utc)
@@ -335,8 +165,14 @@ class RadarRecorder:
             session_type=session_type,
             start_time=start_time.isoformat(),
             max_duration_seconds=self._max_duration,
-            is_mock=self._is_mock,
+            is_mock=is_mock,
         )
+        self._last_mock = is_mock
+        if is_mock:
+            logger.warning(
+                "Radar unavailable - this session records MOCK data "
+                "(flagged in the file and the start_recording response)"
+            )
 
         # Open the crash-safe JSONL output file now and write a meta header.
         # Frames and annotations are appended line-by-line as they occur, so a
@@ -349,30 +185,28 @@ class RadarRecorder:
         self._annotation_count = 0
         self._jsonl = open(file_path, "w")
         self._current_session.file_path = str(file_path)
+        self._start_time = time.time()
+
         self._write_line({
             "type": "meta",
             "session_type": session_type,
             "start_time": self._current_session.start_time,
             "max_duration_seconds": self._max_duration,
-            "mock": self._is_mock,
+            "mock": is_mock,
         })
 
-        # Reset parser
-        self._parser = TLVParser()
-        self._stop_event.clear()
-        self._start_time = time.time()
+        # Frames start flowing only now, with mode already classified
+        self._source.subscribe(self._on_frame)
 
-        # Start recording thread
-        self._recording_thread = threading.Thread(
-            target=self._recording_loop,
-            daemon=True,
-        )
-        self._recording_thread.start()
+        # Auto-stop timer replaces the old per-recording thread
+        self._auto_stop_timer = threading.Timer(self._max_duration, self._auto_stop)
+        self._auto_stop_timer.daemon = True
+        self._auto_stop_timer.start()
 
         logger.info(
             f"Started recording: type={session_type}, "
             f"max_duration={self._max_duration:.0f}s, file={file_path.name}, "
-            f"mock={self._is_mock}"
+            f"mock={is_mock}"
         )
         return self._current_session
 
@@ -383,6 +217,36 @@ class RadarRecorder:
                 return
             self._jsonl.write(json.dumps(obj) + "\n")
             self._jsonl.flush()
+
+    def _on_frame(self, frame: RadarFrame) -> None:
+        """RadarSource subscriber: write one frame to the JSONL stream."""
+        if not self.is_recording or self._start_time is None:
+            return
+
+        # Radar plugged/unplugged mid-session: record the transition so the
+        # dataset says which stretches are real.
+        source_mock = self._source.is_mock
+        t_ms = int((time.time() - self._start_time) * 1000)
+        if source_mock != self._last_mock:
+            self._last_mock = source_mock
+            self._write_line({"type": "mode_change", "t_ms": t_ms, "mock": source_mock})
+            logger.warning(f"Recording mode changed mid-session: mock={source_mock}")
+
+        self._write_line({
+            "type": "frame",
+            "t_ms": t_ms,                        # host recording clock (aligns with annotations)
+            "frame_number": frame.frame_number,  # radar hardware counter
+            "cpu_time_ms": frame.cpu_time_ms,    # radar hardware clock
+            "num_points": frame.num_points,
+            "points": [
+                {"x": p.x, "y": p.y, "z": p.z, "doppler": p.doppler, "snr": p.snr, "noise": p.noise}
+                for p in frame.points
+            ],
+        })
+        with self._lock:
+            self._frame_count += 1
+            if self._current_session is not None:
+                self._current_session.frame_count = self._frame_count
 
     def add_annotation(self, mark: Optional[dict] = None) -> Optional[dict]:
         """
@@ -409,101 +273,39 @@ class RadarRecorder:
         logger.info(f"Annotation @ {t_ms}ms: {mark}")
         return annotation
 
-    def _record_frame(self, frame: RadarFrame) -> None:
-        """Write one radar frame to the JSONL stream (crash-safe) and count it."""
-        self._write_line({"type": "frame", **frame.to_dict()})
-        with self._lock:
-            self._frame_count += 1
-            if self._current_session is not None:
-                self._current_session.frame_count = self._frame_count
+    def _auto_stop(self) -> None:
+        """Timer callback: max duration reached."""
+        logger.info("Max recording duration reached, auto-stopping")
+        self.stop_recording()
 
     def stop_recording(self) -> Optional[RecordingSession]:
         """
-        Stop the current recording and save to file.
+        Stop the current recording and finalize the file.
+
+        Idempotent: a manual stop racing the auto-stop timer returns the
+        already-finalized session instead of raising.
 
         Returns:
-            The completed RecordingSession, or None if not recording
+            The completed RecordingSession, or None if never recorded
         """
-        if not self.is_recording:
-            return None
+        with self._stop_lock:
+            if not self.is_recording:
+                return self._last_session
 
-        # Signal thread to stop
-        self._stop_event.set()
+            # Order matters: unsubscribe first so no frame callback can write
+            # to the file while it is being finalized.
+            self._source.unsubscribe(self._on_frame)
+            if self._auto_stop_timer is not None:
+                self._auto_stop_timer.cancel()
+                self._auto_stop_timer = None
 
-        # Wait for thread to finish
-        if self._recording_thread:
-            self._recording_thread.join(timeout=2.0)
-            self._recording_thread = None
+            session = self._finalize_session()
 
-        # Finalize session
-        session = self._finalize_session()
-
-        logger.info(
-            f"Stopped recording: type={session.session_type}, "
-            f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
-        )
-
-        return session
-
-    def _recording_loop(self):
-        """Main recording loop - runs in separate thread.
-
-        The serial port was already opened (or found absent -> mock mode) in
-        start_recording, so the mock/real decision is fixed before any frame
-        is written.
-        """
-        try:
-            last_progress_time = time.time()
-
-            while not self._stop_event.is_set():
-                elapsed = time.time() - self._start_time
-
-                # Auto-stop after the configured max duration
-                if elapsed >= self._max_duration:
-                    logger.info("Max recording duration reached, auto-stopping")
-                    break
-
-                # Read data
-                if self._serial:
-                    data = self._serial.read(4096)
-                    if data:
-                        frames = self._parser.add_data(data)
-                        for frame in frames:
-                            frame.timestamp_ms = int(elapsed * 1000)
-                            self._record_frame(frame)
-                else:
-                    # Mock data for testing without radar (single moving point).
-                    # Only reached when is_mock is True - flagged in the meta
-                    # line and every status payload so it can't pass as real.
-                    time.sleep(0.1)  # 10Hz
-                    self._record_frame(RadarFrame(
-                        frame_number=self._frame_count,
-                        timestamp_ms=int(elapsed * 1000),
-                        num_points=1,
-                        points=[RadarPoint(
-                            x=math.sin(elapsed) * 2, y=3.0, z=0.5,
-                            doppler=15.0, snr=18.0, noise=5.0,
-                        )],
-                    ))
-
-                # Progress callback (every second)
-                if self._on_progress and time.time() - last_progress_time >= 1.0:
-                    self._on_progress(int(elapsed), self._frame_count)
-                    last_progress_time = time.time()
-
-        except Exception as e:
-            logger.error(f"Recording error: {e}")
-
-        finally:
-            if self._serial:
-                self._serial.close()
-                self._serial = None
-
-            # Finalize if auto-stopped
-            if self._current_session and not self._stop_event.is_set():
-                session = self._finalize_session()
-                if self._on_stopped:
-                    self._on_stopped(session)
+            logger.info(
+                f"Stopped recording: type={session.session_type}, "
+                f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
+            )
+            return session
 
     def _finalize_session(self) -> RecordingSession:
         """Finalize the current session: append an end marker and close the file.
@@ -542,9 +344,10 @@ class RadarRecorder:
             f"{session.duration_seconds:.1f}s)"
         )
 
-        # Clear current session
+        # Clear current session (keep it as last for idempotent stop)
         self._current_session = None
         self._start_time = None
+        self._last_session = session
 
         return session
 
@@ -671,7 +474,8 @@ class RadarRecorder:
                 kind = obj.get("type")
                 if kind == "frame":
                     frames += 1
-                    last_t_ms = max(last_t_ms, obj.get("timestamp_ms", 0))
+                    # t_ms is the current field; timestamp_ms appears in older files
+                    last_t_ms = max(last_t_ms, obj.get("t_ms", obj.get("timestamp_ms", 0)))
                 elif kind == "annotation":
                     annotations += 1
                     last_t_ms = max(last_t_ms, obj.get("t_ms", 0))
