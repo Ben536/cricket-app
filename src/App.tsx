@@ -5,6 +5,7 @@ import { type SimulationResult } from './gameEngine'
 import { useServerSimulation } from './hooks/useServerSimulation'
 import { ServerConfig } from './components/ServerConfig'
 import { RecordingModal } from './components/RecordingModal'
+import { DataGatheringModal } from './components/DataGatheringModal'
 import { RadarVisualizer } from './components/RadarVisualizer'
 
 // Types
@@ -167,6 +168,7 @@ function App() {
   // Server connection state
   const [showServerConfig, setShowServerConfig] = useState(false)
   const [showRecordingModal, setShowRecordingModal] = useState(false)
+  const [showDataGathering, setShowDataGathering] = useState(false)
   const [showRadarViz, setShowRadarViz] = useState(false)
   const { isConnected, connectionState, simulateAsync, sendMessage } = useServerSimulation()
 
@@ -742,6 +744,13 @@ function App() {
           >
             Rec
           </button>
+          <button
+            className="record-radar-btn"
+            onClick={() => setShowDataGathering(true)}
+            title="Gather labelled shot data for tuning"
+          >
+            Data
+          </button>
           <div className="overs-display">
             <span className="overs-label">Overs</span>
             <span className="overs-value">
@@ -1301,6 +1310,15 @@ function App() {
         <RecordingModal
           isConnected={isConnected}
           onClose={() => setShowRecordingModal(false)}
+          sendMessage={sendMessage}
+        />
+      )}
+
+      {/* Data Gathering Modal */}
+      {showDataGathering && (
+        <DataGatheringModal
+          isConnected={isConnected}
+          onClose={() => setShowDataGathering(false)}
           sendMessage={sendMessage}
         />
       )}

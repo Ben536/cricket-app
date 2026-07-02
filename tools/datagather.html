@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<!--
+  CricketRadar - standalone Data Gathering tool (no build step).
+
+  Talks to the Pi WebSocket server (:5002) directly. Deploy by copying into the
+  Pi web root (dist/) and open http://<pi>/datagather.html on a phone.
+
+  Captures raw radar (crash-safe JSONL on the Pi) labelled with ground truth:
+    - Ball only / Batsman only: one timing mark per ball/swing.
+    - Ball + hit: tap the wagon-wheel = the direction the ball went (direction_deg + x/y).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>CricketRadar - Data Gathering</title>
+<!-- Add-to-Home-Screen: makes the shortcut a named, full-screen app with an icon -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="CricketRadar" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 12px; }
+  h1 { font-size: 18px; margin: 4px 0 12px; }
+  .row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .row button { flex: 1; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .grid2 button { font-size: 14px; }
+  button { font-size: 15px; padding: 12px; border-radius: 8px; border: 1px solid #30363d; background: #161b22; color: #e6edf3; }
+  button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button:disabled { opacity: .45; }
+  .big { font-size: 18px; padding: 16px; font-weight: 600; }
+  .start { background: #238636; border-color: #238636; color: #fff; }
+  .stop { background: #da3633; border-color: #da3633; color: #fff; }
+  .mark { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #8b949e; display: block; margin: 12px 0 6px; }
+  #status { font-size: 14px; padding: 10px; border-radius: 8px; background: #161b22; text-align: center; }
+  #status.rec { background: #2d1214; color: #ff7b72; }
+  #wheel { width: 100%; max-width: 340px; display: block; margin: 6px auto; background: #0b3d2e; border-radius: 8px; touch-action: manipulation; }
+  .msg { margin-top: 10px; font-size: 14px; padding: 8px; border-radius: 8px; text-align: center; }
+  .err { background: #2d1214; color: #ff7b72; }
+  .ok { background: #12261a; color: #3fb950; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; vertical-align: middle; }
+  .note { font-size: 12px; color: #8b949e; text-align: center; }
+  #hostRow input { flex: 2; background: #161b22; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>🏏 Data Gathering
+    <span class="dot" id="conn" style="background:#da3633"></span>
+  </h1>
+
+  <div class="row" id="hostRow">
+    <input id="host" placeholder="Pi host/IP" />
+    <button id="connectBtn" onclick="connect()">Connect</button>
+  </div>
+
+  <label>Capture type</label>
+  <div class="grid2" id="types">
+    <button data-type="bowling">Ball only</button>
+    <button data-type="batting">Batsman only</button>
+    <button data-type="both" class="active">Ball + hit</button>
+    <button data-type="foil_ball">Foil ball</button>
+    <button data-type="racket">Tennis racket</button>
+    <button data-type="racket_foil">Racket + foil ball</button>
+  </div>
+
+  <div id="status">Not recording</div>
+  <div id="mockWarn" class="msg err" style="display:none">
+    ⚠️ RADAR NOT DETECTED — recording fabricated mock data, not real radar.
+    Check the radar USB connection, then stop &amp; start again.
+  </div>
+
+  <!-- Wagon wheel (shown for "both") -->
+  <div id="wheelWrap" style="display:none">
+    <label>Tap where the ball went</label>
+    <svg id="wheel" viewBox="0 0 300 300"></svg>
+    <p class="note">Off/Leg shown for a right-handed batter. One tap = one ball.</p>
+  </div>
+
+  <!-- Mark button (shown for bowling/batting) -->
+  <div id="markWrap" style="display:none">
+    <button class="big mark" id="markBtn" onclick="markTiming()">Mark Ball</button>
+  </div>
+
+  <button class="big start" id="startBtn" onclick="start()">Start Recording</button>
+  <button class="big stop" id="stopBtn" onclick="stop()" style="display:none">Stop &amp; Save</button>
+
+  <div id="msg"></div>
+
+<script>
+const CX = 150, CY = 150, R = 130;
+const MAX_SECONDS = 7200; // safety backstop only; sessions are stopped manually
+const HIT_TYPES = ['both', 'racket_foil']; // these show the direction wheel
+let ws = null, connected = false, recording = false;
+let sessionType = 'both';
+let elapsed = 0, frames = 0, marks = 0, timer = null, poll = null, reconnectTimer = null;
+
+const $ = (id) => document.getElementById(id);
+function setMsg(text, cls) { const m = $('msg'); m.textContent = text || ''; m.className = text ? 'msg ' + cls : ''; }
+
+// ---- selectors ----
+$('types').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || recording) return;
+  sessionType = b.dataset.type;
+  [...$('types').children].forEach(x => x.classList.toggle('active', x === b));
+  updateUI();  // refresh wheel/mark visibility for the newly-selected type
+});
+// ---- websocket ----
+function send(type, payload) {
+  if (!ws || ws.readyState !== 1) { setMsg('Not connected', 'err'); return; }
+  ws.send(JSON.stringify({
+    type, message_id: crypto.randomUUID(), timestamp: new Date().toISOString(), payload: payload || {}
+  }));
+}
+function connect() {
+  const host = $('host').value.trim() || location.hostname || '192.168.0.191';
+  $('host').value = host;
+  clearTimeout(reconnectTimer);
+  if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch (e) {} ws = null; }
+  try { ws = new WebSocket(`ws://${host}:5002`); } catch (e) { setMsg('Bad host: ' + e, 'err'); return; }
+  // On (re)connect, ask for status: the recording lives on the server, so a
+  // page reload or dropped WiFi mid-session re-attaches instead of losing it.
+  ws.onopen = () => { connected = true; $('conn').style.background = '#3fb950'; setMsg('Connected to ' + host, 'ok'); send('get_recording_status', {}); };
+  ws.onclose = () => { connected = false; $('conn').style.background = '#da3633'; if (recording) stopUI(); reconnectTimer = setTimeout(connect, 3000); };
+  ws.onerror = () => setMsg('Connection error to ' + host, 'err');
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === 'recording_started') { const p = m.payload || {}; recording = true; elapsed = 0; frames = 0; marks = 0; setMock(!!p.mock); updateUI(); startTimers(); setMsg('Recording…', 'ok'); }
+    else if (m.type === 'recording_stopped') { const p = m.payload || {}; stopUI(); setMock(false); setMsg(`Saved${p.mock ? ' (MOCK DATA)' : ''}: ${Math.round(p.duration_seconds||0)}s · ${p.frame_count||0} frames · ${p.annotation_count||0} balls`, p.mock ? 'err' : 'ok'); }
+    else if (m.type === 'recording_status') {
+      const p = m.payload || {};
+      if (p.is_recording && !recording) adopt(p);
+      if (recording) {
+        frames = p.frame_count || 0; marks = p.annotation_count || 0;
+        if (p.mock != null) setMock(p.mock);
+        renderStatus();
+      }
+      if (p.is_recording === false && recording) { stopUI(); setMsg('Auto-stopped (max duration)', 'ok'); }
+    }
+    else if (m.type === 'annotation_added') { const p = m.payload || {}; if (p.annotation_count != null) { marks = p.annotation_count; renderStatus(); } }
+    else if (m.type === 'error') { setMsg('Error: ' + (m.payload && m.payload.message || 'unknown'), 'err'); }
+  };
+}
+
+// Re-attach to a recording already in progress on the server.
+function adopt(p) {
+  recording = true;
+  if (p.current_session_type) {
+    sessionType = p.current_session_type;
+    [...$('types').children].forEach(x => x.classList.toggle('active', x.dataset.type === sessionType));
+  }
+  const started = Date.parse(p.current_start_time || '');
+  elapsed = isNaN(started) ? 0 : Math.max(0, Math.floor((Date.now() - started) / 1000));
+  setMock(!!p.mock);
+  updateUI(); startTimers();
+  setMsg('Re-attached to recording in progress', 'ok');
+}
+
+function setMock(on) { $('mockWarn').style.display = on ? 'block' : 'none'; }
+
+// ---- recording control ----
+function start() {
+  if (!connected) { setMsg('Connect first', 'err'); return; }
+  send('start_recording', { session_type: sessionType, max_duration: MAX_SECONDS });
+}
+function stop() { send('stop_recording', {}); }
+
+function startTimers() {
+  clearInterval(timer); clearInterval(poll);
+  timer = setInterval(() => { elapsed++; renderStatus(); }, 1000);
+  poll = setInterval(() => send('get_recording_status', {}), 2000);
+}
+function stopUI() { recording = false; clearInterval(timer); clearInterval(poll); updateUI(); }
+
+function updateUI() {
+  $('startBtn').style.display = recording ? 'none' : 'block';
+  $('stopBtn').style.display = recording ? 'block' : 'none';
+  const isHit = HIT_TYPES.includes(sessionType);
+  // Show the wheel whenever a hit type is selected (even before recording) so it
+  // can be tested by clicking; taps only LOG a mark once recording has started.
+  $('wheelWrap').style.display = isHit ? 'block' : 'none';
+  $('markWrap').style.display = (recording && !isHit) ? 'block' : 'none';
+  $('markBtn').textContent = 'Mark';
+  renderStatus();
+}
+function renderStatus() {
+  const s = $('status');
+  if (recording) {
+    s.className = 'rec';
+    const mm = Math.floor(elapsed/60), ss = String(elapsed%60).padStart(2,'0');
+    s.innerHTML = `● REC ${mm}:${ss} &nbsp;·&nbsp; ${frames} frames &nbsp;·&nbsp; ${marks} balls`;
+  } else { s.className = ''; s.textContent = 'Not recording'; }
+}
+
+// ---- marking ----
+function markTiming() { send('add_annotation', { label: sessionType }); flash(); }
+
+function drawWheel() {
+  const svg = $('wheel');
+  svg.innerHTML = `
+    <circle cx="${CX}" cy="${CY}" r="${R}" fill="#0f5132" stroke="#2e8b57" stroke-width="2"/>
+    <circle cx="${CX}" cy="${CY}" r="${R*0.5}" fill="none" stroke="#2e8b57" stroke-width="1" stroke-dasharray="4 4"/>
+    <line x1="${CX}" y1="${CY-R}" x2="${CX}" y2="${CY+R}" stroke="#2e8b57"/>
+    <line x1="${CX-R}" y1="${CY}" x2="${CX+R}" y2="${CY}" stroke="#2e8b57"/>
+    <circle cx="${CX}" cy="${CY}" r="5" fill="#ffd700"/>
+    <text x="${CX}" y="${CY-R+16}" fill="#cde" font-size="13" text-anchor="middle">Bowler</text>
+    <text x="${CX}" y="${CY+R-6}" fill="#cde" font-size="13" text-anchor="middle">Keeper</text>
+    <text x="${CX-R+18}" y="${CY+4}" fill="#cde" font-size="13" text-anchor="middle">Off</text>
+    <text x="${CX+R-18}" y="${CY+4}" fill="#cde" font-size="13" text-anchor="middle">Leg</text>
+    <line id="tapLine" stroke="#ffd700" stroke-width="2" style="display:none"/>
+    <circle id="tapDot" r="6" fill="#ff4136" style="display:none"/>`;
+}
+function wheelTap(e) {
+  const r = $('wheel').getBoundingClientRect();
+  const pt = e.touches ? e.touches[0] : e;
+  const px = (pt.clientX - r.left) / r.width * 300;
+  const py = (pt.clientY - r.top) / r.height * 300;
+  const dx = px - CX, dy = CY - py;             // dy +ve = toward bowler
+  const dir = Math.round(Math.atan2(dx, dy) * 180 / Math.PI * 10) / 10; // 0=straight,+leg,-off
+  const xn = Math.max(-1, Math.min(1, dx / R)), yn = Math.max(-1, Math.min(1, dy / R));
+  const line = $('tapLine'), dot = $('tapDot');
+  line.setAttribute('x1', CX); line.setAttribute('y1', CY); line.setAttribute('x2', px); line.setAttribute('y2', py); line.style.display = '';
+  dot.setAttribute('cx', px); dot.setAttribute('cy', py); dot.style.display = '';
+  if (recording) {
+    send('add_annotation', { direction_deg: dir, x: Math.round(xn*100)/100, y: Math.round(yn*100)/100 });
+    setMsg(`Ball logged → ${dir}°`, 'ok');
+  } else {
+    setMsg(`Preview: ${dir}°  (press Start to log marks)`, 'ok');
+  }
+}
+function flash() { const s = $('status'); s.style.outline = '2px solid #3fb950'; setTimeout(() => s.style.outline = '', 150); }
+
+// init
+$('host').value = location.hostname || '192.168.0.191';
+drawWheel();
+$('wheel').addEventListener('click', wheelTap);
+updateUI();
+// auto-connect if served from the Pi
+if (location.hostname) connect();
+</script>
+</body>
+</html>
