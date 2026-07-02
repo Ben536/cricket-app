@@ -4,9 +4,14 @@
 -- now use 'W', 'wd', 'nb' or other newly-added outcomes, the rebuild INSERT
 -- will fail. Remove or remap those rows before rolling back.
 --
--- Executed via sqlite3 executescript (not the line splitter), so plain SQL.
+-- Dependents (view + trigger) are dropped before the table swap to avoid
+-- dangling-reference errors on modern SQLite. Executed via sqlite3
+-- executescript (not the line splitter), so plain SQL.
 
 PRAGMA foreign_keys = OFF;
+
+DROP VIEW IF EXISTS session_summaries;
+DROP TRIGGER IF EXISTS deliveries_updated_at;
 
 CREATE TABLE deliveries_old (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +60,6 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_ball_number ON deliveries(session_id, 
 CREATE INDEX IF NOT EXISTS idx_deliveries_outcome ON deliveries(outcome);
 CREATE INDEX IF NOT EXISTS idx_deliveries_timestamp ON deliveries(timestamp);
 
-DROP TRIGGER IF EXISTS deliveries_updated_at;
 CREATE TRIGGER deliveries_updated_at
 AFTER UPDATE ON deliveries
 BEGIN
@@ -63,7 +67,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
-DROP VIEW IF EXISTS session_summaries;
 CREATE VIEW session_summaries AS
 SELECT
     s.id as session_id,

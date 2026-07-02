@@ -9,13 +9,26 @@
 --   types and (b) exclude extras (wd/nb) from balls faced / strike rate.
 --
 --   SQLite cannot ALTER a CHECK constraint in place, so the deliveries table is
---   rebuilt. No other table references deliveries via foreign key (deliveries
---   only references sessions), so the rebuild is safe with foreign_keys = ON.
---   Idempotency is provided by the _migrations tracking table in migrate.py.
+--   rebuilt. The session_summaries VIEW and the deliveries trigger reference the
+--   deliveries table, so they MUST be dropped before the table is swapped --
+--   modern SQLite (>= 3.25) validates dependent views during DROP/RENAME and
+--   errors on a dangling reference otherwise. They are recreated afterwards.
+--   No other table references deliveries via foreign key, so the rebuild is
+--   safe with foreign_keys = ON. Idempotency is provided by the _migrations
+--   tracking table in migrate.py.
 
 PRAGMA foreign_keys = ON;
 
--- 1. New deliveries table with extended outcome CHECK
+-- 1. Drop dependents FIRST so the table swap has no dangling references.
+-- migrate.py is not transactional (SQLite auto-commits DDL), so this migration
+-- must be idempotent: re-running after a partially-applied/failed attempt must
+-- still converge. All drops use IF EXISTS and any leftover scratch table from a
+-- prior interrupted run is removed before recreation.
+DROP VIEW IF EXISTS session_summaries;
+DROP TRIGGER IF EXISTS deliveries_updated_at;
+DROP TABLE IF EXISTS deliveries_new;
+
+-- 2. New deliveries table with extended outcome CHECK
 CREATE TABLE deliveries_new (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL,
@@ -53,21 +66,20 @@ CREATE TABLE deliveries_new (
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
--- 2. Copy existing rows verbatim (outcomes all remain valid under the new CHECK)
+-- 3. Copy existing rows verbatim (outcomes all remain valid under the new CHECK)
 INSERT INTO deliveries_new (id, session_id, ball_number, timestamp, bowling_speed, exit_speed, horizontal_angle, vertical_angle, landing_x, landing_y, projected_distance, max_height, radar_frames_captured, detection_confidence, outcome, runs, fielder_position, fielding_position, end_position, is_boundary, is_aerial, description, catch_analysis, fielding_time, collection_difficulty, alignment_score, priority_score, fielder_arrival_time, ball_arrival_time, is_manual_input, created_at, updated_at, version) SELECT id, session_id, ball_number, timestamp, bowling_speed, exit_speed, horizontal_angle, vertical_angle, landing_x, landing_y, projected_distance, max_height, radar_frames_captured, detection_confidence, outcome, runs, fielder_position, fielding_position, end_position, is_boundary, is_aerial, description, catch_analysis, fielding_time, collection_difficulty, alignment_score, priority_score, fielder_arrival_time, ball_arrival_time, is_manual_input, created_at, updated_at, version FROM deliveries;
 
--- 3. Swap tables
+-- 4. Swap tables
 DROP TABLE deliveries;
 ALTER TABLE deliveries_new RENAME TO deliveries;
 
--- 4. Recreate indexes
+-- 5. Recreate indexes
 CREATE INDEX IF NOT EXISTS idx_deliveries_session_id ON deliveries(session_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_ball_number ON deliveries(session_id, ball_number);
 CREATE INDEX IF NOT EXISTS idx_deliveries_outcome ON deliveries(outcome);
 CREATE INDEX IF NOT EXISTS idx_deliveries_timestamp ON deliveries(timestamp);
 
--- 5. Recreate updated_at / version trigger
-DROP TRIGGER IF EXISTS deliveries_updated_at;
+-- 6. Recreate updated_at / version trigger
 CREATE TRIGGER deliveries_updated_at
 AFTER UPDATE ON deliveries
 BEGIN
@@ -75,8 +87,7 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
--- 6. Update session_summaries: count all dismissals, exclude extras from balls faced
-DROP VIEW IF EXISTS session_summaries;
+-- 7. Recreate session_summaries: count all dismissals, exclude extras from balls faced
 CREATE VIEW session_summaries AS
 SELECT
     s.id as session_id,
