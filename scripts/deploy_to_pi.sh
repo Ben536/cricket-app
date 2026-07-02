@@ -5,7 +5,7 @@
 # Usage: ./scripts/deploy_to_pi.sh [pi-address]
 #
 # Requirements:
-#   - SSH access to Pi (password: Radarcricket12$)
+#   - SSH access to Pi (key-based auth recommended; see secrets.local.md)
 #   - Python 3.9+ on Pi
 #   - pip installed on Pi
 #
@@ -23,7 +23,7 @@ echo "Remote: $PI_USER@$PI_HOST:$PI_DIR"
 echo ""
 
 # Check connectivity
-echo "[1/5] Checking Pi connectivity..."
+echo "[1/6] Checking Pi connectivity..."
 if ! ping -c 1 -W 2 "$PI_HOST" > /dev/null 2>&1; then
     echo "ERROR: Cannot reach $PI_HOST"
     exit 1
@@ -32,10 +32,10 @@ echo "  Pi is reachable"
 
 # Sync code
 echo ""
-echo "[2/5] Syncing code to Pi..."
+echo "[2/6] Syncing code to Pi..."
 
 # Create directories first
-ssh "$PI_USER@$PI_HOST" "mkdir -p $PI_DIR/server $PI_DIR/db $PI_DIR/engine $PI_DIR/contracts"
+ssh "$PI_USER@$PI_HOST" "mkdir -p $PI_DIR/server $PI_DIR/db $PI_DIR/engine $PI_DIR/contracts $PI_DIR/radar $PI_DIR/scripts $PI_DIR/tools"
 
 # Sync each directory separately to preserve structure
 rsync -avz --exclude '__pycache__' --exclude '*.pyc' --exclude '*.db' \
@@ -50,14 +50,32 @@ rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
 rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
     "$LOCAL_DIR/contracts/" "$PI_USER@$PI_HOST:$PI_DIR/contracts/"
 
+# radar/ is imported by server/handlers.py - the server cannot run without it
+rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
+    "$LOCAL_DIR/radar/" "$PI_USER@$PI_HOST:$PI_DIR/radar/"
+
+rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
+    "$LOCAL_DIR/scripts/" "$PI_USER@$PI_HOST:$PI_DIR/scripts/"
+
+rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
+    "$LOCAL_DIR/tools/" "$PI_USER@$PI_HOST:$PI_DIR/tools/"
+
 # Install dependencies
 echo ""
-echo "[3/5] Installing Python dependencies..."
+echo "[3/6] Installing Python dependencies..."
 ssh "$PI_USER@$PI_HOST" "sudo apt-get install -y python3-websockets"
+
+# Install/refresh systemd units shipped in scripts/systemd/
+echo ""
+echo "[4/6] Installing systemd units..."
+ssh "$PI_USER@$PI_HOST" "chmod +x $PI_DIR/scripts/*.sh && \
+    sudo cp $PI_DIR/scripts/systemd/cricket-autohotspot.service /etc/systemd/system/ && \
+    sudo systemctl daemon-reload && \
+    sudo systemctl enable cricket-autohotspot.service"
 
 # Run migrations
 echo ""
-echo "[4/5] Running database migrations..."
+echo "[5/6] Running database migrations..."
 ssh "$PI_USER@$PI_HOST" "cd $PI_DIR && python3 -c '
 import sys
 sys.path.insert(0, \".\")
@@ -74,7 +92,7 @@ print(f\"Ran {count} migration(s)\")
 
 # Restart server
 echo ""
-echo "[5/5] Restarting server..."
+echo "[6/6] Restarting server..."
 ssh "$PI_USER@$PI_HOST" "pkill -f 'python3.*websocket_server' || true; sleep 1; cd $PI_DIR && nohup python3 -m server.websocket_server > server.log 2>&1 &"
 sleep 2
 

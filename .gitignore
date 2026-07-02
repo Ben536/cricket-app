@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Captured radar data (recordings live on the Pi / local disk, not in git)
+recordings/
+
 # SQLite databases
 *.db
 *.db-journal
