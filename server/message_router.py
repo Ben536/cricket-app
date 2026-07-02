@@ -132,6 +132,7 @@ VALID_CLIENT_TYPES = {
     "start_recording",
     "stop_recording",
     "get_recording_status",
+    "add_annotation",
     # Streaming
     "start_radar_stream",
     "stop_radar_stream",
@@ -454,12 +455,25 @@ class MessageRouter:
                 )
 
         elif msg_type == "start_recording":
+            from radar.recorder import SESSION_TYPES
             session_type = payload.get("session_type")
-            if session_type not in ["bowling", "batting", "both"]:
+            if session_type not in SESSION_TYPES:
                 return create_error_response(
                     ErrorCode.INVALID_FIELD_VALUE,
                     in_reply_to=message_id,
                     details={"field": "session_type", "value": session_type},
+                )
+
+            # bool is an int subclass, so reject it explicitly
+            max_duration = payload.get("max_duration")
+            if max_duration is not None and (
+                isinstance(max_duration, bool)
+                or not isinstance(max_duration, (int, float))
+            ):
+                return create_error_response(
+                    ErrorCode.INVALID_FIELD_VALUE,
+                    in_reply_to=message_id,
+                    details={"field": "max_duration", "value": max_duration},
                 )
 
         return None

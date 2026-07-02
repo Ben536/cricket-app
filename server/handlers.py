@@ -40,7 +40,7 @@ from db.repository import (
 from engine.game_engine import simulate_delivery
 
 # Radar recorder and streamer
-from radar.recorder import get_recorder, RadarRecorder
+from radar.recorder import get_recorder, RadarRecorder, SESSION_TYPES
 from radar.streamer import get_streamer, RadarStreamer
 
 if TYPE_CHECKING:
@@ -969,15 +969,16 @@ class MessageHandlers:
         """
         Start radar data recording.
 
-        Begins capturing raw radar frames to disk.
-        Auto-stops after 15 seconds.
+        Begins capturing raw radar frames to disk. Auto-stops after
+        max_duration seconds (default: the 15s short-clip limit).
         """
         payload = message.get("payload", {})
         message_id = message.get("message_id")
 
         session_type = payload.get("session_type", "both")
+        max_duration = payload.get("max_duration")  # seconds; None = short-clip default
 
-        if session_type not in ["bowling", "batting", "both"]:
+        if session_type not in SESSION_TYPES:
             return create_error_response(
                 ErrorCode.INVALID_FIELD_VALUE,
                 in_reply_to=message_id,
@@ -994,41 +995,15 @@ class MessageHandlers:
             )
 
         try:
-            # Set up callbacks for progress updates
-            async def on_progress(elapsed: int, frame_count: int):
-                progress_msg = {
-                    "type": "recording_progress",
-                    "message_id": generate_message_id(),
-                    "timestamp": create_timestamp(),
-                    "payload": {
-                        "elapsed_seconds": elapsed,
-                        "frame_count": frame_count,
-                        "max_duration": 15,
-                    },
-                }
-                await self.connection_manager.send_to_client(client_id, progress_msg)
+            # No progress callbacks here: clients poll get_recording_status
+            # (recorder callbacks are sync and cannot await a websocket send).
+            session = recorder.start_recording(session_type, max_duration_seconds=max_duration)
 
-            async def on_stopped(session):
-                stopped_msg = {
-                    "type": "recording_auto_stopped",
-                    "message_id": generate_message_id(),
-                    "timestamp": create_timestamp(),
-                    "payload": {
-                        "reason": "max_duration_reached",
-                        "session_type": session.session_type,
-                        "duration_seconds": session.duration_seconds,
-                        "frame_count": session.frame_count,
-                        "file_path": session.file_path,
-                    },
-                }
-                await self.connection_manager.send_to_client(client_id, stopped_msg)
-
-            # Note: callbacks are sync, we'll handle async in wrapper
-            # For now, we'll skip real-time progress (simpler)
-
-            session = recorder.start_recording(session_type)
-
-            logger.info(f"Started recording: type={session_type}")
+            logger.info(
+                f"Started recording: type={session_type}, "
+                f"max_duration={session.max_duration_seconds:.0f}s, "
+                f"mock={session.is_mock}"
+            )
 
             return {
                 "type": "recording_started",
@@ -1038,7 +1013,8 @@ class MessageHandlers:
                 "payload": {
                     "session_type": session_type,
                     "start_time": session.start_time,
-                    "max_duration": 15,
+                    "max_duration": session.max_duration_seconds,
+                    "mock": session.is_mock,
                     "counts": recorder.get_recording_counts(),
                 },
             }
@@ -1090,6 +1066,8 @@ class MessageHandlers:
                         "session_type": session.session_type,
                         "duration_seconds": session.duration_seconds,
                         "frame_count": session.frame_count,
+                        "annotation_count": session.annotation_count,
+                        "mock": session.is_mock,
                         "file_path": session.file_path,
                         "counts": recorder.get_recording_counts(),
                     },
@@ -1131,7 +1109,47 @@ class MessageHandlers:
                 "is_recording": recorder.is_recording,
                 "current_session_type": current.session_type if current else None,
                 "current_start_time": current.start_time if current else None,
+                "max_duration": current.max_duration_seconds if current else None,
+                "frame_count": current.frame_count if current else 0,
+                "annotation_count": current.annotation_count if current else 0,
+                "mock": current.is_mock if current else False,
                 "counts": recorder.get_recording_counts(),
+            },
+        }
+
+    async def handle_add_annotation(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Mark an event during data-gathering recording (e.g. a hit ball plus the
+        direction it went). The payload is stored verbatim as ground truth,
+        timestamped against the recording clock, e.g.:
+            {"label": "4", "direction_deg": 35.0, "zone": "cover", "shot_type": "drive"}
+        """
+        payload = message.get("payload", {})
+        message_id = message.get("message_id")
+
+        recorder = get_recorder()
+        if not recorder.is_recording:
+            return create_extended_error(
+                "E6003",
+                in_reply_to=message_id,
+                message_override="Not currently recording",
+            )
+
+        annotation = recorder.add_annotation(payload)
+        current = recorder.current_session
+
+        return {
+            "type": "annotation_added",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "annotation": annotation,
+                "annotation_count": current.annotation_count if current else 0,
             },
         }
 
@@ -1350,6 +1368,7 @@ def register_handlers(
     server.message_router.register_handler("start_recording", handlers.handle_start_recording)
     server.message_router.register_handler("stop_recording", handlers.handle_stop_recording)
     server.message_router.register_handler("get_recording_status", handlers.handle_get_recording_status)
+    server.message_router.register_handler("add_annotation", handlers.handle_add_annotation)
 
     # Streaming handlers
     server.message_router.register_handler("start_radar_stream", handlers.handle_start_radar_stream)

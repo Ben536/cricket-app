@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import struct
 import threading
@@ -18,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Callable
 
+from radar.serial_utils import open_radar_serial
+
 logger = logging.getLogger(__name__)
 
 # TLV Magic bytes for IWR6843
@@ -25,8 +28,16 @@ MAGIC_BYTES = bytes([0x02, 0x01, 0x04, 0x03, 0x06, 0x05, 0x08, 0x07])
 HEADER_SIZE = 32  # 8 fields × 4 bytes each
 
 # Recording limits
-MAX_RECORDING_SECONDS = 15
+MAX_RECORDING_SECONDS = 15          # default for short clips (legacy modal)
+MAX_GATHERING_SECONDS = 7200        # 2h safety backstop; gathering sessions are stopped manually
 FRAME_RATE_HZ = 10  # Radar outputs at 10Hz
+
+# Capture types -> recordings/<type>/ subdirectories. Cricket types plus
+# radar-signature test proxies (foil-wrapped ball, tennis racket, racket+foil).
+SESSION_TYPES = [
+    "bowling", "batting", "both",
+    "foil_ball", "racket", "racket_foil",
+]
 
 
 @dataclass
@@ -62,13 +73,17 @@ class RadarFrame:
 
 @dataclass
 class RecordingSession:
-    """Metadata and frames for a recording session."""
-    session_type: str  # "bowling", "batting", or "both"
+    """Metadata for a recording session. Frames stream straight to the JSONL
+    file (crash-safe) and are never held in memory here."""
+    session_type: str  # one of SESSION_TYPES
     start_time: str
     end_time: Optional[str] = None
     duration_seconds: float = 0.0
     frame_count: int = 0
-    frames: list[RadarFrame] = field(default_factory=list)
+    max_duration_seconds: float = MAX_RECORDING_SECONDS
+    annotation_count: int = 0
+    is_mock: bool = False  # True = radar absent, frames are FABRICATED test data
+    annotations: list[dict] = field(default_factory=list)
     file_path: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -78,7 +93,9 @@ class RecordingSession:
             "end_time": self.end_time,
             "duration_seconds": self.duration_seconds,
             "frame_count": self.frame_count,
-            "frames": [f.to_dict() for f in self.frames],
+            "annotation_count": self.annotation_count,
+            "is_mock": self.is_mock,
+            "annotations": self.annotations,
         }
 
 
@@ -225,7 +242,7 @@ class RadarRecorder:
         self.baud_rate = baud_rate
 
         # Ensure directories exist
-        for session_type in ["bowling", "batting", "both"]:
+        for session_type in SESSION_TYPES:
             (self.recordings_dir / session_type).mkdir(parents=True, exist_ok=True)
 
         # Recording state
@@ -235,6 +252,14 @@ class RadarRecorder:
         self._start_time: Optional[float] = None
         self._serial = None
         self._parser = TLVParser()
+
+        # Crash-safe incremental output + thread-safe annotation marking
+        self._lock = threading.Lock()
+        self._jsonl = None                      # open file handle during recording
+        self._frame_count = 0
+        self._annotation_count = 0
+        self._max_duration = float(MAX_RECORDING_SECONDS)
+        self._is_mock = False                   # True when recording without a radar
 
         # Callbacks
         self._on_progress: Optional[Callable[[int, int], None]] = None
@@ -259,32 +284,78 @@ class RadarRecorder:
         self._on_progress = on_progress
         self._on_stopped = on_stopped
 
-    def start_recording(self, session_type: str) -> RecordingSession:
+    def start_recording(
+        self,
+        session_type: str,
+        max_duration_seconds: Optional[float] = None,
+    ) -> RecordingSession:
         """
         Start a new recording session.
 
         Args:
             session_type: One of "bowling", "batting", or "both"
+            max_duration_seconds: Hard cap before auto-stop. Defaults to the
+                short-clip limit (MAX_RECORDING_SECONDS). For data gathering pass
+                a larger value; it is clamped to MAX_GATHERING_SECONDS.
 
         Returns:
-            The new RecordingSession
+            The new RecordingSession. Check its is_mock flag: if the radar
+            could not be opened the session records FABRICATED mock frames.
 
         Raises:
             ValueError: If already recording or invalid session type
-            RuntimeError: If serial port cannot be opened
         """
         if self.is_recording:
             raise ValueError("Already recording")
 
-        if session_type not in ["bowling", "batting", "both"]:
+        if session_type not in SESSION_TYPES:
             raise ValueError(f"Invalid session type: {session_type}")
+
+        # Resolve and clamp the duration cap
+        if max_duration_seconds is None:
+            self._max_duration = float(MAX_RECORDING_SECONDS)
+        else:
+            self._max_duration = max(1.0, min(float(max_duration_seconds), MAX_GATHERING_SECONDS))
+
+        # Open the radar BEFORE responding so the caller knows immediately
+        # whether this session captures real data. Without this, a missing
+        # radar silently records mock frames that look like a successful
+        # session - useless (and misleading) as a field dataset.
+        self._serial = open_radar_serial(self.serial_port, self.baud_rate)
+        self._is_mock = self._serial is None
+        if self._is_mock:
+            logger.warning(
+                "Radar unavailable - this session records MOCK data "
+                "(flagged in the file and the start_recording response)"
+            )
 
         # Create session
         start_time = datetime.now(timezone.utc)
         self._current_session = RecordingSession(
             session_type=session_type,
             start_time=start_time.isoformat(),
+            max_duration_seconds=self._max_duration,
+            is_mock=self._is_mock,
         )
+
+        # Open the crash-safe JSONL output file now and write a meta header.
+        # Frames and annotations are appended line-by-line as they occur, so a
+        # crash/disconnect mid-session keeps everything captured so far.
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        type_dir = self.recordings_dir / session_type
+        type_dir.mkdir(parents=True, exist_ok=True)
+        file_path = type_dir / f"{timestamp}.jsonl"
+        self._frame_count = 0
+        self._annotation_count = 0
+        self._jsonl = open(file_path, "w")
+        self._current_session.file_path = str(file_path)
+        self._write_line({
+            "type": "meta",
+            "session_type": session_type,
+            "start_time": self._current_session.start_time,
+            "max_duration_seconds": self._max_duration,
+            "mock": self._is_mock,
+        })
 
         # Reset parser
         self._parser = TLVParser()
@@ -298,8 +369,53 @@ class RadarRecorder:
         )
         self._recording_thread.start()
 
-        logger.info(f"Started recording: type={session_type}")
+        logger.info(
+            f"Started recording: type={session_type}, "
+            f"max_duration={self._max_duration:.0f}s, file={file_path.name}, "
+            f"mock={self._is_mock}"
+        )
         return self._current_session
+
+    def _write_line(self, obj: dict) -> None:
+        """Thread-safe append of one JSON object as a line to the JSONL file."""
+        with self._lock:
+            if self._jsonl is None:
+                return
+            self._jsonl.write(json.dumps(obj) + "\n")
+            self._jsonl.flush()
+
+    def add_annotation(self, mark: Optional[dict] = None) -> Optional[dict]:
+        """
+        Mark an event during recording, timestamped against the recording clock.
+
+        `mark` is a free-form dict supplied by the UI. For a hit ball it carries
+        the ground-truth direction (and optionally outcome / shot type), e.g.:
+            {"label": "4", "direction_deg": 35.0, "zone": "cover", "shot_type": "drive"}
+
+        The timestamp (t_ms) aligns the mark to the radar frames captured around
+        it. Returns the stored annotation, or None if not recording.
+        """
+        if not self.is_recording or self._start_time is None:
+            return None
+
+        t_ms = int((time.time() - self._start_time) * 1000)
+        annotation = {"type": "annotation", "t_ms": t_ms, **(mark or {})}
+        self._write_line(annotation)
+        with self._lock:
+            self._annotation_count += 1
+            if self._current_session is not None:
+                self._current_session.annotations.append(annotation)
+                self._current_session.annotation_count = self._annotation_count
+        logger.info(f"Annotation @ {t_ms}ms: {mark}")
+        return annotation
+
+    def _record_frame(self, frame: RadarFrame) -> None:
+        """Write one radar frame to the JSONL stream (crash-safe) and count it."""
+        self._write_line({"type": "frame", **frame.to_dict()})
+        with self._lock:
+            self._frame_count += 1
+            if self._current_session is not None:
+                self._current_session.frame_count = self._frame_count
 
     def stop_recording(self) -> Optional[RecordingSession]:
         """
@@ -330,32 +446,20 @@ class RadarRecorder:
         return session
 
     def _recording_loop(self):
-        """Main recording loop - runs in separate thread."""
-        try:
-            # Try to open serial port
-            try:
-                import serial
-                self._serial = serial.Serial(
-                    self.serial_port,
-                    self.baud_rate,
-                    timeout=0.1,
-                )
-                logger.info(f"Opened serial port: {self.serial_port}")
-            except ImportError:
-                logger.warning("pyserial not installed, using mock data")
-                self._serial = None
-            except Exception as e:
-                logger.warning(f"Could not open serial port: {e}, using mock data")
-                self._serial = None
+        """Main recording loop - runs in separate thread.
 
-            frame_count = 0
+        The serial port was already opened (or found absent -> mock mode) in
+        start_recording, so the mock/real decision is fixed before any frame
+        is written.
+        """
+        try:
             last_progress_time = time.time()
 
             while not self._stop_event.is_set():
                 elapsed = time.time() - self._start_time
 
-                # Auto-stop after max duration
-                if elapsed >= MAX_RECORDING_SECONDS:
+                # Auto-stop after the configured max duration
+                if elapsed >= self._max_duration:
                     logger.info("Max recording duration reached, auto-stopping")
                     break
 
@@ -366,23 +470,25 @@ class RadarRecorder:
                         frames = self._parser.add_data(data)
                         for frame in frames:
                             frame.timestamp_ms = int(elapsed * 1000)
-                            self._current_session.frames.append(frame)
-                            frame_count += 1
+                            self._record_frame(frame)
                 else:
-                    # Mock data for testing without radar
+                    # Mock data for testing without radar (single moving point).
+                    # Only reached when is_mock is True - flagged in the meta
+                    # line and every status payload so it can't pass as real.
                     time.sleep(0.1)  # 10Hz
-                    mock_frame = RadarFrame(
-                        frame_number=frame_count,
+                    self._record_frame(RadarFrame(
+                        frame_number=self._frame_count,
                         timestamp_ms=int(elapsed * 1000),
-                        num_points=0,
-                        points=[],
-                    )
-                    self._current_session.frames.append(mock_frame)
-                    frame_count += 1
+                        num_points=1,
+                        points=[RadarPoint(
+                            x=math.sin(elapsed) * 2, y=3.0, z=0.5,
+                            doppler=15.0, snr=18.0, noise=5.0,
+                        )],
+                    ))
 
                 # Progress callback (every second)
                 if self._on_progress and time.time() - last_progress_time >= 1.0:
-                    self._on_progress(int(elapsed), frame_count)
+                    self._on_progress(int(elapsed), self._frame_count)
                     last_progress_time = time.time()
 
         except Exception as e:
@@ -400,30 +506,41 @@ class RadarRecorder:
                     self._on_stopped(session)
 
     def _finalize_session(self) -> RecordingSession:
-        """Finalize and save the current session."""
+        """Finalize the current session: append an end marker and close the file.
+
+        Frames/annotations were already written incrementally to the JSONL file,
+        so there is nothing to dump here - this just stamps the totals and closes
+        the crash-safe stream.
+        """
         session = self._current_session
         if not session:
             raise RuntimeError("No session to finalize")
 
-        # Set end time and duration
-        end_time = datetime.now(timezone.utc)
-        session.end_time = end_time.isoformat()
-        session.duration_seconds = time.time() - self._start_time
-        session.frame_count = len(session.frames)
+        session.end_time = datetime.now(timezone.utc).isoformat()
+        session.duration_seconds = (time.time() - self._start_time) if self._start_time else 0.0
+        session.frame_count = self._frame_count
+        session.annotation_count = self._annotation_count
 
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{timestamp}.json"
-        file_path = self.recordings_dir / session.session_type / filename
+        self._write_line({
+            "type": "end",
+            "end_time": session.end_time,
+            "duration_seconds": round(session.duration_seconds, 2),
+            "frame_count": session.frame_count,
+            "annotation_count": session.annotation_count,
+        })
+        with self._lock:
+            if self._jsonl is not None:
+                try:
+                    self._jsonl.close()
+                except Exception as e:
+                    logger.error(f"Failed to close recording file: {e}")
+                self._jsonl = None
 
-        # Save to file
-        try:
-            with open(file_path, 'w') as f:
-                json.dump(session.to_dict(), f, indent=2)
-            session.file_path = str(file_path)
-            logger.info(f"Saved recording to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to save recording: {e}")
+        logger.info(
+            f"Saved recording to {session.file_path} "
+            f"({session.frame_count} frames, {session.annotation_count} marks, "
+            f"{session.duration_seconds:.1f}s)"
+        )
 
         # Clear current session
         self._current_session = None
@@ -434,39 +551,135 @@ class RadarRecorder:
     def get_recording_counts(self) -> dict[str, int]:
         """Get count of recordings by session type."""
         counts = {}
-        for session_type in ["bowling", "batting", "both"]:
+        for session_type in SESSION_TYPES:
             dir_path = self.recordings_dir / session_type
             if dir_path.exists():
-                counts[session_type] = len(list(dir_path.glob("*.json")))
+                # .jsonl = new crash-safe format; .json = legacy single-file format
+                counts[session_type] = (
+                    len(list(dir_path.glob("*.jsonl")))
+                    + len(list(dir_path.glob("*.json")))
+                )
             else:
                 counts[session_type] = 0
         return counts
 
     def list_recordings(self, session_type: Optional[str] = None) -> list[dict]:
-        """List all recordings, optionally filtered by type."""
+        """List all recordings (.jsonl and legacy .json), optionally filtered."""
         recordings = []
-        types = [session_type] if session_type else ["bowling", "batting", "both"]
+        types = [session_type] if session_type else SESSION_TYPES
 
         for st in types:
             dir_path = self.recordings_dir / st
             if not dir_path.exists():
                 continue
 
-            for file_path in sorted(dir_path.glob("*.json"), reverse=True):
+            files = sorted(
+                list(dir_path.glob("*.jsonl")) + list(dir_path.glob("*.json")),
+                key=lambda p: p.name,
+                reverse=True,
+            )
+            for file_path in files:
                 try:
-                    with open(file_path) as f:
-                        data = json.load(f)
-                    recordings.append({
-                        "file": str(file_path),
-                        "session_type": data.get("session_type", st),
-                        "start_time": data.get("start_time"),
-                        "duration_seconds": data.get("duration_seconds", 0),
-                        "frame_count": data.get("frame_count", 0),
-                    })
+                    if file_path.suffix == ".jsonl":
+                        recordings.append(self._summarize_jsonl(file_path, st))
+                    else:
+                        with open(file_path) as f:
+                            data = json.load(f)
+                        recordings.append({
+                            "file": str(file_path),
+                            "session_type": data.get("session_type", st),
+                            "start_time": data.get("start_time"),
+                            "duration_seconds": data.get("duration_seconds", 0),
+                            "frame_count": data.get("frame_count", 0),
+                            "annotation_count": data.get("annotation_count", 0),
+                        })
                 except Exception as e:
                     logger.warning(f"Could not read {file_path}: {e}")
 
         return recordings
+
+    def _summarize_jsonl(self, file_path: Path, st: str) -> dict:
+        """Summarize a JSONL recording from its meta (first) and end (last) lines.
+
+        Only the head and tail of the file are read - gathering sessions can run
+        for hours (~72k lines at 10Hz), so scanning every line on each listing
+        would crawl on the Pi. A file with no end marker (crashed/interrupted
+        session) falls back to a full scan to recover what was captured.
+        """
+        meta: dict = {}
+        end: dict = {}
+
+        with open(file_path, "rb") as f:
+            first_line = f.readline()
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 8192))
+            tail = f.read().decode("utf-8", errors="replace")
+
+        try:
+            obj = json.loads(first_line)
+            if obj.get("type") == "meta":
+                meta = obj
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+        # The last complete line decides: end marker = clean stop, anything
+        # else = crashed session. Unparseable trailing lines (truncated by a
+        # crash mid-write, or clipped by the tail seek) are skipped.
+        for line in reversed(tail.splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if obj.get("type") == "end":
+                end = obj
+            break
+
+        summary = {
+            "file": str(file_path),
+            "session_type": meta.get("session_type", st),
+            "start_time": meta.get("start_time"),
+            "mock": meta.get("mock", False),
+            "duration_seconds": end.get("duration_seconds", 0),
+            "frame_count": end.get("frame_count", 0),
+            "annotation_count": end.get("annotation_count", 0),
+        }
+        if not end:
+            summary.update(self._recover_crashed_jsonl(file_path))
+            summary["incomplete"] = True
+        return summary
+
+    def _recover_crashed_jsonl(self, file_path: Path) -> dict:
+        """Full scan of a JSONL file with no end marker (session crashed or was
+        interrupted): count frames/annotations and take the duration from the
+        last recorded timestamp. Slow path, only hit for incomplete files."""
+        frames = 0
+        annotations = 0
+        last_t_ms = 0
+        with open(file_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                kind = obj.get("type")
+                if kind == "frame":
+                    frames += 1
+                    last_t_ms = max(last_t_ms, obj.get("timestamp_ms", 0))
+                elif kind == "annotation":
+                    annotations += 1
+                    last_t_ms = max(last_t_ms, obj.get("t_ms", 0))
+        return {
+            "duration_seconds": round(last_t_ms / 1000, 2),
+            "frame_count": frames,
+            "annotation_count": annotations,
+        }
 
 
 # Singleton instance for server use

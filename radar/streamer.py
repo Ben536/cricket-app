@@ -16,6 +16,8 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from radar.serial_utils import open_radar_serial
+
 logger = logging.getLogger(__name__)
 
 # TLV Magic bytes for IWR6843
@@ -189,20 +191,11 @@ class RadarStreamer:
     def _stream_loop(self):
         """Main streaming loop."""
         try:
-            # Try to open serial
-            try:
-                import serial
-                self._serial = serial.Serial(
-                    self.serial_port,
-                    self.baud_rate,
-                    timeout=0.1,
-                )
-                self._use_mock = False
-                logger.info(f"Opened radar on {self.serial_port}")
-            except Exception as e:
-                logger.warning(f"Could not open serial: {e}, using mock data")
-                self._use_mock = True
-                self._serial = None
+            # Try to open serial (HUPCL disabled so close doesn't reset the radar)
+            self._serial = open_radar_serial(self.serial_port, self.baud_rate)
+            self._use_mock = self._serial is None
+            if self._use_mock:
+                logger.warning("Radar unavailable, streaming mock data")
 
             frame_count = 0
             start_time = time.time()
