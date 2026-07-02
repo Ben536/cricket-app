@@ -80,7 +80,13 @@ class HealthMonitor:
 
         self.radar_state = HealthState()
         self.server_state = HealthState()
-        self.restart_count = 0
+        # Separate restart budgets. The radar is NON-CRITICAL: a missing/faulty
+        # radar must never reboot the Pi (the server, UI, manual input and data
+        # gathering all work without it). Only a genuinely dead *server* that
+        # restarts cannot revive may, as a last resort, trigger a reboot.
+        self.radar_restart_count = 0
+        self.server_restart_count = 0
+        self.max_radar_restarts = 3  # cap radar-service restarts; never reboots
         self.running = False
 
     def check_radar(self) -> CheckResult:
@@ -246,37 +252,57 @@ class HealthMonitor:
         self.update_state(self.radar_state, radar_result.healthy)
         self.update_state(self.server_state, server_result.healthy)
 
-        # Log results
+        # Each service resets its own restart budget when it recovers
+        if radar_result.healthy:
+            self.radar_restart_count = 0
+        if server_result.healthy:
+            self.server_restart_count = 0
+
         if radar_result.healthy and server_result.healthy:
             logger.debug(f"Health check passed: radar={radar_result.duration_ms}ms, server={server_result.duration_ms}ms")
-            self.restart_count = 0  # Reset restart count on healthy check
             return HealthStatus.HEALTHY
 
-        # Handle failures
         overall_status = HealthStatus.HEALTHY
 
+        # ---- Radar: degraded only. NEVER reboots. ----
         if not radar_result.healthy:
-            logger.warning(f"Radar unhealthy: {radar_result.message} (failures: {self.radar_state.consecutive_failures})")
             overall_status = HealthStatus.DEGRADED
-
-            if self.radar_state.consecutive_failures >= self.max_failures_before_restart:
+            device_present = os.path.exists(self.radar_device)
+            logger.warning(
+                f"Radar unhealthy: {radar_result.message} "
+                f"(failures={self.radar_state.consecutive_failures}, device_present={device_present})"
+            )
+            # Only restart the oneshot config service if the DEVICE EXISTS but is
+            # faulty (a recoverable state). If the device is absent it's a power/
+            # cabling issue that a restart cannot fix - cricket-radar already
+            # waits for the device to appear, so churning it just wastes cycles.
+            if (
+                device_present
+                and self.radar_state.consecutive_failures >= self.max_failures_before_restart
+                and self.radar_restart_count < self.max_radar_restarts
+            ):
                 self.restart_service("cricket-radar.service")
                 self.radar_state.recovery_actions_taken += 1
-                self.restart_count += 1
+                self.radar_restart_count += 1
 
+        # ---- Server: the critical service. Reboot only as a last resort. ----
         if not server_result.healthy:
-            logger.warning(f"Server unhealthy: {server_result.message} (failures: {self.server_state.consecutive_failures})")
             overall_status = HealthStatus.UNHEALTHY
-
+            logger.warning(
+                f"Server unhealthy: {server_result.message} "
+                f"(failures={self.server_state.consecutive_failures}, restarts={self.server_restart_count})"
+            )
             if self.server_state.consecutive_failures >= self.max_failures_before_restart:
-                self.restart_service("cricket-server.service")
-                self.server_state.recovery_actions_taken += 1
-                self.restart_count += 1
-
-        # Check if we should reboot
-        if self.restart_count >= self.max_restarts_before_reboot:
-            logger.critical(f"Too many restart attempts ({self.restart_count}), escalating to reboot")
-            self.trigger_reboot()
+                if self.server_restart_count < self.max_restarts_before_reboot:
+                    self.restart_service("cricket-server.service")
+                    self.server_state.recovery_actions_taken += 1
+                    self.server_restart_count += 1
+                else:
+                    logger.critical(
+                        f"Server still down after {self.server_restart_count} restarts; "
+                        f"rebooting as last resort"
+                    )
+                    self.trigger_reboot()
 
         return overall_status
 
