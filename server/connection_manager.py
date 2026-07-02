@@ -18,10 +18,7 @@ from enum import Enum
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-# Import from contracts - using selective imports to avoid dataclass inheritance issues
-import sys
 import uuid
-sys.path.insert(0, '/Users/Ben/Documents/cricket-app/contracts')
 
 # Define essential types locally to avoid import issues with complex dataclass inheritance
 class ConnectionState(str, Enum):
@@ -327,7 +324,10 @@ class ConnectionManager:
         try:
             message_json = json.dumps(message)
             await connection.websocket.send(message_json)
-            connection.last_activity = datetime.now(timezone.utc)
+            # NOTE: last_activity is deliberately NOT updated here. Activity
+            # means INBOUND traffic - if outbound sends refreshed it, the 30s
+            # heartbeat broadcast would forever reset the 60s dead-client
+            # timeout and a half-open connection could never be reaped.
 
             # Track message for reconnection
             if "message_id" in message:

@@ -11,8 +11,10 @@ import json
 import sys
 import tempfile
 import os
+from pathlib import Path as _Path
 
-sys.path.insert(0, '/Users/Ben/Documents/cricket-app')
+# Repo root, regardless of machine or cwd
+sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
 
 import websockets
 
@@ -41,6 +43,21 @@ def setup_test_database():
     return db_path
 
 
+
+async def recv_type(websocket, expected: str, timeout: float = 5.0):
+    """Receive until a message of the expected type arrives.
+
+    Skips unsolicited messages (initial session_state push, heartbeats,
+    broadcasts) so assertions don't depend on exact wire ordering.
+    """
+    while True:
+        msg = json.loads(await asyncio.wait_for(websocket.recv(), timeout))
+        if msg['type'] == expected:
+            print(f"[Client] Received: {msg['type']}")
+            return msg
+        print(f"[Client] (skipping unsolicited {msg['type']})")
+
+
 async def test_client(db_path: Path):
     """Test client that connects and sends messages."""
     await asyncio.sleep(0.5)  # Wait for server to start
@@ -53,10 +70,7 @@ async def test_client(db_path: Path):
             print("[Client] Connected!")
 
             # Receive connection status
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'connection_status', f"Expected connection_status, got {msg['type']}"
+            msg = await recv_type(websocket, 'connection_status')
             print(f"[Client] Server version: {msg['payload']['server_version']}")
 
             # Send ping
@@ -69,10 +83,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(ping_msg))
 
             # Receive pong
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'pong', f"Expected pong, got {msg['type']}"
+            msg = await recv_type(websocket, 'pong')
             assert msg['in_reply_to'] == ping_msg['message_id'], "Pong should reference ping message_id"
             print("[Client] PASS: Ping/Pong works")
 
@@ -90,10 +101,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(create_profile_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             assert len(msg['payload']['profiles']) >= 1, "Expected at least one profile"
             profile_id = msg['payload']['profiles'][0]['id']
             print(f"[Client] PASS: Created profile with id={profile_id}")
@@ -112,10 +120,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(start_session_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             assert msg['payload']['session'] is not None, "Expected active session"
             session_id = msg['payload']['session']['id']
             print(f"[Client] PASS: Started session with id={session_id}")
@@ -133,10 +138,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(set_difficulty_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             assert msg['payload']['difficulty'] == 'hard', f"Expected difficulty=hard"
             print("[Client] PASS: Set difficulty to hard")
 
@@ -153,10 +155,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(manual_input_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             assert msg['payload']['session']['runs'] == 2, f"Expected 2 runs"
             assert msg['payload']['session']['balls'] == 1, f"Expected 1 ball"
             print("[Client] PASS: Manual input recorded 2 runs")
@@ -204,10 +203,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(undo_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             # After undo, we should have fewer balls
             assert msg['payload']['session']['balls'] == 1, f"Expected 1 ball after undo"
             print("[Client] PASS: Undo worked")
@@ -225,10 +221,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(end_session_msg))
 
             # Receive session_state
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'session_state', f"Expected session_state, got {msg['type']}"
+            msg = await recv_type(websocket, 'session_state')
             assert msg['payload']['session'] is None, "Expected no active session"
             print("[Client] PASS: Session ended")
 
@@ -242,10 +235,7 @@ async def test_client(db_path: Path):
             await websocket.send(json.dumps(invalid_msg))
 
             # Receive error
-            response = await websocket.recv()
-            msg = json.loads(response)
-            print(f"[Client] Received: {msg['type']}")
-            assert msg['type'] == 'error', f"Expected error, got {msg['type']}"
+            msg = await recv_type(websocket, 'error')
             assert msg['payload']['code'] == 'E3002', f"Expected E3002, got {msg['payload']['code']}"
             print("[Client] PASS: Error handling works")
 

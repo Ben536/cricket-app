@@ -13,6 +13,7 @@ Each handler:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -106,7 +107,7 @@ def create_extended_error(
 # RESPONSE BUILDERS
 # =============================================================================
 
-def build_session_state_response(
+async def build_session_state_response(
     session_manager: SessionManager,
     repository: Repository,
     websocket_id: str,
@@ -118,7 +119,7 @@ def build_session_state_response(
     Includes current session data, all profiles, and configuration.
     """
     # Get all profiles
-    profiles = repository.get_all_profiles()
+    profiles = await asyncio.to_thread(repository.get_all_profiles)
     profile_list = [
         {
             "id": str(p.id),
@@ -248,7 +249,57 @@ class MessageHandlers:
         self.session_manager = session_manager
         self.connection_manager = connection_manager
 
+        # client_id -> radar stream frame callback (for deregistration)
+        self._stream_callbacks: dict[str, Any] = {}
+
         logger.info("MessageHandlers initialized")
+
+    # =========================================================================
+    # DISCONNECT LIFECYCLE
+    # =========================================================================
+
+    async def cleanup_client(self, client_id: str) -> None:
+        """
+        Release everything a disconnecting client holds. Called from the
+        connection handler's finally block - a phone wandering out of WiFi
+        range mid-session is the NORMAL case at the nets, not an edge case.
+
+        Without this: sessions/profiles leak in memory, active_sessions rows
+        leak in the DB, and radar stream callbacks keep firing at frame rate
+        into a dead connection forever (holding the serial port open).
+        """
+        # 1. Radar stream: deregister this client's callback; stop the
+        #    streamer (and release the port) when no subscribers remain.
+        callback = self._stream_callbacks.pop(client_id, None)
+        if callback is not None:
+            streamer = get_streamer()
+            streamer.remove_callback(callback)
+            if not self._stream_callbacks and streamer.is_streaming:
+                await asyncio.to_thread(streamer.stop)
+            logger.info(f"Deregistered radar stream for disconnected client {client_id[:8]}")
+
+        # 2. Session: persist completion and drop all trackers. The client_id
+        #    is per-connection and there is no resume path, so an orphaned
+        #    session could never be continued - completing it keeps the DB
+        #    consistent and the data queryable.
+        active = self.session_manager.get_active_session(client_id)
+        if active:
+            session_id = active.session_id
+            try:
+                db_session = await asyncio.to_thread(self.repository.get_session, session_id)
+                if db_session and not db_session.is_completed:
+                    await asyncio.to_thread(
+                        self.repository.complete_session, session_id, db_session.version
+                    )
+                await asyncio.to_thread(self.repository.delete_active_session, session_id)
+            except Exception as e:
+                logger.error(f"Disconnect cleanup DB error for session {session_id}: {e}")
+            await self.connection_manager.leave_session(client_id)
+            self.connection_manager.cleanup_session(str(session_id))
+            logger.info(f"Auto-completed session {session_id} for disconnected client {client_id[:8]}")
+
+        # 3. In-memory client state (session map + active profile)
+        self.session_manager.cleanup_client(client_id)
 
     # =========================================================================
     # PROFILE HANDLERS
@@ -274,7 +325,7 @@ class MessageHandlers:
 
         try:
             # Create in database
-            profile = self.repository.create_profile(
+            profile = await asyncio.to_thread(self.repository.create_profile, 
                 name=name,
                 batting_hand=batting_hand,
             )
@@ -285,7 +336,7 @@ class MessageHandlers:
             self.session_manager.set_active_profile(client_id, profile.id)
 
             # Return session state with new profile
-            return build_session_state_response(
+            return await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -327,7 +378,7 @@ class MessageHandlers:
         logger.info(f"Selecting profile: {profile_id}")
 
         # Check profile exists
-        profile = self.repository.get_profile(profile_id)
+        profile = await asyncio.to_thread(self.repository.get_profile, profile_id)
         if not profile:
             return create_error_response(
                 ErrorCode.PROFILE_NOT_FOUND,
@@ -341,7 +392,7 @@ class MessageHandlers:
         logger.info(f"Selected profile {profile.id}: {profile.name}")
 
         # Return session state
-        return build_session_state_response(
+        return await build_session_state_response(
             self.session_manager,
             self.repository,
             client_id,
@@ -377,7 +428,7 @@ class MessageHandlers:
         logger.info(f"Updating profile: {profile_id}")
 
         # Get current profile for version
-        profile = self.repository.get_profile(profile_id)
+        profile = await asyncio.to_thread(self.repository.get_profile, profile_id)
         if not profile:
             return create_error_response(
                 ErrorCode.PROFILE_NOT_FOUND,
@@ -387,7 +438,7 @@ class MessageHandlers:
 
         try:
             # Update in database
-            updated = self.repository.update_profile(
+            updated = await asyncio.to_thread(self.repository.update_profile, 
                 player_id=profile_id,
                 version=profile.version,
                 name=name,
@@ -397,7 +448,7 @@ class MessageHandlers:
             logger.info(f"Updated profile {updated.id}: {updated.name}")
 
             # Return session state
-            return build_session_state_response(
+            return await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -458,7 +509,7 @@ class MessageHandlers:
             )
 
         # Verify profile exists
-        profile = self.repository.get_profile(profile_id)
+        profile = await asyncio.to_thread(self.repository.get_profile, profile_id)
         if not profile:
             return create_error_response(
                 ErrorCode.PROFILE_NOT_FOUND,
@@ -471,7 +522,7 @@ class MessageHandlers:
         try:
             # Create session in database
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            db_session = self.repository.create_session(
+            db_session = await asyncio.to_thread(self.repository.create_session, 
                 player_id=profile_id,
                 date=date_str,
                 field_config=field_config,
@@ -490,7 +541,7 @@ class MessageHandlers:
             )
 
             # Create active session tracker in DB
-            self.repository.create_active_session(
+            await asyncio.to_thread(self.repository.create_active_session, 
                 session_id=db_session.id,
                 websocket_id=client_id,
             )
@@ -507,7 +558,7 @@ class MessageHandlers:
             logger.info(f"Started session {db_session.id} for player {profile_id}")
 
             # Return session state
-            return build_session_state_response(
+            return await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -568,13 +619,13 @@ class MessageHandlers:
 
         try:
             # Get DB session for version
-            db_session = self.repository.get_session(session_id)
+            db_session = await asyncio.to_thread(self.repository.get_session, session_id)
             if db_session:
                 # Mark as completed in database
-                self.repository.complete_session(session_id, db_session.version)
+                await asyncio.to_thread(self.repository.complete_session, session_id, db_session.version)
 
             # Remove active session tracker
-            self.repository.delete_active_session(session_id)
+            await asyncio.to_thread(self.repository.delete_active_session, session_id)
 
             # End in session manager
             self.session_manager.end_session(session_id)
@@ -588,7 +639,7 @@ class MessageHandlers:
             logger.info(f"Ended session {session_id}")
 
             # Return session state (now without active session)
-            return build_session_state_response(
+            return await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -642,9 +693,9 @@ class MessageHandlers:
 
             # Update database session
             try:
-                db_session = self.repository.get_session(active_session.session_id)
+                db_session = await asyncio.to_thread(self.repository.get_session, active_session.session_id)
                 if db_session:
-                    self.repository.update_session(
+                    await asyncio.to_thread(self.repository.update_session, 
                         session_id=active_session.session_id,
                         version=db_session.version,
                         field_config=field_config,
@@ -659,7 +710,7 @@ class MessageHandlers:
             )
 
             # Build session state response
-            response = build_session_state_response(
+            response = await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -678,7 +729,7 @@ class MessageHandlers:
         else:
             # No active session - just acknowledge with session state
             logger.debug(f"Set field with no active session, client={client_id}")
-            return build_session_state_response(
+            return await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -710,9 +761,9 @@ class MessageHandlers:
 
             # Update database session
             try:
-                db_session = self.repository.get_session(active_session.session_id)
+                db_session = await asyncio.to_thread(self.repository.get_session, active_session.session_id)
                 if db_session:
-                    self.repository.update_session(
+                    await asyncio.to_thread(self.repository.update_session, 
                         session_id=active_session.session_id,
                         version=db_session.version,
                         difficulty=difficulty,
@@ -725,7 +776,7 @@ class MessageHandlers:
             )
 
         # Return session state
-        return build_session_state_response(
+        return await build_session_state_response(
             self.session_manager,
             self.repository,
             client_id,
@@ -784,7 +835,7 @@ class MessageHandlers:
             runs = 0
 
         # Get next ball number
-        last_delivery = self.repository.get_last_delivery(active_session.session_id)
+        last_delivery = await asyncio.to_thread(self.repository.get_last_delivery, active_session.session_id)
         ball_number = (last_delivery.ball_number + 1) if last_delivery else 1
 
         outcome = result
@@ -795,7 +846,7 @@ class MessageHandlers:
         timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
-            delivery = self.repository.create_delivery(
+            delivery = await asyncio.to_thread(self.repository.create_delivery, 
                 session_id=active_session.session_id,
                 ball_number=ball_number,
                 timestamp=timestamp,
@@ -823,7 +874,7 @@ class MessageHandlers:
         active_session.add_delivery(outcome, runs, is_boundary)
 
         # Manual input has no trajectory, so only a session_state update is sent.
-        session_state = build_session_state_response(
+        session_state = await build_session_state_response(
             self.session_manager,
             self.repository,
             client_id,
@@ -885,7 +936,7 @@ class MessageHandlers:
             )
 
         # Get last delivery
-        last_delivery = self.repository.get_last_delivery(session_id)
+        last_delivery = await asyncio.to_thread(self.repository.get_last_delivery, session_id)
         if not last_delivery:
             return create_error_response(
                 ErrorCode.UNDO_HISTORY_EMPTY,
@@ -899,7 +950,7 @@ class MessageHandlers:
 
         try:
             # Delete from database
-            deleted = self.repository.delete_last_delivery(session_id)
+            deleted = await asyncio.to_thread(self.repository.delete_last_delivery, session_id)
             if not deleted:
                 return create_error_response(
                     ErrorCode.UNDO_HISTORY_EMPTY,
@@ -916,7 +967,7 @@ class MessageHandlers:
             logger.info(f"Undid delivery {last_delivery.id}")
 
             # Build session state
-            response = build_session_state_response(
+            response = await build_session_state_response(
                 self.session_manager,
                 self.repository,
                 client_id,
@@ -997,7 +1048,10 @@ class MessageHandlers:
         try:
             # No progress callbacks here: clients poll get_recording_status
             # (recorder callbacks are sync and cannot await a websocket send).
-            session = recorder.start_recording(session_type, max_duration_seconds=max_duration)
+            # start_recording opens the serial port (blocking) - off the loop.
+            session = await asyncio.to_thread(
+                recorder.start_recording, session_type, max_duration_seconds=max_duration
+            )
 
             logger.info(
                 f"Started recording: type={session_type}, "
@@ -1005,6 +1059,7 @@ class MessageHandlers:
                 f"mock={session.is_mock}"
             )
 
+            counts = await asyncio.to_thread(recorder.get_recording_counts)
             return {
                 "type": "recording_started",
                 "message_id": generate_message_id(),
@@ -1015,7 +1070,7 @@ class MessageHandlers:
                     "start_time": session.start_time,
                     "max_duration": session.max_duration_seconds,
                     "mock": session.is_mock,
-                    "counts": recorder.get_recording_counts(),
+                    "counts": counts,
                 },
             }
 
@@ -1049,7 +1104,8 @@ class MessageHandlers:
             )
 
         try:
-            session = recorder.stop_recording()
+            # stop_recording joins the recording thread (up to 2s) - off the loop
+            session = await asyncio.to_thread(recorder.stop_recording)
 
             if session:
                 logger.info(
@@ -1057,6 +1113,7 @@ class MessageHandlers:
                     f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
                 )
 
+                counts = await asyncio.to_thread(recorder.get_recording_counts)
                 return {
                     "type": "recording_stopped",
                     "message_id": generate_message_id(),
@@ -1069,7 +1126,7 @@ class MessageHandlers:
                         "annotation_count": session.annotation_count,
                         "mock": session.is_mock,
                         "file_path": session.file_path,
-                        "counts": recorder.get_recording_counts(),
+                        "counts": counts,
                     },
                 }
             else:
@@ -1100,6 +1157,8 @@ class MessageHandlers:
         recorder = get_recorder()
         current = recorder.current_session
 
+        # Directory glob - polled every 2s by the UI, keep it off the loop
+        counts = await asyncio.to_thread(recorder.get_recording_counts)
         return {
             "type": "recording_status",
             "message_id": generate_message_id(),
@@ -1113,7 +1172,7 @@ class MessageHandlers:
                 "frame_count": current.frame_count if current else 0,
                 "annotation_count": current.annotation_count if current else 0,
                 "mock": current.is_mock if current else False,
-                "counts": recorder.get_recording_counts(),
+                "counts": counts,
             },
         }
 
@@ -1139,7 +1198,7 @@ class MessageHandlers:
                 message_override="Not currently recording",
             )
 
-        annotation = recorder.add_annotation(payload)
+        annotation = await asyncio.to_thread(recorder.add_annotation, payload)
         current = recorder.current_session
 
         return {
@@ -1190,9 +1249,13 @@ class MessageHandlers:
             except Exception as e:
                 logger.error(f"Frame send error: {e}")
 
+        # A repeat start from the same client must not leave the old closure
+        # registered in the streamer (duplicate frames, unremovable callback).
+        old_callback = self._stream_callbacks.pop(client_id, None)
+        if old_callback is not None:
+            streamer.remove_callback(old_callback)
+
         # Store callback reference for cleanup
-        if not hasattr(self, '_stream_callbacks'):
-            self._stream_callbacks = {}
         self._stream_callbacks[client_id] = frame_callback
 
         # Add callback and start if not running
@@ -1225,13 +1288,13 @@ class MessageHandlers:
         streamer = get_streamer()
 
         # Remove this client's callback
-        if hasattr(self, '_stream_callbacks') and client_id in self._stream_callbacks:
-            callback = self._stream_callbacks.pop(client_id)
+        callback = self._stream_callbacks.pop(client_id, None)
+        if callback is not None:
             streamer.remove_callback(callback)
 
-            # Stop streamer if no more callbacks
+            # Stop streamer if no more callbacks (joins the thread - off the loop)
             if not self._stream_callbacks and streamer.is_streaming:
-                streamer.stop()
+                await asyncio.to_thread(streamer.stop)
 
         logger.info(f"Stopped radar stream for client {client_id[:8]}")
 

@@ -229,10 +229,19 @@ class Repository:
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Get a database connection with proper error handling."""
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        """Get a database connection with proper error handling.
+
+        WAL + synchronous=NORMAL: readers don't block the writer (the REST API
+        runs in a separate process against the same file) and a power cut can
+        lose at most the last transactions, never corrupt the file. The 5s
+        timeout bounds how long a caller can stall on a locked DB - the old
+        30s value could freeze the whole event loop for half a minute.
+        """
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
 
         try:
             yield conn

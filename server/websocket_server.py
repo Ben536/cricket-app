@@ -26,15 +26,13 @@ from websockets.server import WebSocketServerProtocol, serve
 
 # Import from local server modules (types defined there to avoid import issues)
 from server.connection_manager import (
+    ConnectionManager,
     ConnectionState,
     SessionState,
     generate_message_id,
     create_timestamp,
 )
-from server.message_router import Difficulty
-
-from server.connection_manager import ConnectionManager, ClientConnection, ClientState
-from server.message_router import MessageRouter, ErrorCode, create_error_response
+from server.message_router import MessageRouter
 from server.session_manager import SessionManager
 
 # Database repository
@@ -98,10 +96,6 @@ class CricketWebSocketServer:
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._cleanup_task: Optional[asyncio.Task] = None
 
-        # Game state
-        self._current_difficulty = Difficulty.MEDIUM
-        self._session_state = SessionState.NONE
-
         # Message handlers (will be set by _register_handlers)
         self._handlers = None
 
@@ -135,6 +129,19 @@ class CricketWebSocketServer:
 
         self._running = True
         self._start_time = time.time()
+
+        # Reconcile state left by a previous run: every active_sessions row is
+        # stale by definition (this process just started, so no client can
+        # legitimately hold one). Their sessions were auto-completed on
+        # disconnect where possible; rows survive a crash/power cut.
+        try:
+            removed = await asyncio.to_thread(
+                self.repository.delete_stale_active_sessions, 0
+            )
+            if removed:
+                logger.info(f"Startup reconciliation: removed {removed} stale active_sessions row(s)")
+        except Exception as e:
+            logger.error(f"Startup reconciliation failed: {e}")
 
         # Start background tasks
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -269,35 +276,59 @@ class CricketWebSocketServer:
             logger.exception(f"Error handling connection {client_id}: {e}")
 
         finally:
-            # Remove client
+            # Release everything the client holds (session, profile lock,
+            # radar stream callback, active_sessions row), then deregister.
+            try:
+                if self._handlers:
+                    await self._handlers.cleanup_client(client_id)
+            except Exception as e:
+                logger.exception(f"Client cleanup failed for {client_id}: {e}")
             await self.connection_manager.remove_client(client_id)
 
-    async def _send_connection_status(self, client_id: str) -> None:
-        """Send connection status message to a client."""
-        uptime = time.time() - self._start_time if self._start_time else 0
+    def _build_connection_status(self, client_id: str) -> dict:
+        """Build an honest connection_status payload for one client.
 
-        message = {
+        session_state is per-client (from the session manager) and
+        radar_connected reflects whether the radar device node is actually
+        present - the previous hardcoded none/False values caused clients that
+        trusted this message to reset their UI on every heartbeat.
+        """
+        import os
+        from radar.streamer import get_streamer
+
+        session_state = (
+            SessionState.ACTIVE
+            if self.session_manager.has_active_session(client_id)
+            else SessionState.NONE
+        )
+        radar_connected = os.path.exists(get_streamer().serial_port)
+
+        return {
             "type": "connection_status",
             "message_id": generate_message_id(),
             "timestamp": create_timestamp(),
             "in_reply_to": None,
             "payload": {
                 "connection_state": ConnectionState.CONNECTED.value,
-                "session_state": self._session_state.value,
-                "radar_connected": False,  # Will be updated by radar integration
+                "session_state": session_state.value,
+                "radar_connected": radar_connected,
                 "radar_status": None,
                 "server_version": SERVER_VERSION,
-                "uptime_seconds": uptime,
+                "uptime_seconds": time.time() - self._start_time if self._start_time else 0,
             }
         }
 
-        await self.connection_manager.send_to_client(client_id, message)
+    async def _send_connection_status(self, client_id: str) -> None:
+        """Send connection status message to a client."""
+        await self.connection_manager.send_to_client(
+            client_id, self._build_connection_status(client_id)
+        )
 
     async def _send_initial_session_state(self, client_id: str) -> None:
         """Send initial session state to a newly connected client."""
         from server.handlers import build_session_state_response
 
-        message = build_session_state_response(
+        message = await build_session_state_response(
             self.session_manager,
             self.repository,
             client_id,
@@ -334,23 +365,12 @@ class CricketWebSocketServer:
                             pass
                         await self.connection_manager.remove_client(client_id)
 
-                # Send server heartbeat to all clients
-                heartbeat = {
-                    "type": "connection_status",
-                    "message_id": generate_message_id(),
-                    "timestamp": create_timestamp(),
-                    "in_reply_to": None,
-                    "payload": {
-                        "connection_state": ConnectionState.CONNECTED.value,
-                        "session_state": self._session_state.value,
-                        "radar_connected": False,
-                        "radar_status": None,
-                        "server_version": SERVER_VERSION,
-                        "uptime_seconds": time.time() - self._start_time if self._start_time else 0,
-                    }
-                }
-
-                await self.connection_manager.broadcast_to_all(heartbeat)
+                # Send per-client heartbeats (session_state differs per client)
+                for client in self.connection_manager.get_all_clients():
+                    await self.connection_manager.send_to_client(
+                        client.client_id,
+                        self._build_connection_status(client.client_id),
+                    )
 
                 logger.debug(
                     f"Heartbeat sent to {self.connection_manager.client_count} clients"
