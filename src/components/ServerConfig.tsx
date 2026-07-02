@@ -11,17 +11,20 @@ import { getServerUrl, saveServerUrl, clearServerUrl } from '../api/config';
 interface ServerConfigProps {
   isConnected: boolean;
   connectionState: string;
+  statusMessage?: string | null;
+  error?: string | null;
+  onReconnect?: () => void;
   onClose: () => void;
 }
 
-export function ServerConfig({ isConnected, connectionState, onClose }: ServerConfigProps) {
+export function ServerConfig({ isConnected, connectionState, statusMessage, error, onReconnect, onClose }: ServerConfigProps) {
   const [serverAddress, setServerAddress] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     // Load current server URL (just the host:port part)
     const currentUrl = getServerUrl();
-    const match = currentUrl.match(/ws:\/\/(.+)/);
+    const match = currentUrl.match(/wss?:\/\/(.+)/);
     setServerAddress(match ? match[1] : 'raspberrypi.local:5002');
   }, []);
 
@@ -40,8 +43,12 @@ export function ServerConfig({ isConnected, connectionState, onClose }: ServerCo
 
   const handleReconnect = () => {
     saveServerUrl(serverAddress);
-    // Force page reload to reconnect with new URL
-    window.location.reload();
+    if (onReconnect) {
+      onReconnect();
+    } else {
+      // Fallback: reload to reconnect with the new URL
+      window.location.reload();
+    }
   };
 
   return (
@@ -53,6 +60,12 @@ export function ServerConfig({ isConnected, connectionState, onClose }: ServerCo
           <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
           <span>{connectionState}</span>
         </div>
+        {statusMessage && !isConnected && (
+          <p className="config-status-message">{statusMessage}</p>
+        )}
+        {error && (
+          <p className="config-error" style={{ color: '#ff7b72', fontSize: 13 }}>{error}</p>
+        )}
 
         <div className="config-field">
           <label htmlFor="server-address">Pi Server Address:</label>

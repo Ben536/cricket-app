@@ -245,6 +245,20 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
     }
   }, [isStreaming, sendMessage])
 
+  // If the server connection drops and comes back while we think we're
+  // streaming, the server has forgotten our subscription - re-establish it.
+  useEffect(() => {
+    if (!isStreaming) return
+    const resubscribe = () => {
+      sendMessage('start_radar_stream', {}).catch(() => {
+        setIsStreaming(false)
+        setError('Stream lost - press Start to resume')
+      })
+    }
+    window.addEventListener('server-reconnected', resubscribe)
+    return () => window.removeEventListener('server-reconnected', resubscribe)
+  }, [isStreaming, sendMessage])
+
   return (
     <>
       <div className="radar-viz-overlay" onClick={onClose} />

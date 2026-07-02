@@ -146,7 +146,10 @@ const saveProfiles = (profiles: Profile[]) => {
 
 function App() {
   const [profiles, setProfiles] = useState<Profile[]>(loadProfiles)
-  const [activeProfileId, setActiveProfileId] = useState<string>('1')
+  // Initialise from the loaded profiles, not a hardcoded id: if the original
+  // profile '1' was deleted, a hardcoded default silently breaks scoring
+  // (score updates filter on an id that matches no profile).
+  const [activeProfileId, setActiveProfileId] = useState<string>(() => loadProfiles()[0]?.id ?? '1')
   const [fielderPositions, setFielderPositions] = useState<FielderPosition[]>(FIELD_PRESET_POSITIONS['Standard Pace'])
   const [batterHand, setBatterHand] = useState<BattingHand>('right')
   const [showFieldEditor, setShowFieldEditor] = useState(false)
@@ -170,7 +173,7 @@ function App() {
   const [showRecordingModal, setShowRecordingModal] = useState(false)
   const [showDataGathering, setShowDataGathering] = useState(false)
   const [showRadarViz, setShowRadarViz] = useState(false)
-  const { isConnected, connectionState, simulateAsync, sendMessage } = useServerSimulation()
+  const { isConnected, connectionState, simulateAsync, sendMessage, statusMessage, error: connectionError, reconnect } = useServerSimulation()
 
   // Shot simulator state
   const [simAngle, setSimAngle] = useState('30')
@@ -1301,6 +1304,9 @@ function App() {
         <ServerConfig
           isConnected={isConnected}
           connectionState={connectionState}
+          statusMessage={statusMessage}
+          error={connectionError}
+          onReconnect={reconnect}
           onClose={() => setShowServerConfig(false)}
         />
       )}

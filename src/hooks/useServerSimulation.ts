@@ -3,6 +3,12 @@
  *
  * Provides simulation that uses Pi server when connected,
  * falls back to local gameEngine when offline.
+ *
+ * Connection lifecycle is guarded by a generation token: every connect() and
+ * disconnect() bumps the generation, and all async continuations / socket
+ * handlers no-op if their generation is stale. This prevents the classic
+ * flaky-WiFi failure modes: parallel discovery races creating zombie sockets,
+ * intentional disconnects being "auto-reconnected", and orphaned timers.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -12,11 +18,13 @@ import { getServerUrl, discoverServer, saveLastWorkingUrl } from '../api/config'
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'discovering'
 
-// Pending request waiting for server response
+// Pending simulate request: carries a local-engine fallback so a dropped
+// connection or timeout degrades to an offline result instead of an error.
 interface PendingRequest {
   resolve: (result: SimulationResult) => void
   reject: (error: Error) => void
   timeout: number
+  fallback: () => SimulationResult
 }
 
 // Generic pending request for any message type
@@ -56,12 +64,25 @@ interface UseServerSimulationResult {
   serverUrl: string | null
 }
 
+const HEARTBEAT_INTERVAL_MS = 20000
+const HEARTBEAT_TIMEOUT_MS = 45000 // no inbound traffic for this long = dead link
+const RECONNECT_DELAY_MS = 5000
+const DISCOVERY_RETRY_MS = 10000
+const SIMULATE_TIMEOUT_MS = 5000
+const GENERIC_TIMEOUT_MS = 10000
+
 function generateMessageId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
     const v = c === 'x' ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
+}
+
+/** https pages cannot open ws:// sockets (mixed content) - detect it up-front
+ * so the user gets an actionable message instead of silent discovery failure. */
+function isMixedContentBlocked(): boolean {
+  return window.location.protocol === 'https:'
 }
 
 export function useServerSimulation(): UseServerSimulationResult {
@@ -71,53 +92,124 @@ export function useServerSimulation(): UseServerSimulationResult {
   const [serverUrl, setServerUrl] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
+  const heartbeatIntervalRef = useRef<number | null>(null)
+  const lastInboundRef = useRef<number>(0)
+  const generationRef = useRef(0)
+  const connectingRef = useRef(false)
   const pendingRequestsRef = useRef<Map<string, PendingRequest>>(new Map())
   const genericPendingRef = useRef<Map<string, GenericPendingRequest>>(new Map())
 
-  const connectToUrl = useCallback((url: string) => {
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+  }, [])
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current)
+      heartbeatIntervalRef.current = null
+    }
+  }, [])
+
+  /** Settle all in-flight requests: simulations degrade to the local engine,
+   * generic requests reject (their callers show the error inline). */
+  const settlePendingOnDisconnect = useCallback(() => {
+    pendingRequestsRef.current.forEach((req) => {
+      clearTimeout(req.timeout)
+      try {
+        req.resolve(req.fallback())
+      } catch (e) {
+        req.reject(e instanceof Error ? e : new Error('Local simulation failed'))
+      }
+    })
+    pendingRequestsRef.current.clear()
+
+    genericPendingRef.current.forEach((req) => {
+      clearTimeout(req.timeout)
+      req.reject(new Error('Connection closed'))
+    })
+    genericPendingRef.current.clear()
+  }, [])
+
+  /** Detach handlers and close the socket without triggering reconnect logic. */
+  const teardownSocket = useCallback(() => {
+    const ws = wsRef.current
+    if (ws) {
+      ws.onopen = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.onmessage = null
+      try { ws.close() } catch { /* already closed */ }
+      wsRef.current = null
+    }
+    stopHeartbeat()
+  }, [stopHeartbeat])
+
+  const connectToUrl = useCallback((url: string, gen: number) => {
+    const isStale = () => gen !== generationRef.current
+
     try {
       const ws = new WebSocket(url)
       wsRef.current = ws
 
       ws.onopen = () => {
+        if (isStale()) { try { ws.close() } catch { /* noop */ } return }
         setConnectionState('connected')
         setStatusMessage(`Connected to ${url}`)
         setServerUrl(url)
         setError(null)
         saveLastWorkingUrl(url)
+        lastInboundRef.current = Date.now()
+
+        // Heartbeat: detect half-open links (phone wandered out of AP range)
+        // and force a fast reconnect instead of waiting on OS TCP timeouts.
+        stopHeartbeat()
+        heartbeatIntervalRef.current = window.setInterval(() => {
+          if (isStale() || ws.readyState !== WebSocket.OPEN) return
+          if (Date.now() - lastInboundRef.current > HEARTBEAT_TIMEOUT_MS) {
+            console.warn('Heartbeat timeout, forcing reconnect')
+            ws.close() // onclose handler schedules the reconnect
+            return
+          }
+          ws.send(JSON.stringify({
+            type: 'ping',
+            message_id: generateMessageId(),
+            timestamp: new Date().toISOString(),
+            payload: {},
+          }))
+        }, HEARTBEAT_INTERVAL_MS)
+
+        // Let stream consumers (RadarVisualizer) re-establish subscriptions
+        window.dispatchEvent(new CustomEvent('server-reconnected'))
       }
 
       ws.onclose = () => {
+        if (isStale()) return
         setConnectionState('disconnected')
         wsRef.current = null
         setServerUrl(null)
+        stopHeartbeat()
+        settlePendingOnDisconnect()
 
-        // Reject all pending requests
-        pendingRequestsRef.current.forEach((req) => {
-          clearTimeout(req.timeout)
-          req.reject(new Error('Connection closed'))
-        })
-        pendingRequestsRef.current.clear()
-
-        // Reject all generic pending requests
-        genericPendingRef.current.forEach((req) => {
-          clearTimeout(req.timeout)
-          req.reject(new Error('Connection closed'))
-        })
-        genericPendingRef.current.clear()
-
-        // Auto-reconnect after 5s
+        // Auto-reconnect after a delay (clear any timer first)
+        clearReconnectTimer()
         reconnectTimeoutRef.current = window.setTimeout(() => {
+          if (isStale()) return
           setConnectionState('reconnecting')
-          connect()
-        }, 5000)
+          void connectRef.current()
+        }, RECONNECT_DELAY_MS)
       }
 
       ws.onerror = () => {
+        if (isStale()) return
         setError('Connection failed')
       }
 
       ws.onmessage = (event) => {
+        if (isStale()) return
+        lastInboundRef.current = Date.now()
         try {
           const data = JSON.parse(event.data)
 
@@ -174,62 +266,98 @@ export function useServerSimulation(): UseServerSimulationResult {
         }
       }
     } catch (e) {
+      if (isStale()) return
       setConnectionState('disconnected')
       setError(e instanceof Error ? e.message : 'Connection failed')
     }
-  }, [])
+  }, [clearReconnectTimer, settlePendingOnDisconnect, stopHeartbeat])
+
+  // connect needs to reference itself (reconnect scheduling) - use a ref to
+  // avoid a circular useCallback dependency.
+  const connectRef = useRef<() => Promise<void>>(async () => {})
 
   const connect = useCallback(async () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+    // Single-flight: a connect (including its discovery await) is already
+    // running, or a socket is already open/connecting.
+    if (connectingRef.current) return
+    const ws = wsRef.current
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
 
-    // First try direct URL if configured
-    const directUrl = getServerUrl()
-
-    // Check if we have a URL param (skip discovery)
-    const params = new URLSearchParams(window.location.search)
-    if (params.has('server')) {
-      setConnectionState('connecting')
-      setStatusMessage(`Connecting to ${directUrl}...`)
-      connectToUrl(directUrl)
-      return
-    }
-
-    // Auto-discover
-    setConnectionState('discovering')
-    setError(null)
-
-    const discoveredUrl = await discoverServer((msg) => setStatusMessage(msg))
-
-    if (discoveredUrl) {
-      setConnectionState('connecting')
-      connectToUrl(discoveredUrl)
-    } else {
+    if (isMixedContentBlocked()) {
       setConnectionState('disconnected')
-      setError('No server found. Check that CricketRadar is powered on.')
+      setError(
+        'This page is https:// but the CricketRadar server only speaks ws:// - '
+        + 'the browser blocks that combination. Open the app from the Pi instead: '
+        + 'http://cricketradar.local:5173'
+      )
       setStatusMessage(null)
-
-      // Retry discovery after 10s
-      reconnectTimeoutRef.current = window.setTimeout(() => {
-        connect()
-      }, 10000)
+      return // retrying cannot help; the user must switch origin
     }
-  }, [connectToUrl])
+
+    const gen = ++generationRef.current
+    connectingRef.current = true
+    clearReconnectTimer()
+
+    try {
+      // First try direct URL if configured
+      const directUrl = getServerUrl()
+
+      // Check if we have a URL param (skip discovery)
+      const params = new URLSearchParams(window.location.search)
+      if (params.has('server')) {
+        setConnectionState('connecting')
+        setStatusMessage(`Connecting to ${directUrl}...`)
+        connectToUrl(directUrl, gen)
+        return
+      }
+
+      // Auto-discover
+      setConnectionState('discovering')
+      setError(null)
+
+      const discoveredUrl = await discoverServer((msg) => {
+        if (gen === generationRef.current) setStatusMessage(msg)
+      })
+      if (gen !== generationRef.current) return // superseded while discovering
+
+      if (discoveredUrl) {
+        setConnectionState('connecting')
+        connectToUrl(discoveredUrl, gen)
+      } else {
+        setConnectionState('disconnected')
+        setError('No server found. Check that CricketRadar is powered on.')
+        setStatusMessage(null)
+
+        // Retry discovery after 10s
+        reconnectTimeoutRef.current = window.setTimeout(() => {
+          if (gen !== generationRef.current) return
+          void connectRef.current()
+        }, DISCOVERY_RETRY_MS)
+      }
+    } finally {
+      connectingRef.current = false
+    }
+  }, [clearReconnectTimer, connectToUrl])
+
+  connectRef.current = connect
 
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
+    generationRef.current++ // invalidate all handlers/timers/continuations
+    clearReconnectTimer()
+    teardownSocket()
+    settlePendingOnDisconnect()
     setConnectionState('disconnected')
-  }, [])
+  }, [clearReconnectTimer, teardownSocket, settlePendingOnDisconnect])
+
+  /** Manual reconnect: tear down whatever exists, then connect fresh. */
+  const reconnect = useCallback(() => {
+    disconnect()
+    void connect()
+  }, [disconnect, connect])
 
   // Connect on mount
   useEffect(() => {
-    connect()
+    void connect()
     return () => disconnect()
   }, [connect, disconnect])
 
@@ -242,6 +370,17 @@ export function useServerSimulation(): UseServerSimulationResult {
     boundaryDistance: number = 70.0,
     difficulty: 'easy' | 'medium' | 'hard' = 'medium'
   ): Promise<SimulationResult> => {
+    const runLocal = (): SimulationResult => {
+      const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
+      const result = localSimulate(
+        exitSpeed, horizontalAngle, verticalAngle,
+        trajectory.landing_x, trajectory.landing_y,
+        trajectory.projected_distance, trajectory.max_height,
+        fieldConfig, boundaryDistance, difficulty
+      )
+      return { ...result, trajectory } as SimulationResult
+    }
+
     const ws = wsRef.current
 
     // If connected, use server
@@ -249,23 +388,15 @@ export function useServerSimulation(): UseServerSimulationResult {
       return new Promise((resolve, reject) => {
         const messageId = generateMessageId()
 
-        // Set timeout for response
+        // Timeout: degrade to the local engine rather than losing the shot
         const timeout = window.setTimeout(() => {
           pendingRequestsRef.current.delete(messageId)
-          // Fall back to local on timeout
           console.warn('Server simulation timeout, using local engine')
-          const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
-          const result = localSimulate(
-            exitSpeed, horizontalAngle, verticalAngle,
-            trajectory.landing_x, trajectory.landing_y,
-            trajectory.projected_distance, trajectory.max_height,
-            fieldConfig, boundaryDistance, difficulty
-          )
-          resolve({ ...result, trajectory } as SimulationResult)
-        }, 5000)
+          resolve(runLocal())
+        }, SIMULATE_TIMEOUT_MS)
 
-        // Store pending request
-        pendingRequestsRef.current.set(messageId, { resolve, reject, timeout })
+        // Store pending request (fallback also fires if the socket closes)
+        pendingRequestsRef.current.set(messageId, { resolve, reject, timeout, fallback: runLocal })
 
         // Send message
         const message = {
@@ -287,14 +418,7 @@ export function useServerSimulation(): UseServerSimulationResult {
     }
 
     // Not connected - use local engine
-    const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
-    const result = localSimulate(
-      exitSpeed, horizontalAngle, verticalAngle,
-      trajectory.landing_x, trajectory.landing_y,
-      trajectory.projected_distance, trajectory.max_height,
-      fieldConfig, boundaryDistance, difficulty
-    )
-    return { ...result, trajectory } as SimulationResult
+    return runLocal()
   }, [])
 
   // Sync simulate - always uses local (for backwards compatibility)
@@ -335,7 +459,7 @@ export function useServerSimulation(): UseServerSimulationResult {
       const timeout = window.setTimeout(() => {
         genericPendingRef.current.delete(messageId)
         reject(new Error('Request timeout'))
-      }, 10000)
+      }, GENERIC_TIMEOUT_MS)
 
       // Store pending request
       genericPendingRef.current.set(messageId, { resolve, reject, timeout })
@@ -361,7 +485,7 @@ export function useServerSimulation(): UseServerSimulationResult {
     connectionState,
     statusMessage,
     error,
-    reconnect: connect,
+    reconnect,
     serverUrl,
   }
 }
