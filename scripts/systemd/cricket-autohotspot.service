@@ -1,0 +1,18 @@
+[Unit]
+Description=CricketRadar - start AP if no known WiFi connects at boot
+Documentation=file:///home/bdrysdale/cricket-app/vault/learnings/Pi%20Deployment%20and%20Ops.md
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# root so nmcli can control connections without polkit prompts
+User=root
+ExecStart=/home/bdrysdale/cricket-app/scripts/autohotspot.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cricket-autohotspot
+
+[Install]
+WantedBy=multi-user.target
