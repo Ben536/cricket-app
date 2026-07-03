@@ -5,12 +5,11 @@
  * message creation utilities.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import {
   // Types
   type ClientMessage,
-  type ServerMessage,
   type WebSocketMessage,
   type SetFieldMessage,
   type SetDifficultyMessage,
@@ -33,7 +32,6 @@ import {
   type Position,
   type SimulationResult,
   type Profile,
-  type SessionData,
   // Enums
   type Difficulty,
   type BattingHand,

@@ -1,0 +1,7 @@
+# Server runtime dependencies (Pi + dev).
+# websockets: the server currently uses the legacy websockets.server API,
+# which is deprecated but present through v15. Migrate to the asyncio API
+# before this pin can move past 15.
+websockets>=12,<16
+# pyserial is only needed on the Pi (radar UART); harmless elsewhere
+pyserial>=3.5

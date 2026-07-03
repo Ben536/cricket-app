@@ -1,25 +1,5 @@
 """Cricket App Database Package."""
 
-from .database import (
-    init_db,
-    create_player,
-    get_all_players,
-    get_player_by_id,
-    create_session,
-    get_all_sessions,
-    get_sessions_by_player,
-    get_session_by_id,
-    insert_delivery,
-    get_deliveries_for_session,
-    get_session_summary_stats,
-    get_scoring_breakdown_by_zone,
-    get_deliveries_by_over,
-    get_player_session_summaries,
-    get_speed_statistics,
-    delete_player,
-    delete_session,
-)
-
 from .repository import (
     Repository,
     RepositoryError,
@@ -28,34 +8,9 @@ from .repository import (
     ConstraintViolationError,
     DatabaseError,
     DatabaseLockedError,
-    User,
-    AuthToken,
-    Player,
-    Session,
-    ActiveSession,
-    Delivery,
 )
 
 __all__ = [
-    # Legacy database functions
-    "init_db",
-    "create_player",
-    "get_all_players",
-    "get_player_by_id",
-    "create_session",
-    "get_all_sessions",
-    "get_sessions_by_player",
-    "get_session_by_id",
-    "insert_delivery",
-    "get_deliveries_for_session",
-    "get_session_summary_stats",
-    "get_scoring_breakdown_by_zone",
-    "get_deliveries_by_over",
-    "get_player_session_summaries",
-    "get_speed_statistics",
-    "delete_player",
-    "delete_session",
-    # Repository layer
     "Repository",
     "RepositoryError",
     "RecordNotFoundError",
@@ -63,10 +18,4 @@ __all__ = [
     "ConstraintViolationError",
     "DatabaseError",
     "DatabaseLockedError",
-    "User",
-    "AuthToken",
-    "Player",
-    "Session",
-    "ActiveSession",
-    "Delivery",
 ]

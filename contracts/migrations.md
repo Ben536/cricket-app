@@ -1,12 +1,31 @@
 # Database Migration Guide
 
-This document describes how to migrate from the initial database state to the schema defined in `database_schema.sql`.
+**The single provisioning and upgrade path is the migration runner:**
+
+```bash
+python3 -m db.migrate            # apply all pending migrations to db/cricket.db
+python3 -m db.migrate --status   # show what's applied
+python3 -m db.migrate --rollback # roll back the last migration
+```
+
+Fresh installs and upgrades use the SAME command - the runner tracks applied
+migrations in the `_migrations` table and each migration is idempotent.
+NEVER provision from `database_schema.sql`; that file is a generated,
+read-only snapshot of what the migrations produce (see its header). A DB
+created from it would have no `_migrations` records and the runner would
+re-apply everything over it.
+
+The live database is `db/cricket.db` (see `db/repository.py DEFAULT_DB_PATH`).
+`scripts/deploy_to_pi.sh` backs up and migrates it on every deploy.
 
 ## Version History
 
-| Version | Date       | Description                                      |
-|---------|------------|--------------------------------------------------|
-| 1.0.0   | 2024-01-XX | Initial schema with full contract compliance     |
+| Migration | Description |
+|-----------|-------------|
+| 001_initial_enhanced | Users, auth_tokens, players, sessions, deliveries, triggers, session_summaries view |
+| 002_active_sessions | active_sessions WebSocket session tracker |
+| 003_delivery_outcomes | Widened outcome CHECK (W/wd/nb/bowled/lbw/run_out/stumped/hit_wicket); extras excluded from balls faced |
+| 004_integrity | UNIQUE(session_id, ball_number) + renumbering; ISO-8601 UTC trigger timestamps; drop redundant index |
 
 ## Migration Strategy
 
@@ -14,19 +33,9 @@ The cricket app uses SQLite with incremental migrations. Each migration is idemp
 
 ### Pre-Migration Checklist
 
-1. Back up the existing database: `cp cricket.db cricket.db.backup`
+1. Back up the existing database: `cp db/cricket.db db/cricket.db.backup` (the deploy script does this automatically)
 2. Verify SQLite version >= 3.35.0 for full feature support
 3. Run migrations during low-traffic periods
-
----
-
-## Migration: Initial Setup (v1.0.0)
-
-For new installations, simply run the full `database_schema.sql`:
-
-```bash
-sqlite3 cricket.db < contracts/database_schema.sql
-```
 
 ---
 

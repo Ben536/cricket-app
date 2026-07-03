@@ -67,10 +67,6 @@ class ClientConnection:
     last_activity: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     state: ClientState = ClientState.CONNECTING
 
-    # Reconnection tracking
-    reconnect_count: int = 0
-    previous_client_id: Optional[str] = None
-
     def to_dict(self) -> dict:
         """Convert to dictionary for logging/debugging."""
         return {
@@ -80,7 +76,6 @@ class ClientConnection:
             "last_message_id": self.last_message_id,
             "last_activity": self.last_activity.isoformat(),
             "state": self.state.value,
-            "reconnect_count": self.reconnect_count,
         }
 
 
@@ -105,10 +100,6 @@ class ConnectionManager:
         # Lock for thread-safe operations
         self._lock = asyncio.Lock()
 
-        # Message history for reconnection (last N messages per session)
-        self._message_history: dict[str, list[dict]] = {}
-        self._history_limit = 100  # Keep last 100 messages per session
-
         logger.info("ConnectionManager initialized")
 
     @property
@@ -125,7 +116,6 @@ class ConnectionManager:
         self,
         client_id: str,
         websocket: WebSocketServerProtocol,
-        reconnect_client_id: Optional[str] = None,
     ) -> ClientConnection:
         """
         Add a new client connection.
@@ -133,7 +123,6 @@ class ConnectionManager:
         Args:
             client_id: Unique identifier for this client
             websocket: The WebSocket connection
-            reconnect_client_id: If reconnecting, the previous client_id
 
         Returns:
             The created ClientConnection
@@ -141,41 +130,14 @@ class ConnectionManager:
         async with self._lock:
             now = datetime.now(timezone.utc)
 
-            # Handle reconnection
-            previous_session_id = None
-            reconnect_count = 0
-
-            if reconnect_client_id and reconnect_client_id in self._clients:
-                old_conn = self._clients[reconnect_client_id]
-                previous_session_id = old_conn.session_id
-                reconnect_count = old_conn.reconnect_count + 1
-
-                # Remove old connection
-                await self._remove_client_internal(reconnect_client_id)
-
-                logger.info(
-                    f"Client reconnecting: {reconnect_client_id} -> {client_id}, "
-                    f"session={previous_session_id}, count={reconnect_count}"
-                )
-
-            # Create new connection
             connection = ClientConnection(
                 client_id=client_id,
                 websocket=websocket,
                 connected_at=now,
-                session_id=previous_session_id,
                 state=ClientState.CONNECTED,
-                reconnect_count=reconnect_count,
-                previous_client_id=reconnect_client_id,
             )
 
             self._clients[client_id] = connection
-
-            # Re-add to session if reconnecting
-            if previous_session_id:
-                if previous_session_id not in self._session_clients:
-                    self._session_clients[previous_session_id] = set()
-                self._session_clients[previous_session_id].add(client_id)
 
             logger.info(
                 f"Client connected: {client_id}, "
@@ -372,9 +334,6 @@ class ConnectionManager:
         if not client_ids:
             return 0
 
-        # Store in message history for reconnection
-        self._store_message(session_id, message)
-
         # Send to all clients
         sent_count = 0
         for client_id in client_ids:
@@ -420,49 +379,6 @@ class ConnectionManager:
 
         return sent_count
 
-    def _store_message(self, session_id: str, message: dict[str, Any]) -> None:
-        """Store message in history for reconnection recovery."""
-        if session_id not in self._message_history:
-            self._message_history[session_id] = []
-
-        history = self._message_history[session_id]
-        history.append(message)
-
-        # Trim to limit
-        if len(history) > self._history_limit:
-            self._message_history[session_id] = history[-self._history_limit:]
-
-    def get_messages_since(
-        self,
-        session_id: str,
-        last_message_id: str,
-    ) -> list[dict[str, Any]]:
-        """
-        Get messages since a given message ID (for reconnection).
-
-        Args:
-            session_id: The session to get messages for
-            last_message_id: The last message the client received
-
-        Returns:
-            List of messages since the given ID
-        """
-        history = self._message_history.get(session_id, [])
-
-        # Find the index of the last message
-        last_idx = -1
-        for i, msg in enumerate(history):
-            if msg.get("message_id") == last_message_id:
-                last_idx = i
-                break
-
-        # Return messages after that point
-        if last_idx >= 0:
-            return history[last_idx + 1:]
-
-        # If message not found, return all (client might be very out of date)
-        return history
-
     def update_activity(self, client_id: str) -> None:
         """Update last activity timestamp for a client."""
         connection = self._clients.get(client_id)
@@ -487,8 +403,5 @@ class ConnectionManager:
 
     def cleanup_session(self, session_id: str) -> None:
         """Remove all session data (call when session ends)."""
-        # Remove message history
-        self._message_history.pop(session_id, None)
-
         # Note: Don't remove clients, they might start a new session
         logger.info(f"Cleaned up session data: {session_id}")

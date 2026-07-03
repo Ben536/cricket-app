@@ -41,6 +41,18 @@ git add -A && git commit -m "description" && git push origin master
 
 ## All Configurable Parameters
 
+> **Tuning happens in `engine/engine_params.json`** — the single source of
+> truth loaded by BOTH engines (`engine/game_engine.py` and
+> `src/gameEngine.ts`). Never change a constant in engine source code; that is
+> how the engines forked historically. After any engine change, run the golden
+> parity suite (`tools/parity/`, see its README) — 1,154 canonical shots must
+> produce identical results in both engines.
+>
+> **Randomness is seeded**: both engines use the same mulberry32 PRNG. Each
+> shot carries a `seed` (echoed in the result); the same seed reproduces the
+> same outcome in either engine, which is how the client's local fallback
+> stays consistent with the server and how any shot can be replayed.
+
 ### Catching
 | Parameter | Current | Description |
 |-----------|---------|-------------|
@@ -284,17 +296,34 @@ Fielders run to the BEST catchable position along the trajectory:
 
 ## Boundary Logic
 
-- **Six**: Ball clears boundary while aerial (height > 0.5m at boundary)
-- **Four**: Ball reaches boundary along ground (if no fielder intercepts)
+### Angle-dependent boundary distance
+The boundary circle (nominal radius 70m) is centered on the **pitch center**,
+not the batter — the batter stands `BATTER_OFFSET_FROM_CENTER` (8.84m) from
+it. The actual distance from the batter to the rope therefore depends on
+shot angle (ray-circle intersection):
+
+```
+actual = offset*cos(θ) + sqrt(R² − offset²·sin²(θ))
+```
+
+- Straight to the bowler (0°): ~78.8m
+- Square (±90°): ~69.4m
+- Behind the keeper (180°): ~61.2m
+
+Both engines apply this everywhere a boundary matters (six check, four check,
+fielder intercept limit); results carry the resolved `boundary_distance`.
+
+- **Six**: Ball clears the (angle-adjusted) boundary while aerial (height > 0.5m at boundary)
+- **Four**: Ball reaches the boundary along ground (if no fielder intercepts)
 
 ### Ground Fielding on Boundary Balls
-For shots projected to travel >= 70m:
-1. Fielders can intercept BEFORE the boundary (< 70m)
+For shots projected to travel beyond the angle-adjusted boundary:
+1. Fielders can intercept BEFORE the boundary
 2. If stopped cleanly → runs based on fielding time (usually 2-3)
 3. If misfield (ball gets past) → automatic four
 4. If no fielder can intercept → four
 
-Boundary intersection calculated by scaling landing point direction to 70m radius.
+Boundary intersection calculated by scaling landing point direction to the boundary radius.
 
 ---
 

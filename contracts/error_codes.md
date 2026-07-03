@@ -98,6 +98,19 @@ All error codes with descriptions. These codes are returned in `error` messages.
 | `E6005` | `RADAR_LOW_CONFIDENCE` | "Low tracking confidence" | Yes | Detection confidence below threshold |
 | `E6006` | `RADAR_HARDWARE_ERROR` | "Radar hardware error" | No | Hardware malfunction detected |
 
+### Recording State Errors (E61xx)
+
+Recording control (start/stop/annotate) uses a dedicated sub-block so it can
+never collide with the hardware codes above.
+
+| Code | Name | Message | Recoverable | Description |
+|------|------|---------|-------------|-------------|
+| `E6101` | `ALREADY_RECORDING` | "Already recording" | Yes | A recording session is already active |
+| `E6102` | `RECORDING_START_FAILED` | "Failed to start recording" | Yes | Recorder could not start (see message) |
+| `E6103` | `NOT_RECORDING` | "Not currently recording" | Yes | stop/annotate sent with no active recording |
+| `E6104` | `RECORDING_NO_SESSION` | "Recording stop returned no session" | Yes | Internal recorder state error |
+| `E6105` | `RECORDING_STOP_FAILED` | "Failed to stop recording" | Yes | Recorder could not finalize (see message) |
+
 ---
 
 ## Game Engine Errors (7xxx)

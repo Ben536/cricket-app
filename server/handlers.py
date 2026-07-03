@@ -60,12 +60,25 @@ ERROR_VERSION_CONFLICT = "E5002"
 ERROR_CONSTRAINT_VIOLATION = "E5003"
 ERROR_RECORD_NOT_FOUND = "E5004"
 
+# Recording state errors (E61xx - E60xx is reserved for radar hardware
+# errors in contracts/error_codes.md and must not be reused)
+ERROR_ALREADY_RECORDING = "E6101"
+ERROR_RECORDING_START_FAILED = "E6102"
+ERROR_NOT_RECORDING = "E6103"
+ERROR_RECORDING_NO_SESSION = "E6104"
+ERROR_RECORDING_STOP_FAILED = "E6105"
+
 # Extended error messages
 EXTENDED_ERROR_MESSAGES = {
     ERROR_DATABASE: ("Database operation failed", True),
     ERROR_VERSION_CONFLICT: ("Version conflict, please refresh", True),
     ERROR_CONSTRAINT_VIOLATION: ("Database constraint violated", False),
     ERROR_RECORD_NOT_FOUND: ("Record not found", False),
+    ERROR_ALREADY_RECORDING: ("Already recording", True),
+    ERROR_RECORDING_START_FAILED: ("Failed to start recording", True),
+    ERROR_NOT_RECORDING: ("Not currently recording", True),
+    ERROR_RECORDING_NO_SESSION: ("Recording stop returned no session", True),
+    ERROR_RECORDING_STOP_FAILED: ("Failed to stop recording", True),
 }
 
 
@@ -162,6 +175,11 @@ async def build_session_state_response(
     }
 
 
+# NOTE: build_shot_result_response and build_wagon_wheel_update are the
+# contract-defined messages for RADAR-DRIVEN deliveries (shot_result,
+# wagon_wheel_update). Nothing emits them yet - the ball-detection pipeline
+# (radar/detector.py) is what will wire them up. Manual input deliberately
+# does NOT use them (a manual tap has no trajectory).
 def build_shot_result_response(
     session_id: int,
     ball_number: int,
@@ -1038,7 +1056,7 @@ class MessageHandlers:
 
         if recorder.is_recording:
             return create_extended_error(
-                "E6001",
+                ERROR_ALREADY_RECORDING,
                 in_reply_to=message_id,
                 message_override="Already recording",
             )
@@ -1075,7 +1093,7 @@ class MessageHandlers:
         except Exception as e:
             logger.error(f"Failed to start recording: {e}")
             return create_extended_error(
-                "E6002",
+                ERROR_RECORDING_START_FAILED,
                 in_reply_to=message_id,
                 message_override=f"Failed to start recording: {str(e)}",
             )
@@ -1096,7 +1114,7 @@ class MessageHandlers:
 
         if not recorder.is_recording:
             return create_extended_error(
-                "E6003",
+                ERROR_NOT_RECORDING,
                 in_reply_to=message_id,
                 message_override="Not currently recording",
             )
@@ -1129,7 +1147,7 @@ class MessageHandlers:
                 }
             else:
                 return create_extended_error(
-                    "E6004",
+                    ERROR_RECORDING_NO_SESSION,
                     in_reply_to=message_id,
                     message_override="Recording stop returned no session",
                 )
@@ -1137,7 +1155,7 @@ class MessageHandlers:
         except Exception as e:
             logger.error(f"Failed to stop recording: {e}")
             return create_extended_error(
-                "E6005",
+                ERROR_RECORDING_STOP_FAILED,
                 in_reply_to=message_id,
                 message_override=f"Failed to stop recording: {str(e)}",
             )
@@ -1191,7 +1209,7 @@ class MessageHandlers:
         recorder = get_recorder()
         if not recorder.is_recording:
             return create_extended_error(
-                "E6003",
+                ERROR_NOT_RECORDING,
                 in_reply_to=message_id,
                 message_override="Not currently recording",
             )
