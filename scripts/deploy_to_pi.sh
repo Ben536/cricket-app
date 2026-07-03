@@ -60,6 +60,20 @@ rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
 rsync -avz --exclude '__pycache__' --exclude '*.pyc' \
     "$LOCAL_DIR/tools/" "$PI_USER@$PI_HOST:$PI_DIR/tools/"
 
+# Frontend: sync the built app the Pi serves on :5173. Build it first when
+# node is available; otherwise sync whatever dist/ exists (better than the
+# months-stale copy this replaced). --delete purges old hashed bundles.
+if command -v npm >/dev/null 2>&1; then
+    echo "  Building frontend..."
+    (cd "$LOCAL_DIR" && npm run build > /dev/null)
+fi
+if [ -d "$LOCAL_DIR/dist" ]; then
+    rsync -az --delete "$LOCAL_DIR/dist/" "$PI_USER@$PI_HOST:$PI_DIR/dist/"
+    echo "  Frontend dist synced"
+else
+    echo "  WARNING: no dist/ to sync - Pi UI (:5173) may be stale (run 'npm run build')"
+fi
+
 # Install dependencies
 echo ""
 echo "[3/6] Installing Python dependencies..."
