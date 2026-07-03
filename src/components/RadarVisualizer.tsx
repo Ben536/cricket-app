@@ -150,10 +150,14 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
     animationRef.current = requestAnimationFrame(draw)
   }, [])
 
-  // Handle incoming radar frames via custom event
+  // Handle incoming radar frames via custom event. The canvas reads from the
+  // ref buffer at its own pace; the React stat counters update at most once
+  // per second - setting state per frame re-rendered the whole modal at
+  // radar frame rate (10-20Hz) for two numbers.
   useEffect(() => {
     if (!isStreaming) return
 
+    const latest = { frame: 0, points: 0 }
     const handleRadarFrame = (event: CustomEvent<RadarFrame>) => {
       const frame = event.detail
       if (frame) {
@@ -162,15 +166,21 @@ export function RadarVisualizer({ isConnected, onClose, sendMessage }: RadarVisu
         if (frameBufferRef.current.length > 30) {
           frameBufferRef.current.shift()
         }
-        setFrameCount(frame.frame_number)
-        setPointCount(frame.point_count)
+        latest.frame = frame.frame_number
+        latest.points = frame.point_count
       }
     }
+
+    const statTimer = window.setInterval(() => {
+      setFrameCount(latest.frame)
+      setPointCount(latest.points)
+    }, 1000)
 
     window.addEventListener('radar-frame', handleRadarFrame as EventListener)
 
     return () => {
       window.removeEventListener('radar-frame', handleRadarFrame as EventListener)
+      window.clearInterval(statTimer)
     }
   }, [isStreaming])
 

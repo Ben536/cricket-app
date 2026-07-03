@@ -160,7 +160,10 @@ function App() {
   const [isFlashing, setIsFlashing] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [sessionHistory, setSessionHistory] = useState<Session[]>([])
+  // Undo history: each entry snapshots the session AND the wagon-wheel length
+  // at the time of the ball. Wides/no-balls add no wagon-wheel line, so a
+  // blind "pop one line per undo" deleted the previous legitimate shot's line.
+  const [sessionHistory, setSessionHistory] = useState<Array<{ session: Session; wagonWheelLength: number }>>([])
   const [customFields, setCustomFields] = useState<CustomFieldPreset[]>(loadCustomFields)
   const [isSavingField, setIsSavingField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
@@ -199,6 +202,13 @@ function App() {
   // Timeout refs to reset fielder positions after animations
   const catchResetTimeout = useRef<number | null>(null)
   const fieldingResetTimeout = useRef<number | null>(null)
+
+  // Always-current mirrors of state that async flows (simulateShot awaits the
+  // server) must read at CALL time rather than from a stale render closure
+  const profilesRef = useRef(profiles)
+  profilesRef.current = profiles
+  const wagonWheelRef = useRef(wagonWheelShots)
+  wagonWheelRef.current = wagonWheelShots
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -332,13 +342,18 @@ function App() {
         return
       }
 
-      // Convert current fielder positions to game engine format (screen % -> metres)
-      // Also track fielder ID -> zone name mapping for catch display
+      // Convert current fielder positions to game engine format (screen % ->
+      // metres). For a LEFT-handed batter the display mirrors positions
+      // (FieldView flips X) - the simulation must use the same mirrored
+      // coordinates or the fielders on screen are not where the engine
+      // thinks they are.
+      const isLeftHanded = batterHand === 'left'
       const fielderIdToZone: Record<string, string> = {}
       const fieldConfig = fielderPositions.map(f => {
-        const field = screenToField(f.x, f.y)
-        // Find zone name for this fielder
-        const zones = calculateFielderZones([f], batterHand === 'left')
+        const displayed = isLeftHanded ? { ...f, x: 100 - f.x } : f
+        const field = screenToField(displayed.x, displayed.y)
+        // Zone name from the same displayed position the user sees
+        const zones = calculateFielderZones([displayed], isLeftHanded)
         const zoneName = zones[0]?.zoneName || 'fielder'
         fielderIdToZone[f.id] = zoneName
         return {
@@ -362,8 +377,9 @@ function App() {
       const result = fullResult
       const trajectory = fullResult.trajectory!
 
-      // Debug: comprehensive shot analysis
-      console.log('SHOT DEBUG:', JSON.stringify({
+      // Debug: comprehensive shot analysis (dev only - this is a large
+      // JSON blob per shot and production phones don't need it)
+      if (import.meta.env.DEV) console.log('SHOT DEBUG:', JSON.stringify({
         input: { speed, angle, elevation },
         trajectory: {
           aerial_distance: trajectory.aerial_distance,
@@ -439,9 +455,12 @@ function App() {
         endY: screen.y,
         boundaryEndX: boundaryEndScreen.x,
         boundaryEndY: boundaryEndScreen.y,
-        outcome: result.outcome === 'caught' || result.outcome === 'dropped' ? 'W' :
-                 result.outcome === 'misfield' ? String(result.runs) as BallResult :
-                 result.outcome as BallResult,
+        // Only an actual dismissal draws as W. A dropped catch or misfield
+        // scored runs - draw those; a scoreless one is a dot, not "0".
+        outcome: result.outcome === 'caught' ? 'W' :
+                 (result.outcome === 'dropped' || result.outcome === 'misfield')
+                   ? (result.runs > 0 ? String(result.runs) as BallResult : 'dot')
+                   : result.outcome as BallResult,
         distance: displayDistance,
       }
       setWagonWheelShots(prev => [...prev, shotLine])
@@ -470,11 +489,10 @@ function App() {
         const fieldingFielderId = Object.entries(fielderIdToZone)
           .find(([, zoneName]) => zoneName === result.fielder_involved)?.[0]
 
-        console.log('Fielding animation: fielder=', result.fielder_involved, 'id=', fieldingFielderId, 'pos=', result.fielding_position)
+        if (import.meta.env.DEV) console.log('Fielding animation:', result.fielder_involved, fieldingFielderId, result.fielding_position)
 
         if (fieldingFielderId) {
           const fieldingScreen = fieldToScreen(result.fielding_position.x, result.fielding_position.y)
-          console.log('Setting fieldingDisplayPosition:', fieldingFielderId, fieldingScreen)
           setFieldingDisplayPosition({
             fielderId: fieldingFielderId,
             screenX: fieldingScreen.x,
@@ -485,8 +503,6 @@ function App() {
             setFieldingDisplayPosition(null)
           }, 1500)
         }
-      } else {
-        console.log('No fielding animation: hasPos=', !!result.fielding_position, 'fielder=', result.fielder_involved, 'outcome=', result.outcome)
       }
 
       // Update score if not caught (skipWagonWheel=true since we already added it above)
@@ -511,8 +527,16 @@ function App() {
   }
 
   const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false, skipWagonWheel: boolean = false) => {
-    // Save current state for undo (push to history stack)
-    setSessionHistory(prev => [...prev, { ...currentSession, overs: currentSession.overs.map(o => ({ ...o, balls: [...o.balls] })) }])
+    // Save current state for undo. Read the session through the ref, not the
+    // render closure: simulateShot awaits the server before calling addRuns,
+    // and a manual tap during that wait would otherwise be silently discarded
+    // by a later undo (the closure's snapshot predates the tap).
+    const liveProfile = profilesRef.current.find(p => p.id === activeProfileId)
+    const liveSession = liveProfile ? liveProfile.currentSession : currentSession
+    setSessionHistory(prev => [...prev, {
+      session: { ...liveSession, overs: liveSession.overs.map(o => ({ ...o, balls: [...o.balls] })) },
+      wagonWheelLength: wagonWheelRef.current.length,
+    }])
 
     let ballResult: BallResult
     if (isNoBall) {
@@ -577,7 +601,8 @@ function App() {
   const undoLastBall = () => {
     if (sessionHistory.length === 0) return
 
-    const previousSession = sessionHistory[sessionHistory.length - 1]
+    const entry = sessionHistory[sessionHistory.length - 1]
+    const previousSession = entry.session
 
     setProfiles(prev => prev.map(profile => {
       if (profile.id !== activeProfileId) return profile
@@ -599,8 +624,9 @@ function App() {
     // Pop from history stack
     setSessionHistory(prev => prev.slice(0, -1))
 
-    // Remove last wagon wheel shot
-    setWagonWheelShots(prev => prev.slice(0, -1))
+    // Restore the wagon wheel to how it looked before that ball (a wide/nb
+    // added no line, so truncating - not popping - keeps them in sync)
+    setWagonWheelShots(prev => prev.slice(0, entry.wagonWheelLength))
   }
 
   const addNewProfile = () => {

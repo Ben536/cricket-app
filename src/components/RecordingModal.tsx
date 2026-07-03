@@ -50,46 +50,36 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
     }
   }, [isConnected, sendMessage])
 
-  // Timer for recording progress
+  // Timer for recording progress (pure tick - state updaters must not have
+  // side effects; StrictMode invokes them twice in dev)
   useEffect(() => {
-    if (isRecording) {
-      timerRef.current = window.setInterval(() => {
-        setElapsedSeconds((prev) => {
-          const next = prev + 1
-          // Auto-stop handled by server, but update UI
-          if (next >= maxDuration) {
-            setIsRecording(false)
-            setLastResult(`Recording complete (${maxDuration}s)`)
-            if (timerRef.current) {
-              clearInterval(timerRef.current)
-              timerRef.current = null
-            }
-            // Refresh counts
-            sendMessage('get_recording_status', {})
-              .then((response: unknown) => {
-                const resp = response as { payload?: { counts?: RecordingCounts } }
-                if (resp?.payload?.counts) {
-                  setCounts(resp.payload.counts)
-                }
-              })
-              .catch(() => {})
-          }
-          return next
-        })
-      }, 1000)
-    } else {
+    if (!isRecording) return
+    timerRef.current = window.setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1)
+    }, 1000)
+    return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
     }
+  }, [isRecording])
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
-    }
-  }, [isRecording, sendMessage])
+  // Auto-stop mirror: the server enforces max duration; when the local clock
+  // reaches it, reflect that in the UI and refresh counts.
+  useEffect(() => {
+    if (!isRecording || elapsedSeconds < maxDuration) return
+    setIsRecording(false)
+    setLastResult(`Recording complete (${maxDuration}s)`)
+    sendMessage('get_recording_status', {})
+      .then((response: unknown) => {
+        const resp = response as { payload?: { counts?: RecordingCounts } }
+        if (resp?.payload?.counts) {
+          setCounts(resp.payload.counts)
+        }
+      })
+      .catch(() => {})
+  }, [isRecording, elapsedSeconds, maxDuration, sendMessage])
 
   const handleStartRecording = async () => {
     if (!isConnected) {

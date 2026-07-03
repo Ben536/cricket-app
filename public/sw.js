@@ -1,95 +1,123 @@
 /**
  * CricketRadar Service Worker
  *
- * Provides offline caching for the PWA.
- * Caches static assets on install, serves from cache when offline.
+ * Offline caching for the PWA (phone at the nets, flaky or no WiFi).
+ *
+ * Strategy:
+ * - HTML/navigation: NETWORK-FIRST. Serving stale-while-revalidate HTML was
+ *   the "white screen after deploy" bug: cached HTML referenced hashed JS
+ *   bundles that the new deploy had purged. Fresh HTML when online, cached
+ *   HTML only when offline.
+ * - Hashed build assets (/assets/*): CACHE-FIRST. Vite content-hashes them,
+ *   so a cached copy is immutable - no revalidation needed.
+ * - Everything else same-origin: stale-while-revalidate.
+ * - Cross-origin (fonts CDN etc.): cache opaque responses too, so the
+ *   render-blocking Google Fonts stylesheet doesn't stall first paint on a
+ *   dead network at the nets.
  */
 
-const CACHE_NAME = 'cricketradar-v1';
+const CACHE_NAME = 'cricketradar-v2';
 
-// Assets to cache on install
+// App shell cached on install
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/manifest.json',
 ];
 
-// Install event - cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  // Activate immediately
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME)
-          .map((name) => {
-            console.log('[SW] Removing old cache:', name);
-            return caches.delete(name);
-          })
-      );
-    })
+          .map((name) => caches.delete(name))
+      )
+    )
   );
-  // Take control of all pages immediately
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fall back to network
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
+async function cachePut(request, response) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response);
+  } catch {
+    // Quota/opaque errors are non-fatal
+  }
+}
 
-  // Skip WebSocket requests
-  if (event.request.url.includes('ws://') || event.request.url.includes('wss://')) return;
+/** Network-first: fresh when online, cache as fallback. */
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) cachePut(request, response.clone());
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    if (request.mode === 'navigate') {
+      const shell = await caches.match('/index.html');
+      if (shell) return shell;
+    }
+    return new Response('Offline', { status: 503 });
+  }
+}
 
-  // Skip API requests (don't cache dynamic data)
-  if (event.request.url.includes('/api/')) return;
+/** Cache-first: for immutable content-hashed assets. */
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    // Cache OK responses AND opaque cross-origin ones (fonts CDN)
+    if (response.ok || response.type === 'opaque') {
+      cachePut(request, response.clone());
+    }
+    return response;
+  } catch {
+    return new Response('Offline', { status: 503 });
+  }
+}
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Return cached response if available
-      if (cachedResponse) {
-        // Also fetch from network to update cache (stale-while-revalidate)
-        event.waitUntil(
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          }).catch(() => {
-            // Network failed, that's ok - we have cache
-          })
-        );
-        return cachedResponse;
+/** Stale-while-revalidate: fast, refreshed in the background. */
+async function staleWhileRevalidate(request) {
+  const cached = await caches.match(request);
+  const refresh = fetch(request)
+    .then((response) => {
+      if (response.ok || response.type === 'opaque') {
+        cachePut(request, response.clone());
       }
-
-      // No cache - fetch from network
-      return fetch(event.request).then((networkResponse) => {
-        // Cache successful responses
-        if (networkResponse.ok) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Network failed and no cache - show offline page for navigation
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-        return new Response('Offline', { status: 503 });
-      });
+      return response;
     })
-  );
+    .catch(() => cached || new Response('Offline', { status: 503 }));
+  return cached || refresh;
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
+  // Never intercept the WebSocket upgrade or dynamic API data
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (request.mode === 'navigate' || url.pathname === '/index.html') {
+    event.respondWith(networkFirst(request));
+  } else if (url.origin === self.location.origin && url.pathname.startsWith('/assets/')) {
+    event.respondWith(cacheFirst(request));
+  } else if (url.origin !== self.location.origin) {
+    // Fonts/CDN: cache-first so offline first paint doesn't stall
+    event.respondWith(cacheFirst(request));
+  } else {
+    event.respondWith(staleWhileRevalidate(request));
+  }
 });
