@@ -30,6 +30,7 @@ Design decisions, learnings, and plans for the CricketRadar project. Open this f
 ## Current status (2026-07-03)
 - ✅ Full-codebase review + hardening program executed (all phases) → [[2026-07 Hardening Plan]]. Highlights: single-owner radar reader (record+stream concurrently), disconnect lifecycle + async DB on the server, engines unified with a 1,154-shot parity suite in CI, ball-detection pipeline + offline replay harness, dead code purged, contracts re-synced, pytest/vitest/CI green.
 - ✅ [[Data Gathering Mode]] built (crash-safe JSONL, wagon-wheel ground truth, mock flagging).
-- ⚠️ NOTE: migrations may never have reached the live Pi DB (deploy script migrated the wrong file — now fixed). On next Pi contact run the deploy script and check `python3 -m db.migrate --status`.
-- ⛔ Blocker: radar not currently enumerated on the Pi (no `/dev/ttyUSB*`) — see [[Pi Deployment and Ops]]. Recording/streaming now clearly flag MOCK data until fixed.
-- 🎯 Next: nets session → real recordings → tune detection offline (`tools/replay_jsonl.py`) → wire detector to the live reader → emit `shot_result`.
+- ✅ **Pi fully deployed and verified live (2026-07-03)**: radar enumerated and streaming REAL data (`mock: false`), migrations 001–004 applied to the real DB, all 5 services enabled, current frontend served on :5173, live point cloud confirmed in the browser.
+- ✅ First real tuning iteration done: an empty-room recording exposed multipath/aliasing ghosts (33 false balls); three physics-consistency checks in the detector now silence them (frozen as a regression fixture). Note: ghost doppler clusters at ~26 m/s — check the profile's true unambiguous-velocity limit vs the cfg's "145 km/h" comment.
+- 📋 The Vercel (https) app cannot reach the Pi's ws:// — by browser design. Field UI = http://cricketradar.local:5173 (deploys now keep its build current).
+- 🎯 Next: nets session → record `bowling` + `racket`/`racket_foil` + `both` with wagon-wheel taps → tune detection offline (`tools/replay_jsonl.py`) → fit the radar→field direction calibration → wire detector to the live reader → emit `shot_result`.
