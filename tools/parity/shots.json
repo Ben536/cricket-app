@@ -1,0 +1,9293 @@
+{
+ "field": [
+  {
+   "x": 0,
+   "y": -3,
+   "name": "wicketkeeper"
+  },
+  {
+   "x": -5,
+   "y": -4,
+   "name": "first slip"
+  },
+  {
+   "x": -8,
+   "y": 2,
+   "name": "gully"
+  },
+  {
+   "x": -15,
+   "y": 15,
+   "name": "point"
+  },
+  {
+   "x": -20,
+   "y": 30,
+   "name": "cover"
+  },
+  {
+   "x": -5,
+   "y": 35,
+   "name": "mid-off"
+  },
+  {
+   "x": 5,
+   "y": 35,
+   "name": "mid-on"
+  },
+  {
+   "x": 20,
+   "y": 25,
+   "name": "midwicket"
+  },
+  {
+   "x": 15,
+   "y": 10,
+   "name": "square leg"
+  },
+  {
+   "x": 45,
+   "y": 45,
+   "name": "deep midwicket"
+  },
+  {
+   "x": -40,
+   "y": 40,
+   "name": "deep cover"
+  }
+ ],
+ "shots": [
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1001
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1002
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1003
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1004
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1005
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1006
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1007
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1008
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1009
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1010
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1011
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1012
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1013
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1014
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1015
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1016
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1017
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1018
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1019
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1020
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1021
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1022
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1023
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1024
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1025
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1026
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1027
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1028
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1029
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1030
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1031
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1032
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1033
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1034
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1035
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1036
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1037
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1038
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1039
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1040
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1041
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1042
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1043
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1044
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1045
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1046
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1047
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1048
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1049
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1050
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1051
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1052
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1053
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1054
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1055
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1056
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1057
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1058
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1059
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1060
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1061
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1062
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1063
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1064
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1065
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1066
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1067
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1068
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1069
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1070
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1071
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -180,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1072
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1073
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1074
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1075
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1076
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1077
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1078
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1079
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1080
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1081
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1082
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1083
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1084
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1085
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1086
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1087
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1088
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1089
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1090
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1091
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1092
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1093
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1094
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1095
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1096
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1097
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1098
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1099
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1100
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1101
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1102
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1103
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1104
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1105
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1106
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1107
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1108
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1109
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1110
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1111
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1112
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1113
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1114
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1115
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1116
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1117
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1118
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1119
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1120
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1121
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1122
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1123
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1124
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1125
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1126
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1127
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1128
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1129
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1130
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1131
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1132
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1133
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1134
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1135
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1136
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1137
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1138
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1139
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1140
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1141
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1142
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1143
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1144
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1145
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1146
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1147
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1148
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1149
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1150
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1151
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1152
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1153
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1154
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1155
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1156
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1157
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1158
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1159
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1160
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1161
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1162
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1163
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1164
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1165
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1166
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1167
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1168
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1169
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1170
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1171
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1172
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1173
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1174
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1175
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1176
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1177
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1178
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1179
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1180
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1181
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1182
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1183
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1184
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1185
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1186
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1187
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1188
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1189
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1190
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1191
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1192
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1193
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1194
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1195
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1196
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1197
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1198
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1199
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1200
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1201
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1202
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1203
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1204
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1205
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1206
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1207
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1208
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1209
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1210
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1211
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1212
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1213
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1214
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1215
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1216
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1217
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1218
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1219
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1220
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1221
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1222
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1223
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1224
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1225
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1226
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1227
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1228
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1229
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1230
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1231
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1232
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1233
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1234
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1235
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1236
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1237
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1238
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1239
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1240
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1241
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1242
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1243
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1244
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1245
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1246
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1247
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1248
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1249
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1250
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1251
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1252
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1253
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1254
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1255
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1256
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1257
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1258
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1259
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1260
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1261
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1262
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1263
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1264
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1265
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1266
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1267
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1268
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1269
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1270
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1271
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1272
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1273
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1274
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1275
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1276
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1277
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1278
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1279
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1280
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1281
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1282
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1283
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1284
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1285
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1286
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1287
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1288
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1289
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1290
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1291
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1292
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1293
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1294
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1295
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1296
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1297
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1298
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1299
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1300
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1301
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1302
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1303
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1304
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1305
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1306
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1307
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1308
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1309
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1310
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1311
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1312
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1313
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1314
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1315
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1316
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1317
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1318
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1319
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1320
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1321
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1322
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1323
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1324
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1325
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1326
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1327
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1328
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1329
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1330
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1331
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1332
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1333
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1334
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1335
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1336
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1337
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1338
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1339
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1340
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1341
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1342
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1343
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1344
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1345
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1346
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1347
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1348
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1349
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1350
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1351
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1352
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1353
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1354
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1355
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1356
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1357
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1358
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1359
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1360
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1361
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1362
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1363
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1364
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1365
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1366
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1367
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1368
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1369
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1370
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1371
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1372
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1373
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1374
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1375
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1376
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1377
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1378
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1379
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1380
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1381
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1382
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1383
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1384
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1385
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1386
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1387
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1388
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1389
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1390
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1391
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1392
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1393
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1394
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1395
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1396
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1397
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1398
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1399
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1400
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1401
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1402
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1403
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1404
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1405
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1406
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1407
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1408
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1409
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1410
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1411
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1412
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1413
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1414
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1415
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1416
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1417
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1418
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1419
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1420
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1421
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1422
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1423
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1424
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1425
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1426
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1427
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1428
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1429
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1430
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1431
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1432
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1433
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1434
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1435
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1436
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1437
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1438
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1439
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1440
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1441
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1442
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1443
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1444
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1445
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1446
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1447
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1448
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1449
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1450
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1451
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1452
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1453
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1454
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1455
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1456
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1457
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1458
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1459
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1460
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1461
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1462
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1463
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1464
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1465
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1466
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1467
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1468
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1469
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1470
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1471
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1472
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1473
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1474
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1475
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1476
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1477
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1478
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1479
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1480
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1481
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1482
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1483
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1484
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1485
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1486
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1487
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1488
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1489
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1490
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1491
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1492
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1493
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1494
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1495
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1496
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1497
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1498
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1499
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1500
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1501
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1502
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1503
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": -15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1504
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1505
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1506
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1507
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1508
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1509
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1510
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1511
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1512
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1513
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1514
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1515
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1516
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1517
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1518
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1519
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1520
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1521
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1522
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1523
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1524
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1525
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1526
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1527
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1528
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1529
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1530
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1531
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1532
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1533
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1534
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1535
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1536
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1537
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1538
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1539
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1540
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1541
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1542
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1543
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1544
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1545
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1546
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1547
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1548
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1549
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1550
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1551
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1552
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1553
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1554
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1555
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1556
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1557
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1558
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1559
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1560
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1561
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1562
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1563
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1564
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1565
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1566
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1567
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1568
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1569
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1570
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1571
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1572
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1573
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1574
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1575
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 0,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1576
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1577
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1578
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1579
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1580
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1581
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1582
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1583
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1584
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1585
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1586
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1587
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1588
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1589
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1590
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1591
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1592
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1593
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1594
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1595
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1596
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1597
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1598
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1599
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1600
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1601
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1602
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1603
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1604
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1605
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1606
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1607
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1608
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1609
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1610
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1611
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1612
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1613
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1614
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1615
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1616
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1617
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1618
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1619
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1620
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1621
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1622
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1623
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1624
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1625
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1626
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1627
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1628
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1629
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1630
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1631
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1632
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1633
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1634
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1635
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1636
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1637
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1638
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1639
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1640
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1641
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1642
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1643
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1644
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1645
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1646
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1647
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 15,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1648
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1649
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1650
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1651
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1652
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1653
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1654
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1655
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1656
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1657
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1658
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1659
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1660
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1661
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1662
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1663
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1664
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1665
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1666
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1667
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1668
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1669
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1670
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1671
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1672
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1673
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1674
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1675
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1676
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1677
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1678
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1679
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1680
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1681
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1682
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1683
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1684
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1685
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1686
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1687
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1688
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1689
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1690
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1691
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1692
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1693
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1694
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1695
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1696
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1697
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1698
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1699
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1700
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1701
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1702
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1703
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1704
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1705
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1706
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1707
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1708
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1709
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1710
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1711
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1712
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1713
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1714
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1715
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1716
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1717
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1718
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1719
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 30,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1720
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1721
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1722
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1723
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1724
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1725
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1726
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1727
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1728
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1729
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1730
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1731
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1732
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1733
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1734
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1735
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1736
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1737
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1738
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1739
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1740
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1741
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1742
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1743
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1744
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1745
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1746
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1747
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1748
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1749
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1750
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1751
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1752
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1753
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1754
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1755
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1756
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1757
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1758
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1759
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1760
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1761
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1762
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1763
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1764
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1765
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1766
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1767
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1768
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1769
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1770
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1771
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1772
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1773
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1774
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1775
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1776
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1777
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1778
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1779
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1780
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1781
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1782
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1783
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1784
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1785
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1786
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1787
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1788
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1789
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1790
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1791
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 45,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1792
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1793
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1794
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1795
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1796
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1797
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1798
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1799
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1800
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1801
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1802
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1803
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1804
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1805
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1806
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1807
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1808
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1809
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1810
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1811
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1812
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1813
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1814
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1815
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1816
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1817
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1818
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1819
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1820
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1821
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1822
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1823
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1824
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1825
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1826
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1827
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1828
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1829
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1830
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1831
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1832
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1833
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1834
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1835
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1836
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1837
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1838
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1839
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1840
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1841
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1842
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1843
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1844
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1845
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1846
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1847
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1848
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1849
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1850
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1851
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1852
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1853
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1854
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1855
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1856
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1857
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1858
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1859
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1860
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1861
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1862
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1863
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 60,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1864
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1865
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1866
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1867
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1868
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1869
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1870
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1871
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1872
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1873
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1874
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1875
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1876
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1877
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1878
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1879
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1880
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1881
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1882
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1883
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1884
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1885
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1886
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1887
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1888
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1889
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1890
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1891
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1892
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1893
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1894
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1895
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1896
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1897
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1898
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1899
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1900
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1901
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1902
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1903
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1904
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1905
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1906
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1907
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1908
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1909
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1910
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1911
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1912
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1913
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1914
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1915
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1916
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1917
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1918
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1919
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1920
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1921
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1922
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1923
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1924
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1925
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1926
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1927
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1928
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1929
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1930
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1931
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1932
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1933
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1934
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1935
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 90,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1936
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1937
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1938
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1939
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1940
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1941
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1942
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1943
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1944
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1945
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1946
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1947
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1948
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1949
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1950
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1951
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1952
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1953
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1954
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1955
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1956
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1957
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1958
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1959
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1960
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1961
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1962
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1963
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1964
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1965
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1966
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1967
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1968
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1969
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1970
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1971
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1972
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1973
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1974
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1975
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1976
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1977
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1978
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1979
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1980
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1981
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1982
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1983
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1984
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1985
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1986
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1987
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1988
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1989
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1990
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1991
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1992
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1993
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1994
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1995
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1996
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 1997
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 1998
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 1999
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2000
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2001
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2002
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2003
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2004
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2005
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2006
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2007
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 135,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2008
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2009
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2010
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2011
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2012
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2013
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2014
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2015
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2016
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2017
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2018
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2019
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2020
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2021
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2022
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2023
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2024
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2025
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2026
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2027
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2028
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2029
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2030
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2031
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2032
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2033
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2034
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2035
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2036
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2037
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2038
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2039
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2040
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2041
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2042
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2043
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2044
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2045
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2046
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2047
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2048
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2049
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2050
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2051
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2052
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2053
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2054
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2055
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2056
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2057
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2058
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2059
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2060
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2061
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2062
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2063
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2064
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2065
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2066
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2067
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2068
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2069
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2070
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2071
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2072
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2073
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2074
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2075
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2076
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2077
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2078
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2079
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 170,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2080
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2081
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2082
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2083
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2084
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2085
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2086
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2087
+  },
+  {
+   "exit_speed": 0,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2088
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2089
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2090
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2091
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2092
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2093
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2094
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2095
+  },
+  {
+   "exit_speed": 20,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2096
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2097
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2098
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2099
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2100
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2101
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2102
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2103
+  },
+  {
+   "exit_speed": 45,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2104
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2105
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2106
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2107
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2108
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2109
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2110
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2111
+  },
+  {
+   "exit_speed": 65,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2112
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2113
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2114
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2115
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2116
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2117
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2118
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2119
+  },
+  {
+   "exit_speed": 80,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2120
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2121
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2122
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2123
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2124
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2125
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2126
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2127
+  },
+  {
+   "exit_speed": 100,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2128
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2129
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2130
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2131
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2132
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2133
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2134
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2135
+  },
+  {
+   "exit_speed": 120,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2136
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2137
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2138
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2139
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2140
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2141
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2142
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2143
+  },
+  {
+   "exit_speed": 160,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2144
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 0,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2145
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 2,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2146
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 8,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2147
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 15,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2148
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 30,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2149
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 45,
+   "boundary_distance": 70.0,
+   "difficulty": "hard",
+   "seed": 2150
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 60,
+   "boundary_distance": 70.0,
+   "difficulty": "easy",
+   "seed": 2151
+  },
+  {
+   "exit_speed": 200,
+   "horizontal_angle": 190,
+   "vertical_angle": 90,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2152
+  },
+  {
+   "exit_speed": 300,
+   "horizontal_angle": 720,
+   "vertical_angle": 120,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2153
+  },
+  {
+   "exit_speed": -50,
+   "horizontal_angle": -540,
+   "vertical_angle": -10,
+   "boundary_distance": 70.0,
+   "difficulty": "medium",
+   "seed": 2154
+  }
+ ]
+}

@@ -370,13 +370,18 @@ export function useServerSimulation(): UseServerSimulationResult {
     boundaryDistance: number = 70.0,
     difficulty: 'easy' | 'medium' | 'hard' = 'medium'
   ): Promise<SimulationResult> => {
+    // One seed per shot, shared by the server request AND the local fallback:
+    // both engines use the same PRNG, so the outcome is identical whichever
+    // one ends up answering (timeout/disconnect degradation is seamless).
+    const shotSeed = Math.floor(Math.random() * 4294967296) >>> 0
+
     const runLocal = (): SimulationResult => {
       const trajectory = calculateTrajectory(exitSpeed, horizontalAngle, verticalAngle)
       const result = localSimulate(
         exitSpeed, horizontalAngle, verticalAngle,
         trajectory.landing_x, trajectory.landing_y,
         trajectory.projected_distance, trajectory.max_height,
-        fieldConfig, boundaryDistance, difficulty
+        fieldConfig, boundaryDistance, difficulty, shotSeed
       )
       return { ...result, trajectory } as SimulationResult
     }
@@ -410,6 +415,7 @@ export function useServerSimulation(): UseServerSimulationResult {
             field_config: fieldConfig,
             boundary_distance: boundaryDistance,
             difficulty: difficulty,
+            seed: shotSeed,
           },
         }
 

@@ -1330,6 +1330,15 @@ class MessageHandlers:
         boundary_distance = payload.get("boundary_distance", 70)
         difficulty = payload.get("difficulty", "medium")
 
+        # Optional client-supplied PRNG seed: the client sends the same seed
+        # to its local engine fallback, so the outcome is identical whether
+        # this server answered in time or not.
+        seed = payload.get("seed")
+        try:
+            seed = int(seed) & 0xFFFFFFFF if seed is not None else None
+        except (TypeError, ValueError):
+            seed = None
+
         # Calculate trajectory data for the simulation
         from engine.game_engine import _calculate_trajectory
 
@@ -1347,6 +1356,7 @@ class MessageHandlers:
             field_config=field_config,
             boundary_distance=boundary_distance,
             difficulty=difficulty,
+            seed=seed,
         )
 
         logger.info(

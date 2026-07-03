@@ -1,0 +1,57 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for all tunable game-engine parameters. Loaded by BOTH engines (engine/game_engine.py and src/gameEngine.ts). Never change a constant in one engine's source - that is exactly how the engines forked before (misfield penalty 2.5 vs 2.0, hard-catch 1.15 vs 1.10). Tune here; the golden parity suite (tools/parity/) verifies both engines still agree.",
+
+  "gravity": 9.81,
+  "bat_height": 1.0,
+  "batter_offset_from_center": 8.84,
+
+  "catch_height_min": 0.2,
+  "catch_height_max": 4.0,
+  "catch_optimal_min": 1.0,
+  "catch_optimal_max": 1.8,
+
+  "fielder_reaction_time": 0.25,
+  "fielder_run_speed": 6.0,
+  "fielder_dive_range": 1.0,
+  "fielder_accel_time": 0.5,
+  "fielder_static_range": 1.5,
+  "ground_fielding_range": 3.0,
+
+  "pitch_length": 20.12,
+  "time_for_first_run": 3.5,
+  "time_for_extra_run": 2.5,
+  "throw_speed": 30.0,
+  "collection_time_direct": 0.5,
+  "collection_time_moving": 1.0,
+  "collection_time_diving": 1.5,
+  "pickup_time_stopped": 0.4,
+  "ground_friction": 0.05,
+  "misfield_time_penalty": 2.0,
+  "fumble_time_penalty": 1.0,
+
+  "weight_reaction": 0.25,
+  "weight_movement": 0.35,
+  "weight_height": 0.20,
+  "weight_speed": 0.20,
+
+  "inner_ring_radius": 15.0,
+  "mid_field_radius": 30.0,
+
+  "aerial_height_threshold": 1.5,
+  "aerial_angle_threshold": 10.0,
+  "six_height_at_boundary": 0.5,
+
+  "catch_base_prob": 0.98,
+  "catch_prob_slope": 0.52,
+  "catch_difficulty_modifier": {
+    "easy": 0.85,
+    "medium": 1.0,
+    "hard": 1.10
+  },
+
+  "ground_fielding": {
+    "easy":   { "stopped": 0.70, "misfield_no_extra": 0.20, "misfield_extra": 0.10 },
+    "medium": { "stopped": 0.85, "misfield_no_extra": 0.10, "misfield_extra": 0.05 },
+    "hard":   { "stopped": 0.95, "misfield_no_extra": 0.04, "misfield_extra": 0.01 }
+  }
+}

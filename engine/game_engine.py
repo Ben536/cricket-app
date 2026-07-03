@@ -25,10 +25,19 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import random
-from typing import NamedTuple, TypedDict, Optional, Sequence
+from pathlib import Path
+from typing import Callable, NamedTuple, TypedDict, Optional, Sequence
+
+from engine.prng import mulberry32
+
+# All tunable parameters come from the SHARED params file - the TypeScript
+# engine loads the same file, so a constant can never fork between engines
+# again (that is how misfield 2.5-vs-2.0 and hard-catch 1.15-vs-1.10 happened).
+_PARAMS = json.loads((Path(__file__).parent / "engine_params.json").read_text())
 
 # =============================================================================
 # Logging Configuration
@@ -110,35 +119,35 @@ class SimulationResult(TypedDict):
 # =============================================================================
 
 # Gravity
-GRAVITY = 9.81  # m/s^2
+GRAVITY = _PARAMS["gravity"]  # m/s^2
 
 # Ball starting height (bat contact point)
-BAT_HEIGHT = 1.0  # metres
+BAT_HEIGHT = _PARAMS["bat_height"]  # metres
 
 # Batter position offset from field center
 # The boundary is a circle centered on the pitch center, not the batter
 # Batter is 8.84m from pitch center (half pitch length minus crease)
-BATTER_OFFSET_FROM_CENTER = 8.84  # metres
+BATTER_OFFSET_FROM_CENTER = _PARAMS["batter_offset_from_center"]  # metres
 
 # =============================================================================
 # Catch Thresholds
 # =============================================================================
 
-CATCH_HEIGHT_MIN = 0.2   # metres - below this is half-volley/scoop
-CATCH_HEIGHT_MAX = 4.0   # metres - above this is uncatchable (jumping catch limit)
-CATCH_OPTIMAL_MIN = 1.0  # metres - waist height  # Matched to TypeScript
-CATCH_OPTIMAL_MAX = 1.8  # metres - chest height  # Matched to TypeScript
+CATCH_HEIGHT_MIN = _PARAMS["catch_height_min"]   # metres - below this is half-volley/scoop
+CATCH_HEIGHT_MAX = _PARAMS["catch_height_max"]   # metres - above this is uncatchable
+CATCH_OPTIMAL_MIN = _PARAMS["catch_optimal_min"]  # metres - waist height
+CATCH_OPTIMAL_MAX = _PARAMS["catch_optimal_max"]  # metres - chest height
 
 # =============================================================================
 # Fielder Movement Constants
 # =============================================================================
 
-FIELDER_REACTION_TIME = 0.25  # seconds - elite fielders react in 0.15-0.25s  # Matched to TypeScript
-FIELDER_RUN_SPEED = 6.0       # m/s - ~22 km/h, professional fielder sprint  # Matched to TypeScript
-FIELDER_DIVE_RANGE = 1.0      # metres - full-length diving catch  # Matched to TypeScript
-FIELDER_ACCEL_TIME = 0.5      # seconds to reach max speed  # Matched to TypeScript
-FIELDER_STATIC_RANGE = 1.5    # metres - catch without moving (arm reach + step)
-GROUND_FIELDING_RANGE = 3.0   # metres - lateral reach for ground balls
+FIELDER_REACTION_TIME = _PARAMS["fielder_reaction_time"]  # seconds
+FIELDER_RUN_SPEED = _PARAMS["fielder_run_speed"]       # m/s
+FIELDER_DIVE_RANGE = _PARAMS["fielder_dive_range"]      # metres
+FIELDER_ACCEL_TIME = _PARAMS["fielder_accel_time"]      # seconds to reach max speed
+FIELDER_STATIC_RANGE = _PARAMS["fielder_static_range"]    # metres
+GROUND_FIELDING_RANGE = _PARAMS["ground_fielding_range"]   # metres
 
 
 # =============================================================================
@@ -209,41 +218,41 @@ def _get_fielder_travel_time(distance: float) -> float:
 # Ground Fielding Time Constants
 # =============================================================================
 
-PITCH_LENGTH = 20.12          # metres between stumps (22 yards)
-TIME_FOR_FIRST_RUN = 3.5      # seconds - quick single takes 2.5-3s + reaction/call
-TIME_FOR_EXTRA_RUN = 2.5      # seconds - already running, turn and sprint
-THROW_SPEED = 30.0            # m/s - 108 km/h, professional throw speed
-COLLECTION_TIME_DIRECT = 0.5  # seconds - ball straight to fielder, clean take
-COLLECTION_TIME_MOVING = 1.0  # seconds - fielder moves to collect
-COLLECTION_TIME_DIVING = 1.5  # seconds - diving stop, recover, release
-PICKUP_TIME_STOPPED = 0.4     # seconds - picking up stationary ball
-GROUND_FRICTION = 0.05        # deceleration factor per metre - cricket outfield  # Matched to TypeScript
-MISFIELD_TIME_PENALTY = 2.0   # seconds added when ball gets past fielder (spec + TS parity)
-FUMBLE_TIME_PENALTY = 1.0     # seconds added on fumble/bobble
+PITCH_LENGTH = _PARAMS["pitch_length"]          # metres between stumps
+TIME_FOR_FIRST_RUN = _PARAMS["time_for_first_run"]      # seconds
+TIME_FOR_EXTRA_RUN = _PARAMS["time_for_extra_run"]      # seconds
+THROW_SPEED = _PARAMS["throw_speed"]            # m/s
+COLLECTION_TIME_DIRECT = _PARAMS["collection_time_direct"]  # seconds
+COLLECTION_TIME_MOVING = _PARAMS["collection_time_moving"]  # seconds
+COLLECTION_TIME_DIVING = _PARAMS["collection_time_diving"]  # seconds
+PICKUP_TIME_STOPPED = _PARAMS["pickup_time_stopped"]     # seconds
+GROUND_FRICTION = _PARAMS["ground_friction"]        # deceleration per metre
+MISFIELD_TIME_PENALTY = _PARAMS["misfield_time_penalty"]   # seconds when ball gets past
+FUMBLE_TIME_PENALTY = _PARAMS["fumble_time_penalty"]     # seconds on fumble/bobble
 
 # =============================================================================
 # Difficulty Weights (for catch scoring)
 # =============================================================================
 
-WEIGHT_REACTION = 0.25   # How much time pressure matters
-WEIGHT_MOVEMENT = 0.35   # How far fielder must move
-WEIGHT_HEIGHT = 0.20     # Awkwardness of catch height
-WEIGHT_SPEED = 0.20      # Ball speed at fielder
+WEIGHT_REACTION = _PARAMS["weight_reaction"]   # How much time pressure matters
+WEIGHT_MOVEMENT = _PARAMS["weight_movement"]   # How far fielder must move
+WEIGHT_HEIGHT = _PARAMS["weight_height"]     # Awkwardness of catch height
+WEIGHT_SPEED = _PARAMS["weight_speed"]      # Ball speed at fielder
 
 # =============================================================================
 # Field Zone Radii
 # =============================================================================
 
-INNER_RING_RADIUS = 15.0  # metres
-MID_FIELD_RADIUS = 30.0   # metres
+INNER_RING_RADIUS = _PARAMS["inner_ring_radius"]  # metres
+MID_FIELD_RADIUS = _PARAMS["mid_field_radius"]   # metres
 
 # =============================================================================
 # Simulation Thresholds
 # =============================================================================
 
-AERIAL_HEIGHT_THRESHOLD = 1.5     # metres - above this is aerial
-AERIAL_ANGLE_THRESHOLD = 10.0     # degrees - above this is aerial
-SIX_HEIGHT_AT_BOUNDARY = 0.5      # metres - must be above this for six
+AERIAL_HEIGHT_THRESHOLD = _PARAMS["aerial_height_threshold"]     # metres
+AERIAL_ANGLE_THRESHOLD = _PARAMS["aerial_angle_threshold"]     # degrees
+SIX_HEIGHT_AT_BOUNDARY = _PARAMS["six_height_at_boundary"]      # metres
 MIN_SHOT_LENGTH = 0.1             # metres - below this is no shot
 TRAJECTORY_TIME_STEP = 0.05       # seconds - resolution for catch analysis
 FIELDER_PATH_START_T = 0.05       # parameter - ignore intercepts at t < this
@@ -275,32 +284,18 @@ MAX_HEIGHT = 50.0           # metres - extreme lofted shot
 # - stopped: clean fielding, ball returned quickly
 # - misfield_no_extra: fumble but recovers, slight delay
 # - misfield_extra: ball gets past, significant delay
+# Ground fielding probabilities per difficulty come from the shared params
+# file. (The old regulation_catch/hard_catch tables were dead: catch outcomes
+# use the continuous 0.98 - 0.52*difficulty formula below, never the tables.)
 DIFFICULTY_SETTINGS = {
-    'easy': {
-        'regulation_catch': {'caught': 0.70, 'dropped': 0.20, 'runs': 0.10},
-        'hard_catch': {'caught': 0.30, 'dropped': 0.40, 'runs': 0.30},
-        'ground_fielding': {'stopped': 0.70, 'misfield_no_extra': 0.20, 'misfield_extra': 0.10},
-    },
-    'medium': {
-        'regulation_catch': {'caught': 0.90, 'dropped': 0.08, 'runs': 0.02},
-        'hard_catch': {'caught': 0.55, 'dropped': 0.30, 'runs': 0.15},
-        'ground_fielding': {'stopped': 0.85, 'misfield_no_extra': 0.10, 'misfield_extra': 0.05},
-    },
-    'hard': {
-        'regulation_catch': {'caught': 0.98, 'dropped': 0.02, 'runs': 0.00},
-        'hard_catch': {'caught': 0.75, 'dropped': 0.20, 'runs': 0.05},
-        'ground_fielding': {'stopped': 0.95, 'misfield_no_extra': 0.04, 'misfield_extra': 0.01},
-    },
+    level: {'ground_fielding': probs}
+    for level, probs in _PARAMS["ground_fielding"].items()
 }
 
 # Catch probability is calculated dynamically based on difficulty score:
 #   base_prob = 0.98 - 0.52 * difficulty_score
 # These modifiers scale the base probability by difficulty level
-CATCH_DIFFICULTY_MODIFIER = {
-    'easy': 0.85,    # More drops - amateur fielders
-    'medium': 1.0,   # Standard - professional level
-    'hard': 1.10,    # Fewer drops - elite fielders (spec + TS parity)
-}
+CATCH_DIFFICULTY_MODIFIER = _PARAMS["catch_difficulty_modifier"]
 
 
 # =============================================================================
@@ -619,6 +614,9 @@ def _calculate_trajectory(
 
     # Normalize angle to -180 to 180 range (handles both 0-360 and -180 to 180 input)
     horizontal_angle = _normalize_angle(horizontal_angle)
+    # Clamp elevation like the TS engine - out-of-range input must produce the
+    # same trajectory in both engines
+    vertical_angle = _clamp(vertical_angle, MIN_VERTICAL_ANGLE, MAX_VERTICAL_ANGLE)
 
     # Precompute trig (expensive on Pi)
     h_rad = math.radians(horizontal_angle)
@@ -1060,16 +1058,16 @@ def _analyze_catch_difficulty(
 # Outcome Rolling
 # =============================================================================
 
-def _roll_catch_outcome(analysis: CatchAnalysis, difficulty: str) -> str:
+def _roll_catch_outcome(analysis: CatchAnalysis, difficulty: str, rand: Callable[[], float]) -> str:
     """Roll catch outcome based on difficulty score."""
-    base_prob = 0.98 - 0.52 * analysis['difficulty']
+    base_prob = _PARAMS["catch_base_prob"] - _PARAMS["catch_prob_slope"] * analysis['difficulty']
     modifier = CATCH_DIFFICULTY_MODIFIER.get(difficulty, 1.0)
     catch_prob = min(0.99, base_prob * modifier)
 
-    return 'caught' if random.random() < catch_prob else 'dropped'
+    return 'caught' if rand() < catch_prob else 'dropped'
 
 
-def _roll_ground_fielding_outcome(probs: dict, collection_difficulty: float = 0.0) -> str:
+def _roll_ground_fielding_outcome(probs: dict, collection_difficulty: float, rand: Callable[[], float]) -> str:
     """
     Roll ground fielding outcome with probability modified by collection difficulty.
 
@@ -1103,7 +1101,7 @@ def _roll_ground_fielding_outcome(probs: dict, collection_difficulty: float = 0.
         misfield_no_extra_prob = gf['misfield_no_extra'] + 0.05
     # else (0.15-0.3): easy collection - use base probabilities
 
-    roll = random.random()
+    roll = rand()
     if roll < stopped_prob:
         return 'stopped'
     if roll < stopped_prob + misfield_no_extra_prob:
@@ -1423,6 +1421,7 @@ def _evaluate_catches(
     exit_speed: float,
     shot_name: str,
     is_aerial: bool,
+    rand: Callable[[], float],
 ) -> Optional[dict]:
     """Evaluate catching chances for all fielders."""
     # TS:1037 - Any ball at catchable height can be caught (regardless of isAerial)
@@ -1458,7 +1457,7 @@ def _evaluate_catches(
     chances.sort(key=lambda x: x[2])
 
     for fielder, analysis, _ in chances:
-        outcome = _roll_catch_outcome(analysis, difficulty)
+        outcome = _roll_catch_outcome(analysis, difficulty, rand)
 
         if outcome == 'caught':
             catch_x, catch_y, _ = _get_ball_position_at_time(
@@ -1504,7 +1503,7 @@ def _evaluate_catches(
                     catch_analysis=analysis,
                 )
 
-            runs = _calculate_runs_for_dropped(projected_distance, exit_speed)
+            runs = _calculate_runs_for_dropped(projected_distance, exit_speed, rand)
             return _build_result(
                 outcome='dropped',
                 runs=runs,
@@ -1520,17 +1519,17 @@ def _evaluate_catches(
     return None
 
 
-def _calculate_runs_for_dropped(projected_distance: float, exit_speed: float) -> int:
+def _calculate_runs_for_dropped(projected_distance: float, exit_speed: float, rand: Callable[[], float]) -> int:
     """Calculate runs when catch is dropped.
 
     Matched to TypeScript: calculateRunsForDistance(distance, false, exitSpeed > 80)
     """
     # TS: if (distance >= MID_FIELD_RADIUS) return Math.random() < 0.33 ? 3 : 2
     if projected_distance >= MID_FIELD_RADIUS:
-        return 3 if random.random() < 0.33 else 2
+        return 3 if rand() < 0.33 else 2
     # TS: if (distance >= INNER_RING_RADIUS) return Math.random() < 0.33 ? 2 : 1
     elif projected_distance >= INNER_RING_RADIUS:
-        return 2 if random.random() < 0.33 else 1
+        return 2 if rand() < 0.33 else 1
     return 1
 
 
@@ -1683,7 +1682,8 @@ def _evaluate_ground_fielding(
     probs: dict,
     aerial_distance: float,
     time_of_flight: float,
-    boundary_distance: float = 70.0,
+    boundary_distance: float,
+    rand: Callable[[], float],
 ) -> Optional[dict]:
     """
     Evaluate ground fielding chances.
@@ -1769,7 +1769,7 @@ def _evaluate_ground_fielding(
         ball_time = chance['ball_arrival_time']
         fielder_time = chance['fielder_arrival_time']
 
-        outcome = _roll_ground_fielding_outcome(probs, collection_difficulty)
+        outcome = _roll_ground_fielding_outcome(probs, collection_difficulty, rand)
 
         fielding_time = _calculate_fielding_time(
             exit_speed, intercept_dist, lat_dist,
@@ -2030,6 +2030,7 @@ def simulate_delivery(
     field_config: list[dict],
     boundary_distance: float = 70.0,
     difficulty: str = 'medium',
+    seed: Optional[int] = None,
 ) -> dict:
     """
     Simulate the outcome of a cricket shot.
@@ -2045,10 +2046,17 @@ def simulate_delivery(
         field_config: List of fielder dicts with 'x', 'y', 'name'
         boundary_distance: Boundary radius in metres
         difficulty: 'easy', 'medium', or 'hard'
+        seed: PRNG seed for the stochastic outcomes (catch/misfield rolls).
+            The same seed gives the same outcome in BOTH engines (shared
+            mulberry32); omit for a random seed. Echoed in the result so any
+            shot can be replayed exactly.
 
     Returns:
-        Dict with outcome, runs, description, fielder info, etc.
+        Dict with outcome, runs, description, fielder info, seed, etc.
     """
+    if seed is None:
+        seed = random.getrandbits(32)
+    rand = mulberry32(seed)
     # Validate and sanitize inputs
     (exit_speed, horizontal_angle, vertical_angle, landing_x, landing_y,
      projected_distance, max_height, boundary_distance, warnings) = _validate_and_sanitize_inputs(
@@ -2090,15 +2098,17 @@ def simulate_delivery(
                         actual_boundary, is_aerial, shot_name, landing_x, landing_y)
     if result:
         result['boundary_distance'] = actual_boundary
+        result['seed'] = seed
         logger.info(f"Result: SIX - {result['description']}")
         return result
 
     # Check 2: Catches
     result = _evaluate_catches(fielders, traj, projected_distance, max_height,
                                landing_x, landing_y, actual_boundary, difficulty,
-                               exit_speed, shot_name, is_aerial)
+                               exit_speed, shot_name, is_aerial, rand)
     if result:
         result['boundary_distance'] = actual_boundary
+        result['seed'] = seed
         logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
@@ -2108,9 +2118,10 @@ def simulate_delivery(
     result = _evaluate_ground_fielding(fielders, projected_distance, landing_x, landing_y,
                                         exit_speed, is_aerial, shot_name, probs,
                                         traj.aerial_distance, traj.time_of_flight,
-                                        actual_boundary)
+                                        actual_boundary, rand)
     if result:
         result['boundary_distance'] = actual_boundary
+        result['seed'] = seed
         logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
         return result
 
@@ -2119,6 +2130,7 @@ def simulate_delivery(
                                    landing_x, landing_y, is_aerial, shot_name)
     if result:
         result['boundary_distance'] = actual_boundary
+        result['seed'] = seed
         logger.info(f"Result: FOUR - {result['description']}")
         return result
 
@@ -2126,5 +2138,6 @@ def simulate_delivery(
     result = _fallback_nearest_fielder(fielders, landing_x, landing_y, projected_distance,
                                         exit_speed, is_aerial, shot_name)
     result['boundary_distance'] = actual_boundary
+    result['seed'] = seed
     logger.info(f"Result: {result['outcome'].upper()} - {result['description']}")
     return result
