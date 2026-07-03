@@ -30,6 +30,22 @@ needs the mount calibration - derived offline by comparing detected
 directions against the wagon-wheel ground truth in the recordings
 (tools/replay_jsonl.py reports both so the offset can be fitted).
 
+MOUNTING GEOMETRY (product constraint): the sensor is ALWAYS mounted
+OVERHEAD, above the batter, looking down (hence the IWR6843 ODS variant).
+Consequences for tuning:
+- point-cloud x/y maps ~directly onto the field plane, so direction is a
+  fixed rotation from the mount, not a per-session fit
+- the doppler null occurs AT CONTACT (horizontal motion is perpendicular
+  to the boresight when the ball is directly below) - tracks start weak
+  and strengthen within ~0.1s; the bridging logic matters at track START
+- the dominant clutter is the BAT SWING directly beneath the sensor
+  (25+ m/s tip speed, well above any doppler gate) - cluster-size
+  rejection plus the racket/racket_foil recordings are the defence
+- the ~9m range sees only the ball's first ~6-8m: exactly the launch
+  segment (exit speed + direction); the engine simulates the rest
+- the incoming delivery approaches near head-on from the bowler's end -
+  ideal doppler geometry for bowling speed
+
 Designed to run identically offline (replay over JSONL recordings) and
 live (as a RadarSource subscriber) - tune offline first, then attach.
 """

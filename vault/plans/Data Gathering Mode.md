@@ -67,6 +67,18 @@ Big **Start/Stop**, session-type selector, and a row of **outcome buttons** that
 - Next: what to change in detection/kinematics
 ```
 
+## Mounting constraint (product decision, 2026-07-03)
+The sensor is **always mounted overhead, above the batter, looking down** —
+whether radar or (a possible future) phone camera. This shapes detection:
+direction reads almost directly off the point cloud's x/y (fixed mount
+rotation, no per-session calibration); the doppler null happens **at
+contact** (tracks start weak, strengthen within ~0.1s); the **bat swing is
+the main clutter source** directly beneath the sensor (prioritise `racket`/
+`racket_foil` recordings); the ~9m range covers exactly the launch segment
+the engine needs. A phone recording 240fps slo-mo alongside a radar session
+would double as a labelled dataset for the camera approach — same mount
+point, zero extra effort.
+
 ## Open choices
 - Label granularity today: just **timing marks**, or full **outcome labels**? (Building outcome labels; you can ignore them and just tap one button if rushed.)
 - Whether to also log a "bowled" mark separate from "hit". (v1: single mark at contact.)
