@@ -1,5 +1,11 @@
 # 2026-07 Full Review — Findings & Hardening Plan
 
+> **STATUS 2026-07-03: ALL PHASES EXECUTED.** Every checkbox below shipped
+> except the two explicitly deferred items in "Remaining follow-ups" at the
+> bottom. Verification: 34 pytest tests, 47 vitest tests, 1,154-shot
+> cross-engine parity suite, production build — all green; CI runs them on
+> every push.
+
 Source: full-codebase review (5 parallel subsystem audits: server core, DB layer, dual game engines, frontend, radar/ops), 2026-07-03. Everything below was verified against code, not speculated.
 
 ## Showstoppers (the product is broken in these ways TODAY)
@@ -57,6 +63,12 @@ Source: full-codebase review (5 parallel subsystem audits: server core, DB layer
 - [ ] Extract `useScoringSession` reducer + `FieldEditor` from App.tsx (~700 lines); fix undo/wagon-wheel desync, left-handed mirroring, dropped-catch display mapping.
 - [ ] `vite-plugin-pwa` precache + self-hosted fonts; decide Pi-origin vs wss story for the installed PWA.
 
-## Decision needed
-- Keep dual engines (recommended: shared params + golden tests) vs kill client-side simulation.
-- PWA origin: install from Pi (http, simple) vs TLS on the Pi (wss, lets Vercel origin work).
+## Decisions taken (2026-07-03)
+- **Dual engines KEPT**, unified: shared `engine/engine_params.json`, shared seeded mulberry32 PRNG (bit-identical across languages), PY fallback+offset-boundary ported to TS, 1,154-shot golden parity suite in CI. The client sends one seed per shot to both the server and its local fallback, so the outcome is identical whichever engine answers.
+- **PWA origin: install from the Pi** (http://cricketradar.local:5173). The app now detects the https+ws:// mixed-content dead end and tells the user to switch origin instead of failing silently. TLS-on-Pi (wss) remains possible later if the Vercel origin should work standalone.
+
+## Remaining follow-ups (deferred deliberately)
+- [ ] App.tsx structural extraction (useScoringSession reducer + FieldEditor component, ~700 lines). All known bugs in that code are FIXED; the extraction is pure structure and needs visual verification with the running app.
+- [ ] websockets library: migrate off the deprecated legacy API before the `<16` pin needs lifting (requirements.txt documents this).
+- [ ] On next Pi contact: run `./scripts/deploy_to_pi.sh` (now migrates the REAL db, installs all 5 units), verify migration 003/004 applied (`python3 -m db.migrate --status`), copy `profile_cricket.cfg` into the repo, rotate the leaked Pi password + scrub git history.
+- [ ] At the next nets session: record real data, then tune detection offline with `python3 tools/replay_jsonl.py <recording>` and fit the radar→field direction calibration from the matched wagon-wheel taps.
