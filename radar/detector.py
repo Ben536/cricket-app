@@ -78,6 +78,23 @@ class DetectorParams:
     max_coast_frames: int = 2       # missed frames before a track dies
     max_track_gap_ms: int = 400     # absolute time gap that kills a track
     max_bridge_streak: int = 2      # consecutive doppler-null points a track may absorb
+    # Motion-consistency: a real ball's POSITION travels at roughly the speed
+    # its doppler claims. Real IWR6843 data (first live recording, 2026-07-03)
+    # is full of static multipath/aliasing ghosts reading ~26 m/s doppler
+    # while sitting perfectly still - 33 false "balls" from an empty room.
+    # Observed speed (displacement/time) must be at least this fraction of
+    # the claimed radial speed.
+    min_motion_ratio: float = 0.3
+    # Path straightness: a ball covers its ~0.3s dwell in a near-straight
+    # line; surviving ghosts TELEPORT between multipath mirror positions
+    # (8m zigzags). straightness = net displacement / total path length.
+    min_straightness: float = 0.7
+    # Physical plausibility cap - ghost tracks claimed 265+ km/h
+    max_plausible_speed_kmh: float = 250.0
+    # Segment consistency: a real ball MOVES in every inter-frame segment;
+    # ghosts alternate between parked (0 m/s) and teleporting (45 m/s).
+    # At least this fraction of segments must show ball-consistent motion.
+    min_moving_fraction: float = 0.6
 
 
 # =============================================================================
@@ -333,6 +350,39 @@ class BallDetector:
         first, last = strong[0], strong[-1]
         disp = (last.x - first.x, last.y - first.y, last.z - first.z)
         disp_len = math.sqrt(sum(v * v for v in disp))
+
+        # Motion-consistency check: stationary ghosts with aliased doppler
+        # claim ball-like radial speed but travel nowhere. Reject any track
+        # whose observed speed is a small fraction of its claimed speed.
+        duration_s = (last.t_ms - first.t_ms) / 1000.0
+        if duration_s > 0:
+            observed_ms = disp_len / duration_s
+            if observed_ms < radial_ms * p.min_motion_ratio:
+                return None
+
+        # Straightness check: multipath ghosts zigzag between mirror
+        # positions; a ball's strong points lie on a near-straight line.
+        path_len = sum(
+            math.dist((a.x, a.y, a.z), (b.x, b.y, b.z))
+            for a, b in zip(strong, strong[1:])
+        )
+        if path_len > 0.5 and disp_len / path_len < p.min_straightness:
+            return None
+
+        # Segment-consistency check: every inter-frame hop of a real ball
+        # moves at ~ball speed; parked-then-teleporting ghosts don't.
+        moving = 0
+        total = 0
+        for a, b in zip(strong, strong[1:]):
+            dt = (b.t_ms - a.t_ms) / 1000.0
+            if dt <= 0:
+                continue
+            total += 1
+            seg_speed = math.dist((a.x, a.y, a.z), (b.x, b.y, b.z)) / dt
+            if seg_speed >= radial_ms * p.min_motion_ratio:
+                moving += 1
+        if total > 0 and moving / total < p.min_moving_fraction:
+            return None
         mid = strong[len(strong) // 2]
         radial = (mid.x, mid.y, mid.z)
         radial_len = math.sqrt(sum(v * v for v in radial))
@@ -344,6 +394,8 @@ class BallDetector:
         cos_theta = max(cos_theta, 0.35)  # cap correction at ~2.9x
 
         speed_ms = radial_ms / cos_theta
+        if speed_ms * 3.6 > p.max_plausible_speed_kmh:
+            return None  # faster than any cricket ball: aliasing ghost
 
         # Horizontal direction of travel in the radar frame
         direction = math.degrees(math.atan2(disp[0], disp[1])) if disp_len > 0.1 else 0.0

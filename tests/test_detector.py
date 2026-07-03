@@ -114,3 +114,29 @@ def test_two_separated_balls_two_events():
         events.extend(detector.process_frame(make_frame(n, points), t_ms))
     events.extend(detector.flush())
     assert len(events) == 2, [e.to_dict() for e in events]
+
+
+def test_real_world_static_clutter_produces_no_events():
+    """Regression fixture from the FIRST real IWR6843 recording (2026-07-03):
+    an empty room whose multipath/aliasing ghosts claim ~26 m/s doppler and
+    once produced 33 false ball events. Motion-consistency, straightness and
+    segment checks must silence it completely."""
+    import json
+    from pathlib import Path
+
+    fixture = Path(__file__).parent / "fixtures" / "real_static_clutter.jsonl"
+    detector = BallDetector()
+    events = []
+    for line in fixture.read_text().splitlines():
+        obj = json.loads(line)
+        if obj.get("type") != "frame":
+            continue
+        frame = RadarFrame(
+            frame_number=obj["frame_number"],
+            cpu_time_ms=obj["cpu_time_ms"],
+            num_points=obj["num_points"],
+            points=[RadarPoint(**p) for p in obj["points"]],
+        )
+        events.extend(detector.process_frame(frame, obj["t_ms"]))
+    events.extend(detector.flush())
+    assert events == [], f"{len(events)} ghost events from real static clutter"
