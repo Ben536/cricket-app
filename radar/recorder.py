@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import threading
 import time
 from dataclasses import dataclass, field
@@ -38,6 +39,15 @@ logger = logging.getLogger(__name__)
 # Recording limits
 MAX_RECORDING_SECONDS = 15          # default for short clips (legacy modal)
 MAX_GATHERING_SECONDS = 7200        # 2h safety backstop; gathering sessions are stopped manually
+
+# Durability / capacity. Measured on real captures: ~8.7KB per frame at 20Hz,
+# i.e. ~170KiB/s, so a full 2h gathering session writes ~1.25GB. A card that
+# fills mid-session makes write() raise inside the frame callback, which the
+# reader logs and swallows - recording silently stops while the UI still says
+# "recording". Refuse to start rather than discover that at the nets.
+FSYNC_INTERVAL_SECONDS = 1.0
+BYTES_PER_SECOND_ESTIMATE = 175_000
+DISK_HEADROOM_BYTES = 200 * 1024 * 1024   # never fill the card to the brim
 
 # Capture types -> recordings/<type>/ subdirectories. Cricket types plus
 # radar-signature test proxies (foil-wrapped ball, tennis racket, racket+foil).
@@ -102,6 +112,7 @@ class RadarRecorder:
         self._current_session: Optional[RecordingSession] = None
         self._last_session: Optional[RecordingSession] = None
         self._start_time: Optional[float] = None
+        self._last_fsync: float = 0.0
         self._jsonl = None                      # open file handle during recording
         self._frame_count = 0
         self._annotation_count = 0
@@ -152,6 +163,8 @@ class RadarRecorder:
         else:
             self._max_duration = max(1.0, min(float(max_duration_seconds), MAX_GATHERING_SECONDS))
 
+        self._check_disk_space(self._max_duration)
+
         # Resolve mock/real BEFORE subscribing, so the meta line and the first
         # frames agree. A missing radar must never silently produce a
         # plausible-looking dataset - it is flagged in the file and response.
@@ -186,6 +199,7 @@ class RadarRecorder:
         self._jsonl = open(file_path, "w")
         self._current_session.file_path = str(file_path)
         self._start_time = time.time()
+        self._last_fsync = self._start_time
 
         self._write_line({
             "type": "meta",
@@ -210,6 +224,27 @@ class RadarRecorder:
         )
         return self._current_session
 
+    def _check_disk_space(self, duration_seconds: float) -> None:
+        """Refuse to start a recording the card cannot hold.
+
+        Raises ValueError, which start_recording's caller already surfaces to
+        the UI - far better than a session that stops writing halfway through
+        with the UI still reporting "recording".
+        """
+        needed = int(duration_seconds * BYTES_PER_SECOND_ESTIMATE) + DISK_HEADROOM_BYTES
+        try:
+            free = shutil.disk_usage(self.recordings_dir).free
+        except OSError as e:
+            logger.warning(f"Could not check disk space: {e}")
+            return
+        if free < needed:
+            raise ValueError(
+                f"Not enough disk space: {free // (1024*1024)}MB free, "
+                f"a {duration_seconds:.0f}s recording needs ~{needed // (1024*1024)}MB "
+                f"(including {DISK_HEADROOM_BYTES // (1024*1024)}MB headroom). "
+                f"Delete old recordings first."
+            )
+
     def _write_line(self, obj: dict) -> None:
         """Thread-safe append of one JSON object as a line to the JSONL file."""
         with self._lock:
@@ -217,6 +252,19 @@ class RadarRecorder:
                 return
             self._jsonl.write(json.dumps(obj) + "\n")
             self._jsonl.flush()
+            # flush() only moves bytes into the OS page cache. The realistic
+            # failure at the nets is a battery/power cut, which loses everything
+            # still dirty there - up to ~30s of a session that cannot be
+            # repeated. fsync every FSYNC_INTERVAL_SECONDS bounds that loss;
+            # doing it per frame would be an SD-card write per frame, which is
+            # exactly the stall that used to corrupt the stream.
+            now = time.time()
+            if now - self._last_fsync >= FSYNC_INTERVAL_SECONDS:
+                try:
+                    os.fsync(self._jsonl.fileno())
+                    self._last_fsync = now
+                except OSError as e:
+                    logger.error(f"fsync failed (disk full?): {e}")
 
     def _on_frame(self, frame: RadarFrame) -> None:
         """RadarSource subscriber: write one frame to the JSONL stream."""

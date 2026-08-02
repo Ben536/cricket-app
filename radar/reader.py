@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import math
+import queue
 import random
 import threading
 import time
@@ -29,8 +30,13 @@ from radar.tlv import RadarFrame, RadarPoint, TLVParser
 logger = logging.getLogger(__name__)
 
 FRAME_RATE_HZ = 20  # radar profile frame rate (profile_cricket.cfg, 2026-06-27)
-MOCK_FRAME_INTERVAL = 0.1  # mock frames at 10Hz - enough for UI testing
+MOCK_FRAME_INTERVAL = 1.0 / FRAME_RATE_HZ  # match the real rate so mock timing is representative
 SERIAL_RETRY_SECONDS = 5.0  # how often to re-try the real port while mocking
+
+# Frames buffered between the reader thread and the dispatch thread. At 20Hz
+# this is ~2.5s of slack - long enough to ride out an SD-card writeback stall,
+# short enough that a wedged subscriber cannot accumulate memory.
+FRAME_QUEUE_MAX = 50
 
 FrameCallback = Callable[[RadarFrame], None]
 
@@ -49,14 +55,27 @@ class RadarSource:
         self._lock = threading.RLock()
         self._subscribers: list[FrameCallback] = []
         self._thread: Optional[threading.Thread] = None
+        self._dispatch_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._serial = None
         self._is_mock = True
         self._mode_known = threading.Event()  # set after the first port attempt
 
+        # Subscribers run on their OWN thread, fed by a bounded queue. They used
+        # to be invoked inline on the reader thread, which meant a slow sink
+        # stalled the UART: the recorder's per-frame json.dumps + write + flush
+        # is a blocking SD-card write, and while it ran nothing drained the tty,
+        # the kernel buffer overflowed, and bytes were lost MID-PACKET. Measured
+        # at 788 reads/0.5s with a fast subscriber vs 18 with a 50ms one (-98%).
+        # That byte loss is what produced the corrupt frames in the committed
+        # recordings. Backpressure must lose whole frames (visible, counted),
+        # never bytes (silent corruption).
+        self._frame_queue: queue.Queue = queue.Queue(maxsize=FRAME_QUEUE_MAX)
+
         # Data-flow stats - lets health checks measure "frames are arriving"
         # instead of poking the UART (which can reset the chip via DTR).
         self.frames_total = 0
+        self.frames_dropped_backpressure = 0
         self.last_frame_time: float = 0.0
 
     @property
@@ -83,6 +102,10 @@ class RadarSource:
             if not self.is_running:
                 self._stop_event.clear()
                 self._mode_known.clear()
+                self._dispatch_thread = threading.Thread(
+                    target=self._dispatch_loop, daemon=True, name="radar-dispatch"
+                )
+                self._dispatch_thread.start()
                 self._thread = threading.Thread(
                     target=self._run, daemon=True, name="radar-reader"
                 )
@@ -106,32 +129,64 @@ class RadarSource:
 
     def unsubscribe(self, callback: FrameCallback) -> None:
         """Deregister a callback; stops the reader when none remain."""
-        stop_thread = None
+        stop_threads = []
         with self._lock:
             if callback in self._subscribers:
                 self._subscribers.remove(callback)
             if not self._subscribers and self.is_running:
                 self._stop_event.set()
-                stop_thread = self._thread
+                stop_threads = [t for t in (self._thread, self._dispatch_thread) if t]
                 self._thread = None
+                self._dispatch_thread = None
 
-        # Join outside the lock; never join from the reader thread itself
-        # (an auto-stop that unsubscribes runs on a timer thread, but guard
-        # anyway so a subscriber callback can safely unsubscribe).
-        if stop_thread and stop_thread is not threading.current_thread():
-            stop_thread.join(timeout=2.0)
+        # Join outside the lock; never join from one of these threads itself.
+        # A subscriber callback runs on the DISPATCH thread and may unsubscribe
+        # (the recorder's auto-stop does), so both need the self-join guard.
+        for t in stop_threads:
+            if t is not threading.current_thread():
+                t.join(timeout=2.0)
+        if stop_threads:
             logger.info("Radar reader stopped (no subscribers)")
 
     def _dispatch(self, frame: RadarFrame) -> None:
+        """Enqueue a frame for the dispatch thread. MUST NOT BLOCK.
+
+        Called from the reader thread, which has to get straight back to
+        draining the serial port.
+        """
         self.frames_total += 1
         self.last_frame_time = time.time()
-        with self._lock:
-            subscribers = list(self._subscribers)
-        for callback in subscribers:
+        try:
+            self._frame_queue.put_nowait(frame)
+        except queue.Full:
+            # Drop the OLDEST frame, not this one: for live view and detection
+            # the freshest data is the useful data.
             try:
-                callback(frame)
-            except Exception as e:
-                logger.error(f"Radar subscriber error: {e}")
+                self._frame_queue.get_nowait()
+                self._frame_queue.put_nowait(frame)
+            except (queue.Empty, queue.Full):
+                pass
+            self.frames_dropped_backpressure += 1
+            if self.frames_dropped_backpressure % 20 == 1:
+                logger.warning(
+                    f"Radar subscriber(s) too slow - dropped oldest frame "
+                    f"[{self.frames_dropped_backpressure} dropped so far]"
+                )
+
+    def _dispatch_loop(self) -> None:
+        """Deliver queued frames to subscribers, off the reader thread."""
+        while not self._stop_event.is_set():
+            try:
+                frame = self._frame_queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            with self._lock:
+                subscribers = list(self._subscribers)
+            for callback in subscribers:
+                try:
+                    callback(frame)
+                except Exception as e:
+                    logger.error(f"Radar subscriber error: {e}")
 
     def _open_serial(self) -> None:
         """Try to open the real port; update mock state on transitions."""

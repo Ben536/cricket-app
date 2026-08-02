@@ -6,7 +6,10 @@
 > divergence + the parity coverage that would have caught it). Everything else below is
 > still proposed. Items are marked ✅ DONE inline as they land.
 >
-> **Tier 1 is clear. The next milestone is Tier 0 — it blocks the nets trip.**
+> **Tier 1 is clear and Tier 0's code work (T0.1-T0.4) is done.** The nets trip is no
+> longer blocked on software — only on **T0.5**, the two physical measurements that
+> settle the mount geometry and whether `extendedMaxVelocity` is engaging.
+>
 >
 > Source: full-codebase review, 2026-08-02,
 > six parallel subsystem audits (dual engines, radar pipeline, server core, DB layer,
@@ -77,7 +80,24 @@ now wastes the trip**: the recorder corrupts frames, drops them silently when th
 scene gets busy, and the detector's geometry is wrong, so anything tuned against the
 resulting data is tuned against noise.
 
-### T0.1 — The recorder is corrupting the data it exists to collect · P1
+> **Status 2026-08-02: T0.1-T0.4 are done.** Verified before/after against a
+> worktree at the pre-fix commit, using synthetic frames built from the real TI
+> byte layout:
+>
+> | case | before | after |
+> |---|---|---|
+> | garbage float (−1.198e38, from the real recordings) | emitted | dropped |
+> | NaN coordinate | emitted | dropped |
+> | `numTLVs` lies (says 3, has 1) | emitted | dropped |
+> | 32-byte padded frame (legal) | emitted | **still emitted** |
+> | 400-point realistic frame, 9,136 B | **dropped — blind** | emitted |
+> | 20 dispatches with a 50 ms sink | **1.07 s, UART stalled** | 0.00 s |
+>
+> 23 new tests in `tests/test_tier0_capture.py`; suite 73 passed.
+>
+> **T0.5 is still open — it needs the hardware and it gates Tier 2.**
+
+### T0.1 — The recorder is corrupting the data it exists to collect · P1 · ✅ DONE 2026-08-02
 `radar/tlv.py:148-192`, root cause `radar/reader.py:125-134`
 
 When bytes are lost mid-packet, `len(buffer) >= total_length` is satisfied using the
@@ -97,7 +117,7 @@ independently across all recordings: 3,102 clean points, but `y` ranges to
 (`isfinite`, `|x|,|y|,|z| ≤ max_range`, `|doppler| ≤ v_max`). Count frame-number
 discontinuities as lost frames.
 
-### T0.2 — Synchronous fan-out stalls the UART, which is what causes T0.1 · P1
+### T0.2 — Synchronous fan-out stalls the UART, which is what causes T0.1 · P1 · ✅ DONE 2026-08-02
 `radar/reader.py:125-134`; offending sink `radar/recorder.py:213-219`
 
 `_dispatch` calls every subscriber inline on the reader thread. `recorder._on_frame`
@@ -111,7 +131,7 @@ a 50 ms subscriber (−98%).
 on overflow and count drops, so backpressure loses *frames* (visible) not *bytes*
 (silent corruption).
 
-### T0.3 — The system goes blind exactly when the scene gets busy · P2
+### T0.3 — The system goes blind exactly when the scene gets busy · P2 · ✅ DONE 2026-08-02
 `radar/tlv.py:36` (`MAX_PACKET_LENGTH = 8192`), enforced `tlv.py:142-145`
 
 With `guiMonitor -1 1 1 1 0 0 1` the frame carries point cloud + range profile
@@ -127,7 +147,7 @@ view frozen, no shot ever detected, nothing above DEBUG in the log.
 with rate limiting. Separately turn off `logMagRange`/`noiseProfile` in `guiMonitor`
 — 1,024 unused bytes per frame, ~48% of the packet.
 
-### T0.4 — No fsync, no disk check · P2
+### T0.4 — No fsync, no disk check · P2 · ✅ DONE 2026-08-02
 `radar/recorder.py:213-219`, `:40`
 
 `flush()` moves bytes to the page cache, not the card; the realistic failure is a
@@ -139,7 +159,7 @@ ERROR — recording silently stops while the UI still says "recording".
 **Fix:** `os.fsync` every ~1 s; `shutil.disk_usage` check before starting, abort with
 a clear error.
 
-### T0.5 — Settle the mount geometry with a 5-minute test
+### T0.5 — Settle the mount geometry with a 5-minute test · ⬜ NEEDS HARDWARE
 Before writing any detector fix, record 10 s with the radar mounted overhead and a
 ball rolled along a known ground line. If `y` stays ≈ mount height while `x` and `z`
 sweep, T2.1 is confirmed outright and the fix can be written with confidence.
