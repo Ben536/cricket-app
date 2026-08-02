@@ -10,6 +10,18 @@ Wants=network-online.target
 # This allows manual mode operation
 Wants=cricket-radar.service
 
+# Crash-loop rate limiting: at most 5 starts in 60s, then latch into `failed` and
+# stop restarting (the health monitor clears that with `systemctl reset-failed`).
+# These MUST live in [Unit]. In [Service] systemd logs "Unknown key name
+# 'StartLimitIntervalSec' in section 'Service', ignoring" and falls back to
+# DefaultStartLimitIntervalSec=10s - which RestartSec=3 can never trip (starts at
+# t=0,3,6,9,12... is only 4 in any 10s window). The rate limit the comment below
+# used to promise therefore did not exist, and a unit that cannot start restarted
+# forever.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+StartLimitAction=none
+
 [Service]
 Type=simple
 
@@ -31,14 +43,6 @@ ExecStart=/usr/bin/python3 -m server.websocket_server
 Restart=on-failure
 RestartSec=3
 
-# Rate limiting: max 5 restarts in 60 seconds
-# Prevents crash loops from exhausting resources
-StartLimitIntervalSec=60
-StartLimitBurst=5
-
-# If we hit the limit, wait 5 minutes before trying again
-StartLimitAction=none
-
 # Graceful shutdown
 TimeoutStopSec=10
 KillMode=mixed
@@ -53,8 +57,13 @@ SyslogIdentifier=cricket-server
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/bdrysdale/cricket-app/db
-ReadWritePaths=/home/bdrysdale/cricket-app/recordings
+# The `-` prefix makes a missing path non-fatal. Without it, a ReadWritePaths
+# directory that does not exist fails the mount namespace and the unit dies with
+# 226/NAMESPACE before Python runs at all - and `recordings/` is gitignored, so a
+# fresh clone or reflashed card has no such directory. That is an unstartable
+# server, which is exactly the condition the reboot gate now refuses to reboot on.
+ReadWritePaths=-/home/bdrysdale/cricket-app/db
+ReadWritePaths=-/home/bdrysdale/cricket-app/recordings
 
 [Install]
 WantedBy=multi-user.target

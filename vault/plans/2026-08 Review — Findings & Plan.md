@@ -1,6 +1,11 @@
 # 2026-08 Full Review — Findings & Plan
 
-> **Status: PROPOSED (nothing executed).** Source: full-codebase review, 2026-08-02,
+> **Status: IN PROGRESS.** Done so far: **T1.1, T1.1b** (undo/scoring correctness) and
+> the watchdog cluster **T1.4 + T1.5 + T1.6**, landed together because fixing the health
+> check alone would have made the reboot loop *easier* to trigger. Everything else below
+> is still proposed. Items are marked ✅ DONE inline as they land.
+>
+> Source: full-codebase review, 2026-08-02,
 > six parallel subsystem audits (dual engines, radar pipeline, server core, DB layer,
 > frontend, ops/deploy/contracts). Successor to [[2026-07 Hardening Plan]], whose
 > phases were all executed on 2026-07-03.
@@ -275,7 +280,7 @@ exactly the affected band (69°-90° at angle 0).
 `traj.time_of_flight` and the trajectory's own direction so the signature matches TS
 exactly. Then add elevations 70/75/80/85 to `gen_shots.py`.
 
-### T1.4 — The watchdog reports a completely frozen server as healthy · P0
+### T1.4 — The watchdog reports a completely frozen server as healthy · P0 · ✅ DONE 2026-08-02
 `scripts/health_monitor.py:167-211`
 
 `check_websocket` does `asyncio.open_connection()` and closes — a bare TCP connect
@@ -296,7 +301,7 @@ check — ~480 spurious journal lines per 2 h session that read like a client bu
 **Must land together with T1.5**, or a working check makes the reboot loop easier to
 trigger.
 
-### T1.5 — The watchdog can reboot-loop the device indefinitely · P0
+### T1.5 — The watchdog can reboot-loop the device indefinitely · P0 · ✅ DONE 2026-08-02
 `scripts/health_monitor.py:336-346`; `scripts/systemd/cricket-server.service:36-40`
 
 `check_and_recover` treats "server never started" identically to "server died": 2
@@ -326,7 +331,7 @@ this process lifetime (not the `field(default_factory=time.time)` initialiser at
 twice within an hour; move `StartLimit*` to `[Unit]`; `ReadWritePaths=-…/recordings`
 and `mkdir -p` it in the deploy.
 
-### T1.6 — The watchdog can restart the radar into a state only an unplug fixes · P0
+### T1.6 — The watchdog can restart the radar into a state only an unplug fixes · P0 · ✅ DONE 2026-08-02
 `scripts/health_monitor.py:309-327`; `scripts/configure_radar.py:144-169`
 
 On two failed radar checks with the device node present, it restarts

@@ -34,8 +34,12 @@ echo "  Pi is reachable"
 echo ""
 echo "[2/6] Syncing code to Pi..."
 
-# Create directories first
-ssh "$PI_USER@$PI_HOST" "mkdir -p $PI_DIR/server $PI_DIR/db $PI_DIR/engine $PI_DIR/contracts $PI_DIR/radar $PI_DIR/scripts $PI_DIR/tools"
+# Create directories first.
+# `recordings` is gitignored so it never arrives via rsync, but cricket-server's
+# ReadWritePaths names it - a missing directory used to fail the unit's mount
+# namespace (226/NAMESPACE) before Python started. The unit now tolerates it
+# with a `-` prefix; creating it here means the recorder has somewhere to write.
+ssh "$PI_USER@$PI_HOST" "mkdir -p $PI_DIR/server $PI_DIR/db $PI_DIR/engine $PI_DIR/contracts $PI_DIR/radar $PI_DIR/scripts $PI_DIR/tools $PI_DIR/recordings"
 
 # Sync each directory separately to preserve structure
 rsync -avz --exclude '__pycache__' --exclude '*.pyc' --exclude '*.db' \
