@@ -163,7 +163,7 @@ function App() {
   // Undo history: each entry snapshots the session AND the wagon-wheel length
   // at the time of the ball. Wides/no-balls add no wagon-wheel line, so a
   // blind "pop one line per undo" deleted the previous legitimate shot's line.
-  const [sessionHistory, setSessionHistory] = useState<Array<{ session: Session; wagonWheelLength: number }>>([])
+  const [sessionHistory, setSessionHistory] = useState<Array<{ session: Session; wagonWheelLength: number; profileId: string }>>([])
   const [customFields, setCustomFields] = useState<CustomFieldPreset[]>(loadCustomFields)
   const [isSavingField, setIsSavingField] = useState(false)
   const [newFieldName, setNewFieldName] = useState('')
@@ -209,6 +209,8 @@ function App() {
   profilesRef.current = profiles
   const wagonWheelRef = useRef(wagonWheelShots)
   wagonWheelRef.current = wagonWheelShots
+  const activeProfileIdRef = useRef(activeProfileId)
+  activeProfileIdRef.current = activeProfileId
 
   const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0]
   const currentSession = activeProfile.currentSession
@@ -225,6 +227,24 @@ function App() {
   useEffect(() => {
     saveCustomFields(customFields)
   }, [customFields])
+
+  // Undo history, wagon wheel and last ball all describe the CURRENT innings,
+  // but they live outside `profiles` (which is per-player). Without this reset,
+  // switching batter left them pointing at the previous player's innings:
+  // undoLastBall would write that player's snapshot into the new player's
+  // session, inventing runs and balls the new batter never faced, and the
+  // wagon wheel would show shots they never played.
+  //
+  // These three reset together because they are one unit: `wagonWheelLength`
+  // in each history entry is an index into the shared `wagonWheelShots`, so
+  // per-player undo history would need a per-player wagon wheel to stay
+  // meaningful. Clearing all three on switch keeps them consistent without
+  // restructuring how the wagon wheel is stored.
+  useEffect(() => {
+    setSessionHistory([])
+    setWagonWheelShots([])
+    setLastBall(null)
+  }, [activeProfileId])
 
   const handleSaveNewCustomField = () => {
     if (newFieldName.trim()) {
@@ -377,6 +397,14 @@ function App() {
       const result = fullResult
       const trajectory = fullResult.trajectory!
 
+      // The batter can be switched while the await above is in flight. The runs
+      // still belong to this closure's profile (addRuns applies them correctly),
+      // but the wagon wheel is shared display state describing whoever is on
+      // strike NOW — appending here would draw the previous batter's shot on the
+      // new batter's wheel, and leave an undo entry that restores the wrong
+      // innings. See T1.1b.
+      const stillOnStrike = activeProfileIdRef.current === activeProfileId
+
       // Debug: comprehensive shot analysis (dev only - this is a large
       // JSON blob per shot and production phones don't need it)
       if (import.meta.env.DEV) console.log('SHOT DEBUG:', JSON.stringify({
@@ -463,7 +491,9 @@ function App() {
                    : result.outcome as BallResult,
         distance: displayDistance,
       }
-      setWagonWheelShots(prev => [...prev, shotLine])
+      if (stillOnStrike) {
+        setWagonWheelShots(prev => [...prev, shotLine])
+      }
 
       // If caught, show fielder at catch position
       if (result.outcome === 'caught' && result.fielder_involved) {
@@ -531,12 +561,24 @@ function App() {
     // render closure: simulateShot awaits the server before calling addRuns,
     // and a manual tap during that wait would otherwise be silently discarded
     // by a later undo (the closure's snapshot predates the tap).
+    // simulateShot awaits the server before calling us, so the batter may have
+    // changed in the meantime. The runs below still belong to THIS closure's
+    // profile and are applied correctly — but the undo stack, wagon wheel and
+    // last-ball panel are shared per-innings display state that now describes a
+    // different batter. Writing to them would paste this ball onto whoever is on
+    // strike now: an undo would then restore the previous batter's whole innings
+    // over the new one. Score the ball, skip the display state.
+    const stillOnStrike = activeProfileIdRef.current === activeProfileId
+
     const liveProfile = profilesRef.current.find(p => p.id === activeProfileId)
     const liveSession = liveProfile ? liveProfile.currentSession : currentSession
-    setSessionHistory(prev => [...prev, {
-      session: { ...liveSession, overs: liveSession.overs.map(o => ({ ...o, balls: [...o.balls] })) },
-      wagonWheelLength: wagonWheelRef.current.length,
-    }])
+    if (stillOnStrike) {
+      setSessionHistory(prev => [...prev, {
+        session: { ...liveSession, overs: liveSession.overs.map(o => ({ ...o, balls: [...o.balls] })) },
+        wagonWheelLength: wagonWheelRef.current.length,
+        profileId: activeProfileId,
+      }])
+    }
 
     let ballResult: BallResult
     if (isNoBall) {
@@ -584,13 +626,15 @@ function App() {
       }
     })
 
-    setLastBall(ballResult)
-    setIsFlashing(true)
-    setTimeout(() => setIsFlashing(false), 500)
+    if (stillOnStrike) {
+      setLastBall(ballResult)
+      setIsFlashing(true)
+      setTimeout(() => setIsFlashing(false), 500)
+    }
 
     // Add shot to wagon wheel (for manual input - generates random position)
     // Skip if called from simulateShot which adds its own precise trajectory
-    if (!skipWagonWheel) {
+    if (!skipWagonWheel && stillOnStrike) {
       const shotLine = generateShotLine(ballResult)
       if (shotLine) {
         setWagonWheelShots(prev => [...prev, shotLine])
@@ -602,6 +646,17 @@ function App() {
     if (sessionHistory.length === 0) return
 
     const entry = sessionHistory[sessionHistory.length - 1]
+
+    // Belt and braces: a snapshot only ever belongs to the batter who faced that
+    // ball. Applying one to a different profile is exactly what T1.1/T1.1b did —
+    // it restores a whole foreign innings over the current one. The reset effect
+    // and the addRuns guard should each already prevent a foreign entry reaching
+    // the stack; if one ever does, discard it rather than apply it.
+    if (entry.profileId !== activeProfileId) {
+      setSessionHistory(prev => prev.slice(0, -1))
+      return
+    }
+
     const previousSession = entry.session
 
     setProfiles(prev => prev.map(profile => {
