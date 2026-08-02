@@ -722,27 +722,23 @@ def _calculate_trajectory(
 def _get_ball_position_at_time(
     traj: Trajectory,
     time: float,
-    landing_x: float = None,
-    landing_y: float = None,
 ) -> tuple[float, float, float]:
-    """Get ball position (x, y, z) at specific time along trajectory."""
+    """
+    Get ball position (x, y, z) at specific time along trajectory.
+
+    Mirrors getBallPositionAtTime in src/gameEngine.ts. This also used to accept
+    landing_x/landing_y and re-derive the direction from them, overriding the
+    trajectory's own - the same defect just removed from
+    _find_catchable_intercept, and inert for the same reason: its one caller
+    (_evaluate_catches) passes the landing point of the very trajectory it also
+    passes, so the re-derived direction was collinear to ~1e-16. It would have diverged the
+    moment any caller supplied a measured landing point rather than a modelled
+    one - which is exactly what wiring the radar detector in would do.
+    """
     horizontal_dist = traj.horizontal_speed * time
 
-    # Use actual landing coordinates for direction if provided
-    if landing_x is not None and landing_y is not None:
-        actual_dist = _distance(landing_x, landing_y)
-        if actual_dist > MIN_SHOT_LENGTH:
-            dir_x = landing_x / actual_dist
-            dir_y = landing_y / actual_dist
-        else:
-            dir_x = traj.direction_x
-            dir_y = traj.direction_y
-    else:
-        dir_x = traj.direction_x
-        dir_y = traj.direction_y
-
-    x = horizontal_dist * dir_x
-    y = horizontal_dist * dir_y
+    x = horizontal_dist * traj.direction_x
+    y = horizontal_dist * traj.direction_y
     z = BAT_HEIGHT + traj.vertical_speed * time - 0.5 * GRAVITY * time * time
     return x, y, max(0.0, z)
 
@@ -859,13 +855,26 @@ def _get_boundary_intersection(
 def _find_catchable_intercept(
     fielder: Fielder,
     traj: Trajectory,
-    landing_x: float,
-    landing_y: float,
-    projected_distance: float,
-    max_height: float = None,
 ) -> tuple[float, float, float, bool]:
     """
     Find best point along trajectory where fielder could catch.
+
+    Takes ONLY the fielder and the trajectory, mirroring findCatchableIntercept
+    in src/gameEngine.ts. It previously also took landing_x/landing_y (to
+    override the direction), projected_distance (to rescale the flight time) and
+    max_height (to rescale every sampled height). None of those exist in the TS
+    twin, and the height rescaling in particular was a test hook - its comment
+    said "allows test cases to override the physics-based trajectory" - that
+    shipped in production, because simulate_delivery passes the caller's
+    max_height, clamped to MAX_HEIGHT=50m.
+
+    The effect: any shot whose true apex exceeded 50m had its whole height
+    profile squashed by (50 - BAT_HEIGHT)/(apex - BAT_HEIGHT) while flight time
+    and horizontal speed kept their true values - not a physical trajectory, and
+    not what the browser computed. A steepling top edge could be caught on the
+    Pi and dropped for 3 in the local fallback, from the same shot and seed.
+    Divergence was ~4% of shots in the steep band; the parity suite missed it
+    because gen_shots.py sampled no elevation between 60 and 89 degrees.
 
     Returns: (time, lateral_distance, height, had_time_for_optimal)
     """
@@ -873,32 +882,12 @@ def _find_catchable_intercept(
     if traj.time_of_flight <= 0:
         return float('inf'), float('inf'), 0.0, False
 
-    # Use passed-in landing coordinates for direction (may differ from trajectory physics)
-    actual_dist = _distance(landing_x, landing_y)
-    if actual_dist > MIN_SHOT_LENGTH:
-        dir_x = landing_x / actual_dist
-        dir_y = landing_y / actual_dist
-    else:
-        dir_x = traj.direction_x
-        dir_y = traj.direction_y
-
-    # Scale time of flight to match actual distance
-    if traj.horizontal_speed > 0:
-        actual_flight_time = projected_distance / traj.horizontal_speed
-    else:
-        actual_flight_time = traj.time_of_flight
-
-    # Calculate height scaling if max_height is provided
-    # This allows test cases to override the physics-based trajectory
-    if max_height is not None and traj.max_height > BAT_HEIGHT:
-        height_scale = (max_height - BAT_HEIGHT) / (traj.max_height - BAT_HEIGHT)
-    else:
-        height_scale = 1.0
-
     # Extract values for tight loop (avoid repeated attribute access)
+    dir_x = traj.direction_x
+    dir_y = traj.direction_y
     h_speed = traj.horizontal_speed
     v_speed = traj.vertical_speed
-    flight_time = actual_flight_time
+    flight_time = traj.time_of_flight
     fx, fy = fielder.x, fielder.y
 
     best_optimal = None  # Best point at optimal height
@@ -912,9 +901,8 @@ def _find_catchable_intercept(
         h_dist = h_speed * t
         x = h_dist * dir_x
         y = h_dist * dir_y
-        # Calculate height with optional scaling to match provided max_height
-        raw_z = BAT_HEIGHT + v_speed * t - 0.5 * GRAVITY * t * t
-        z = BAT_HEIGHT + (raw_z - BAT_HEIGHT) * height_scale if height_scale != 1.0 else raw_z
+        # True projectile height - never rescaled (see docstring)
+        z = BAT_HEIGHT + v_speed * t - 0.5 * GRAVITY * t * t
 
         # Check if at catchable height
         if CATCH_HEIGHT_MIN <= z <= CATCH_HEIGHT_MAX:
@@ -961,16 +949,20 @@ def _find_catchable_intercept(
 def _analyze_catch_difficulty(
     fielder: Fielder,
     traj: Trajectory,
-    intercept_distance: float,
     lateral_distance: float,
-    landing_x: float,
-    landing_y: float,
-    projected_distance: float,
-    max_height: float = None,
 ) -> CatchAnalysis:
-    """Calculate detailed catch difficulty based on trajectory and position."""
+    """
+    Calculate detailed catch difficulty based on trajectory and position.
+
+    `lateral_distance` is only reported back on the can't-catch path; every
+    difficulty component uses the distance measured at the chosen intercept.
+    The landing/projected_distance/max_height arguments this used to take were
+    passed straight through to _find_catchable_intercept and nowhere else - see
+    its docstring for why they are gone. `intercept_distance` went with them: it
+    was never read.
+    """
     time_to_intercept, lateral_dist_actual, height, had_optimal = _find_catchable_intercept(
-        fielder, traj, landing_x, landing_y, projected_distance, max_height
+        fielder, traj
     )
 
     # Can't catch - no arrival possible
@@ -1446,9 +1438,7 @@ def _evaluate_catches(
             continue
 
         intercept_dist = _distance(closest_x, closest_y)
-        analysis = _analyze_catch_difficulty(
-            fielder, traj, intercept_dist, lat_dist, landing_x, landing_y, projected_distance, max_height
-        )
+        analysis = _analyze_catch_difficulty(fielder, traj, lat_dist)
 
         if analysis['can_catch']:
             chances.append((fielder, analysis, intercept_dist))
@@ -1461,7 +1451,7 @@ def _evaluate_catches(
 
         if outcome == 'caught':
             catch_x, catch_y, _ = _get_ball_position_at_time(
-                traj, analysis['time_to_intercept'], landing_x, landing_y
+                traj, analysis['time_to_intercept']
             )
 
             if analysis['catch_type'] == 'spectacular':

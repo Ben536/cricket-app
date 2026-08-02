@@ -45,7 +45,7 @@ git add -A && git commit -m "description" && git push origin master
 > truth loaded by BOTH engines (`engine/game_engine.py` and
 > `src/gameEngine.ts`). Never change a constant in engine source code; that is
 > how the engines forked historically. After any engine change, run the golden
-> parity suite (`tools/parity/`, see its README) — 1,154 canonical shots must
+> parity suite (`tools/parity/`, see its README) — 2,274 canonical shots must
 > produce identical results in both engines.
 >
 > **Randomness is seeded**: both engines use the same mulberry32 PRNG. Each

@@ -6,13 +6,16 @@
  * Writes results_ts.json. Run with: npx tsx tools/parity/run_ts.ts
  */
 
+import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { calculateTrajectory, simulateDelivery, type FielderConfig } from '../../src/gameEngine'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const data = JSON.parse(readFileSync(join(here, 'shots.json'), 'utf-8')) as {
+const shotsBytes = readFileSync(join(here, 'shots.json'))
+const shotsSha = createHash('sha256').update(shotsBytes).digest('hex')
+const data = JSON.parse(shotsBytes.toString('utf-8')) as {
   field: FielderConfig[]
   shots: Array<{
     exit_speed: number
@@ -53,5 +56,6 @@ const results = data.shots.map((shot) => {
   }
 })
 
-writeFileSync(join(here, 'results_ts.json'), JSON.stringify(results))
+// Stamp the input hash - see the note in run_py.py.
+writeFileSync(join(here, 'results_ts.json'), JSON.stringify({ shots_sha: shotsSha, results }))
 console.log(`typescript engine: ${results.length} results -> results_ts.json`)

@@ -44,6 +44,14 @@ jobs:
         with:
           python-version: "3.11"
       - run: npm ci
+      # The shots_sha stamp proves both runners read the SAME shots.json - not
+      # that shots.json matches gen_shots.py. Without this, editing the shot
+      # generator and forgetting to commit the regenerated file means CI grades
+      # the old shot set and passes.
+      - name: shots.json is current with gen_shots.py
+        run: |
+          python3 tools/parity/gen_shots.py
+          git diff --exit-code tools/parity/shots.json
       - run: python3 tools/parity/run_py.py
       - run: npx tsx tools/parity/run_ts.ts
       - run: python3 tools/parity/compare.py

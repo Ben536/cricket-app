@@ -6,6 +6,7 @@ trajectory from engine._calculate_trajectory, then simulate_delivery.
 Writes results_py.json.
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -14,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from engine.game_engine import _calculate_trajectory, simulate_delivery  # noqa: E402
 
-data = json.loads((Path(__file__).parent / "shots.json").read_text())
+shots_path = Path(__file__).parent / "shots.json"
+shots_sha = hashlib.sha256(shots_path.read_bytes()).hexdigest()
+data = json.loads(shots_path.read_text())
 field = data["field"]
 
 results = []
@@ -49,5 +52,8 @@ for shot in data["shots"]:
     })
 
 out = Path(__file__).parent / "results_py.json"
-out.write_text(json.dumps(results))
+# Stamp the input hash: results_*.json are gitignored, so a stale file from a
+# previous shots.json can sit on disk indefinitely. compare.py refuses to grade
+# results that were not produced from the current shot set.
+out.write_text(json.dumps({"shots_sha": shots_sha, "results": results}))
 print(f"python engine: {len(results)} results -> {out}")

@@ -1,9 +1,12 @@
 # 2026-08 Full Review — Findings & Plan
 
-> **Status: IN PROGRESS.** Done so far: **T1.1, T1.1b** (undo/scoring correctness) and
-> the watchdog cluster **T1.4 + T1.5 + T1.6**, landed together because fixing the health
-> check alone would have made the reboot loop *easier* to trigger. Everything else below
-> is still proposed. Items are marked ✅ DONE inline as they land.
+> **Status: IN PROGRESS.** Done so far: **T1.1, T1.1b** (undo/scoring correctness),
+> the watchdog cluster **T1.4 + T1.5 + T1.6** (landed together — fixing the health check
+> alone would have made the reboot loop *easier* to trigger), and **T1.3** (engine
+> divergence + the parity coverage that would have caught it). Everything else below is
+> still proposed. Items are marked ✅ DONE inline as they land.
+>
+> **Tier 1 is clear. The next milestone is Tier 0 — it blocks the nets trip.**
 >
 > Source: full-codebase review, 2026-08-02,
 > six parallel subsystem audits (dual engines, radar pipeline, server core, DB layer,
@@ -24,9 +27,12 @@ frontend sync). Each had to produce a concrete failure scenario with real number
 not a code smell. ~80 findings came back; this plan keeps the ones that survived
 verification and drops the rest.
 
-The 1,154-shot parity suite, 35 pytest tests and 47 vitest tests are all green, and
-`npm run build` succeeds. **None of the P0s below are caught by any of them** — that
-is the point.
+At review time the parity suite (then 1,154 shots), 35 pytest tests and 47 vitest
+tests were all green and `npm run build` succeeded. **None of the P0s below were
+caught by any of them** — that is the point. Worse, the parity suite could not have
+been: `compare.py` had no staleness guard, and the `results_ts.json` on disk was five
+weeks old, so a Python-only re-run printed `PARITY OK` without the TS engine having
+run at all. Both gaps are now closed (see T1.3).
 
 ---
 
@@ -252,7 +258,7 @@ Same root cause. Switch batter after Player 1 faces `1, 4, •, 2, 6` and the ne
 player's wagon wheel shows all five lines including the red 4-to-the-rope, with
 Last Ball reading `6`. Covered by the same fix.
 
-### T1.3 — The Python engine squashes high shots; the TS engine doesn't · P0
+### T1.3 — The Python engine squashes high shots; the TS engine doesn't · P0 · ✅ DONE 2026-08-02
 `engine/game_engine.py:893-896`, `:917` (fed by the clamp at `:273,377-379`); no
 counterpart in `src/gameEngine.ts:491-575`
 
@@ -276,9 +282,43 @@ across the full domain. Neutralising *only* the rescaling → 0/3000.
 `elevations = [0, 2, 8, 15, 30, 45, 60, 90]` — nothing between 60 and 89, which is
 exactly the affected band (69°-90° at angle 0).
 
-**Fix:** delete the `height_scale` mechanism and the `max_height` parameter; use
-`traj.time_of_flight` and the trajectory's own direction so the signature matches TS
-exactly. Then add elevations 70/75/80/85 to `gen_shots.py`.
+**Fix — DONE.** `_find_catchable_intercept(fielder, traj)` and
+`_analyze_catch_difficulty(fielder, traj, lateral_distance)` now take only what the
+TS twins take; the height rescaling, the flight-time rescaling and the landing-point
+direction override are all gone. `_get_ball_position_at_time` had the identical
+landing-point override (inert — its one caller passes the trajectory's own landing
+point) and was cleaned up in the same pass, before the radar wiring makes it live by
+supplying a *measured* landing point.
+
+Verified: `PARITY OK: 2274 shots identical`. The reported shot
+(184.91/−19.30/85.68, seed 2342376404) goes Python `caught, 0` → `dropped, 3`,
+matching TS to the last ulp. A 5,000-shot fuzz of the steep band: **3.90% divergence
+before, 0.00% after.**
+
+**The coverage was the harder half.** Against the pre-fix engine:
+
+| shot set | detections |
+|---|---|
+| the suite as committed (1,154) | **0** — the bug shipped completely invisible |
+| grid widened to elevations 65-85 (1,874) | 1 |
+| + deterministic 400-shot steep-band sweep (2,274) | **11** |
+
+One grid hit was luck, not a guard. The sweep is statistical: across six LCG seeds it
+detects 2.5–6.25% (pooled 4.25%), so P(a 400-shot sweep catches nothing) ≈ 2.9e-08.
+The generator is byte-identical on CPython 3.9/3.11/3.12/3.13 and PyPy 3.11 — it has
+to be, because CI now regenerates `shots.json` and fails on any diff.
+
+Two supporting gaps closed at the same time:
+- `results_*.json` now carry a `shots_sha`; `compare.py` refuses to grade results not
+  produced from the current `shots.json`. **This was live**: `results_ts.json` on disk
+  was from 3 July, and a Python-only re-run printed `PARITY OK` against it. Any
+  parity result claimed before this guard existed should be treated as unverified.
+- CI regenerates `shots.json` and `git diff --exit-code`s it, so editing the generator
+  without committing the output can no longer pass silently.
+
+**Known limit:** all 10 sweep detections come through `end_x`/`end_y`; the discrete
+fields agree on those shots. Those two fields are load-bearing in `compare.py` —
+noted in the source and the README.
 
 ### T1.4 — The watchdog reports a completely frozen server as healthy · P0 · ✅ DONE 2026-08-02
 `scripts/health_monitor.py:167-211`
