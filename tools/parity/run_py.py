@@ -18,7 +18,7 @@ from engine.game_engine import _calculate_trajectory, simulate_delivery  # noqa:
 shots_path = Path(__file__).parent / "shots.json"
 shots_sha = hashlib.sha256(shots_path.read_bytes()).hexdigest()
 data = json.loads(shots_path.read_text())
-field = data["field"]
+fields = data["fields"]
 
 results = []
 for shot in data["shots"]:
@@ -33,7 +33,7 @@ for shot in data["shots"]:
         landing_y=traj.landing_y,
         projected_distance=traj.projected_distance,
         max_height=traj.max_height,
-        field_config=field,
+        field_config=fields[shot["field"]],
         boundary_distance=shot["boundary_distance"],
         difficulty=shot["difficulty"],
         seed=shot["seed"],

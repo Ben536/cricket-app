@@ -460,7 +460,13 @@ def get_boundary_distance_at_angle(horizontal_angle: float, boundary_radius: flo
     # Ray-circle intersection formula
     # Batter at (0, -offset) from pitch center, boundary circle radius R
     # Distance = offset * cos(θ) + √(R² - offset² * sin²(θ))
-    return offset * cos_angle + math.sqrt(boundary_radius * boundary_radius - offset_sq * sin_angle * sin_angle)
+    #
+    # The radicand is clamped at zero. A boundary radius smaller than the
+    # batter offset (R < 8.84·|sinθ|) has no geometric meaning; unguarded this
+    # raised ValueError and the whole shot was lost, while the TypeScript twin
+    # returned NaN. Both now return the tangent-point distance.
+    radicand = max(0.0, boundary_radius * boundary_radius - offset_sq * sin_angle * sin_angle)
+    return offset * cos_angle + math.sqrt(radicand)
 
 
 def _distance(x1: float, y1: float, x2: float = 0.0, y2: float = 0.0) -> float:
@@ -589,7 +595,23 @@ def _calculate_trajectory(
     Calculate full trajectory with precomputed values.
 
     Returns a Trajectory namedtuple for efficient access.
+
+    Input sanitisation mirrors calculateTrajectory in src/gameEngine.ts
+    exactly: non-finite -> 0, speed clamped to 0-200, elevation to 0-90, angle
+    normalised. This function used to clamp only the elevation, so a speed
+    above 200 km/h produced a longer trajectory here than in the browser -
+    the one input path where the engines still disagreed. simulate_delivery
+    clamps its own copy of exit_speed, but the landing point and distance it
+    is handed come from HERE, so the clamp has to happen here too.
     """
+    if not _is_valid_number(speed_kmh):
+        speed_kmh = 0.0
+    if not _is_valid_number(horizontal_angle):
+        horizontal_angle = 0.0
+    if not _is_valid_number(vertical_angle):
+        vertical_angle = 0.0
+    speed_kmh = _clamp(speed_kmh, MIN_EXIT_SPEED, MAX_EXIT_SPEED)
+
     # Handle edge case: zero speed
     if speed_kmh <= 0:
         return Trajectory(

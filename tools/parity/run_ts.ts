@@ -16,7 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const shotsBytes = readFileSync(join(here, 'shots.json'))
 const shotsSha = createHash('sha256').update(shotsBytes).digest('hex')
 const data = JSON.parse(shotsBytes.toString('utf-8')) as {
-  field: FielderConfig[]
+  fields: Record<string, FielderConfig[]>
   shots: Array<{
     exit_speed: number
     horizontal_angle: number
@@ -24,6 +24,7 @@ const data = JSON.parse(shotsBytes.toString('utf-8')) as {
     boundary_distance: number
     difficulty: 'easy' | 'medium' | 'hard'
     seed: number
+    field: string
   }>
 }
 
@@ -37,7 +38,7 @@ const results = data.shots.map((shot) => {
     traj.landing_y,
     traj.projected_distance,
     traj.max_height,
-    data.field,
+    data.fields[shot.field],
     shot.boundary_distance,
     shot.difficulty,
     shot.seed,

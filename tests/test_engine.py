@@ -62,12 +62,50 @@ def test_nan_inputs_do_not_crash():
     assert r["outcome"]  # produced a result, didn't blow up
 
 
-def test_prng_reference_sequence():
-    """Pin the PRNG output so neither engine can drift (TS twin is tested by
-    the parity suite against these same semantics)."""
-    r = mulberry32(42)
-    first = [r() for _ in range(3)]
-    for v in first:
-        assert 0.0 <= v < 1.0
-    r2 = mulberry32(42)
-    assert [r2() for _ in range(3)] == first
+def test_prng_golden_vectors():
+    """Pin the PRNG to exact values. These are the SAME vectors the TypeScript
+    twin is pinned to in src/__tests__/gameEngine.test.ts - change one and the
+    engines have forked. The previous version of this test asserted only
+    0 <= v < 1 and that two identical seeds agree, which random.Random would
+    also have passed."""
+    golden = {
+        42: [0.6011037519201636, 0.44829055899754167, 0.8524657934904099,
+             0.6697340414393693, 0.17481389874592423],
+        0: [0.26642920868471265, 0.0003297457005828619, 0.2232720274478197,
+            0.1462021479383111, 0.46732782293111086],
+        4294967295: [0.8964226141106337, 0.189478256739676, 0.7156526781618595,
+                     0.9440599093213677, 0.8452364315744489],
+        2342376404: [0.6776549476198852, 0.0221342071890831, 0.9222554524894804,
+                     0.3933766789268702, 0.21716754604130983],
+    }
+    for seed, expected in golden.items():
+        r = mulberry32(seed)
+        assert [r() for _ in range(5)] == expected, seed
+
+
+def test_boundary_radicand_is_clamped():
+    """R < 8.84*|sin(theta)| used to raise ValueError (shot lost); TS returned
+    NaN. Both now return the tangent-point distance."""
+    d = get_boundary_distance_at_angle(90, 5)
+    assert math.isfinite(d)
+    assert math.isclose(d, 8.84 * math.cos(math.radians(90)), abs_tol=1e-9)
+    r = simulate_delivery(exit_speed=100, horizontal_angle=90, vertical_angle=10,
+                          landing_x=-40, landing_y=0, projected_distance=60,
+                          max_height=3, field_config=FIELD, boundary_distance=5, seed=3)
+    assert r["outcome"]
+
+
+def test_trajectory_sanitises_like_typescript():
+    """_calculate_trajectory feeds the handler and the parity runner. It clamped
+    only the elevation, so speeds above 200 produced a longer trajectory here
+    than in the browser - the last input path on which the engines disagreed."""
+    from engine.game_engine import _calculate_trajectory
+
+    capped = _calculate_trajectory(200, 20, 15)
+    assert _calculate_trajectory(300, 20, 15) == capped
+    assert _calculate_trajectory(1e9, 20, 15) == capped
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        t = _calculate_trajectory(bad, 30, 10)
+        assert t.projected_distance == 0.0
+        t = _calculate_trajectory(100, bad, bad)
+        assert math.isfinite(t.landing_x) and math.isfinite(t.max_height)

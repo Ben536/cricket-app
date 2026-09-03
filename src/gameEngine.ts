@@ -109,9 +109,19 @@ const AERIAL_ANGLE_THRESHOLD = PARAMS.aerial_angle_threshold
 const SIX_HEIGHT_AT_BOUNDARY = PARAMS.six_height_at_boundary
 
 /** Normalize angle to -180..180 (positive modulo, matching Python). */
-function normalizeAngle(angle: number): number {
+export function normalizeAngle(angle: number): number {
   return ((((angle + 180) % 360) + 360) % 360) - 180
 }
+
+/** The engine's own input limits - the same numbers the Python engine clamps
+ * to and that CLAUDE.md documents. Exported so the UI and the server can
+ * validate against the engine's truth instead of restating it. */
+export const ENGINE_LIMITS = {
+  speedKmh: { min: 0, max: 200 },
+  elevationDeg: { min: 0, max: 90 },
+  projectedDistanceM: { max: 150 },
+  maxHeightM: { max: 50 },
+} as const
 
 /**
  * Actual boundary distance from the BATTER at a given shot angle.
@@ -120,13 +130,20 @@ function normalizeAngle(angle: number): number {
  * offset from it by BATTER_OFFSET_FROM_CENTER (8.84m): straight shots travel
  * further to the rope (~79m), shots behind square reach it sooner (~61m).
  * Ray-circle intersection: offset*cos(th) + sqrt(R^2 - offset^2*sin^2(th)).
+ *
+ * The radicand is clamped at zero: a boundary radius smaller than the batter
+ * offset has no geometric meaning, and an unguarded sqrt returned NaN here,
+ * which then poisoned every `>=` comparison downstream (a NaN boundary is
+ * never reached, never cleared, and never fielded). Python raises ValueError
+ * on the same input; both engines now return the tangent-point distance.
  */
-function getBoundaryDistanceAtAngle(horizontalAngle: number, boundaryRadius: number): number {
+export function getBoundaryDistanceAtAngle(horizontalAngle: number, boundaryRadius: number): number {
   const angleRad = (horizontalAngle * Math.PI) / 180
   const cosA = Math.cos(angleRad)
   const sinA = Math.sin(angleRad)
   const offset = BATTER_OFFSET_FROM_CENTER
-  return offset * cosA + Math.sqrt(boundaryRadius * boundaryRadius - offset * offset * sinA * sinA)
+  const radicand = Math.max(0, boundaryRadius * boundaryRadius - offset * offset * sinA * sinA)
+  return offset * cosA + Math.sqrt(radicand)
 }
 
 export interface TrajectoryData {
@@ -186,10 +203,14 @@ export function calculateTrajectory(
   vAngle: number
 ): TrajectoryData {
   // Sanitize inputs: clamp ranges, NORMALIZE the angle (a wraparound angle
-  // from radar noise must not clamp to the wrong side of the field)
-  const clampedSpeed = Math.max(0, Math.min(200, speedKmh))
-  const clampedHAngle = normalizeAngle(hAngle)
-  const clampedVAngle = Math.max(0, Math.min(90, vAngle))
+  // from radar noise must not clamp to the wrong side of the field). NaN/Inf
+  // become 0 first - Math.min/Math.max propagate NaN, so without this a
+  // non-finite speed sailed through the clamp and every trajectory field was
+  // NaN. The Python twin applies the identical sanitisation.
+  const finite = (v: number) => (Number.isFinite(v) ? v : 0)
+  const clampedSpeed = Math.max(ENGINE_LIMITS.speedKmh.min, Math.min(ENGINE_LIMITS.speedKmh.max, finite(speedKmh)))
+  const clampedHAngle = normalizeAngle(finite(hAngle))
+  const clampedVAngle = Math.max(ENGINE_LIMITS.elevationDeg.min, Math.min(ENGINE_LIMITS.elevationDeg.max, finite(vAngle)))
 
   // Edge case: zero speed - no trajectory at all (PY parity)
   if (clampedSpeed <= 0) {
@@ -346,7 +367,9 @@ function getBallHeightAtDistance(
 ): number {
   if (projectedDistance <= 0) return 0
 
-  const startHeight = 1.0
+  // Was a literal 1.0 shadowing bat_height: retuning the param in the
+  // documented way would have forked the engines with no source change.
+  const startHeight = BAT_HEIGHT
 
   if (verticalAngle < 5) {
     if (distanceFromBatter >= projectedDistance) return 0
@@ -649,13 +672,15 @@ function analyzeCatchDifficulty(
     // Fielder reached optimal position - easy catch height
     heightScore = 0
   } else {
-    // Fielder was rushed - penalty based on how far from optimal
-    if (heightAtIntercept >= 1.0 && heightAtIntercept <= 1.8) {
+    // Fielder was rushed - penalty based on how far from optimal. The
+    // optimal band comes from the shared params (it was a literal 1.0-1.8
+    // here, shadowing catch_optimal_min/max).
+    if (heightAtIntercept >= CATCH_OPTIMAL_MIN && heightAtIntercept <= CATCH_OPTIMAL_MAX) {
       heightScore = 0
-    } else if (heightAtIntercept < 1.0) {
-      heightScore = Math.min(1, (1.0 - heightAtIntercept) / 0.7)
+    } else if (heightAtIntercept < CATCH_OPTIMAL_MIN) {
+      heightScore = Math.min(1, (CATCH_OPTIMAL_MIN - heightAtIntercept) / 0.7)
     } else {
-      heightScore = Math.min(1, (heightAtIntercept - 1.8) / 1.7)
+      heightScore = Math.min(1, (heightAtIntercept - CATCH_OPTIMAL_MAX) / 1.7)
     }
   }
 
@@ -1131,14 +1156,23 @@ export function simulateDelivery(
   // Sanitize inputs (parity with PY _validate_and_sanitize_inputs): NaN/Inf
   // from a flaky radar reading must not flow into outcome comparisons.
   const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback)
-  exitSpeed = Math.max(0, Math.min(200, finite(exitSpeed, 0)))
+  exitSpeed = Math.max(ENGINE_LIMITS.speedKmh.min, Math.min(ENGINE_LIMITS.speedKmh.max, finite(exitSpeed, 0)))
   horizontalAngle = normalizeAngle(finite(horizontalAngle, 0))
-  verticalAngle = Math.max(0, Math.min(90, finite(verticalAngle, 0)))
+  verticalAngle = Math.max(ENGINE_LIMITS.elevationDeg.min, Math.min(ENGINE_LIMITS.elevationDeg.max, finite(verticalAngle, 0)))
   landingX = finite(landingX, 0)
   landingY = finite(landingY, 0)
-  projectedDistance = Math.max(0, Math.min(150, finite(projectedDistance, 0)))
-  maxHeight = Math.max(0, Math.min(50, finite(maxHeight, 0)))
+  projectedDistance = Math.max(0, Math.min(ENGINE_LIMITS.projectedDistanceM.max, finite(projectedDistance, 0)))
+  maxHeight = Math.max(0, Math.min(ENGINE_LIMITS.maxHeightM.max, finite(maxHeight, 0)))
   if (!Number.isFinite(boundaryDistance) || boundaryDistance <= 0) boundaryDistance = 70.0
+  // The union type is erased at runtime and this value arrives from a server
+  // payload. An unknown string used to index the probability tables as
+  // `undefined`: NaN comparisons made every catch a drop, then `.stopped`
+  // threw and took the local fallback down with it. Python degrades to
+  // 'medium' with a warning; do the same.
+  if (!(difficulty in GROUND_FIELDING_PROBS)) {
+    console.warn(`Unknown difficulty '${String(difficulty)}', using 'medium'`)
+    difficulty = 'medium'
+  }
 
   // The boundary circle is centered on the pitch, not the batter: the real
   // distance to the rope depends on shot angle (~79m straight, ~61m behind)
