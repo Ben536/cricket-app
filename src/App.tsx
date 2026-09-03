@@ -1,14 +1,23 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import './App.css'
-import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
-import { type SimulationResult } from './gameEngine'
+import { calculateFielderZones, FIELD_PRESET_POSITIONS, SCREEN_GEOMETRY, DEFAULT_BOUNDARY_RADIUS, constrainToField, fieldToScreen, screenToField, type FielderWithZone } from './fieldZones'
+import { getBoundaryDistanceAtAngle, type SimulationResult } from './gameEngine'
+import {
+  applyDelivery, ballClass, cloneSession, createEmptySession, formatOvers, lastBallLabel,
+  lastBallOf, migrateSession, overSymbol,
+  type BallResult, type BattingHand, type Difficulty, type Profile, type Session,
+} from './scoring'
+import { loadSettings, saveSettings, type FielderPosition } from './settings'
 import { useServerSimulation } from './hooks/useServerSimulation'
 import { ServerConfig } from './components/ServerConfig'
 import { RecordingModal } from './components/RecordingModal'
 import { DataGatheringModal } from './components/DataGatheringModal'
 import { RadarVisualizer } from './components/RadarVisualizer'
 
-// Types
+// Scoring rules, session/profile types and the persisted settings live in
+// src/scoring.ts and src/settings.ts (pure, unit-tested). This file owns the
+// React state, the undo stack, the wagon wheel and the field editor.
+
 interface ShotLine {
   id: string
   endX: number           // Screen % where ball ended (0-100)
@@ -19,55 +28,11 @@ interface ShotLine {
   distance: number       // metres from batter
 }
 
-interface Session {
-  id: string
-  date: string
-  runs: number
-  balls: number
-  fours: number
-  sixes: number
-  wickets: number
-  isOut: boolean
-  overs: Over[]
-  strikeRate: number
-}
-
-interface Profile {
-  id: string
-  name: string
-  sessions: Session[]
-  currentSession: Session
-}
-
-// Simple fielder position (zone calculated dynamically)
-interface FielderPosition {
-  id: string
-  x: number
-  y: number
-}
-
-type BattingHand = 'right' | 'left'
-type Difficulty = 'easy' | 'medium' | 'hard'
-type BallResult = 'dot' | '1' | '2' | '3' | '4' | '6' | 'W' | 'wd' | 'nb'
 type LastBallResult = null | BallResult
 
-interface Over {
-  balls: BallResult[]
-  runs: number
-}
-
-const createEmptySession = (): Session => ({
-  id: Date.now().toString(),
-  date: new Date().toISOString(),
-  runs: 0,
-  balls: 0,
-  fours: 0,
-  sixes: 0,
-  wickets: 0,
-  isOut: false,
-  overs: [{ balls: [], runs: 0 }],
-  strikeRate: 0,
-})
+// Two shots in the same millisecond used to share an id (a duplicate React key)
+let shotCounter = 0
+const newShotId = (): string => `${Date.now()}-${++shotCounter}`
 
 const createDefaultProfiles = (): Profile[] => [
   {
@@ -113,11 +78,6 @@ const saveCustomFields = (fields: CustomFieldPreset[]) => {
   }
 }
 
-const migrateSession = (session: Session): Session => ({
-  ...session,
-  wickets: session.wickets ?? 0,
-})
-
 const loadProfiles = (): Profile[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -149,13 +109,15 @@ function App() {
   // Initialise from the loaded profiles, not a hardcoded id: if the original
   // profile '1' was deleted, a hardcoded default silently breaks scoring
   // (score updates filter on an id that matches no profile).
-  const [activeProfileId, setActiveProfileId] = useState<string>(() => loadProfiles()[0]?.id ?? '1')
-  const [fielderPositions, setFielderPositions] = useState<FielderPosition[]>(FIELD_PRESET_POSITIONS['Standard Pace'])
-  const [batterHand, setBatterHand] = useState<BattingHand>('right')
+  const [activeProfileId, setActiveProfileId] = useState<string>(() => profiles[0]?.id ?? '1')
+  // Field layout, batter hand and difficulty survive a reload (see settings.ts)
+  const [initialSettings] = useState(loadSettings)
+  const [fielderPositions, setFielderPositions] = useState<FielderPosition[]>(initialSettings.fielderPositions)
+  const [batterHand, setBatterHand] = useState<BattingHand>(initialSettings.batterHand)
   const [showFieldEditor, setShowFieldEditor] = useState(false)
   const [showSessionHistory, setShowSessionHistory] = useState(false)
   const [historyProfileId, setHistoryProfileId] = useState<string | null>(null)
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium')
+  const [difficulty, setDifficulty] = useState<Difficulty>(initialSettings.difficulty)
   const [lastBall, setLastBall] = useState<LastBallResult>(null)
   const [isFlashing, setIsFlashing] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
@@ -228,6 +190,11 @@ function App() {
     saveCustomFields(customFields)
   }, [customFields])
 
+  // Persist the current session's settings whenever they change
+  useEffect(() => {
+    saveSettings({ fielderPositions, batterHand, difficulty })
+  }, [fielderPositions, batterHand, difficulty])
+
   // Undo history, wagon wheel and last ball all describe the CURRENT innings,
   // but they live outside `profiles` (which is per-player). Without this reset,
   // switching batter left them pointing at the previous player's innings:
@@ -271,12 +238,10 @@ function App() {
     setCustomFields(prev => prev.filter(f => f.name !== name))
   }
 
-  const calculateStrikeRate = (runs: number, balls: number): number => {
-    if (balls === 0) return 0
-    return (runs / balls) * 100
-  }
-
-  // Generate a random shot for wagon wheel based on outcome
+  // Generate a random shot for wagon wheel based on outcome. A manual tap
+  // carries no trajectory, so the direction and distance here are INVENTED
+  // within a plausible band for the outcome - the wagon wheel is decorative
+  // for manual input. Simulated shots draw their real end position instead.
   const generateShotLine = (outcome: BallResult): ShotLine | null => {
     // Don't generate shots for extras
     if (outcome === 'wd' || outcome === 'nb') return null
@@ -309,14 +274,10 @@ function App() {
     // Convert to screen coordinates
     const screen = fieldToScreen(fieldX, fieldY)
 
-    // Calculate boundary distance at this angle (batter is offset from pitch center)
-    // Formula: offset * cos(angle) + sqrt(R² - offset² * sin²(angle))
-    const BATTER_OFFSET = 8.84  // metres from pitch center
-    const BOUNDARY_RADIUS = 70  // nominal boundary radius from pitch center
-    const cosAngle = Math.cos(angleRad)
-    const sinAngle = Math.sin(angleRad)
-    const boundaryDist = BATTER_OFFSET * cosAngle +
-      Math.sqrt(BOUNDARY_RADIUS * BOUNDARY_RADIUS - BATTER_OFFSET * BATTER_OFFSET * sinAngle * sinAngle)
+    // Boundary distance at this angle: the engine's own formula (the batter
+    // is offset from the pitch centre). The engine's angle convention is
+    // +off/-leg while this wheel's is +leg, so mirror the sign.
+    const boundaryDist = getBoundaryDistanceAtAngle(-angle, DEFAULT_BOUNDARY_RADIUS)
 
     // Calculate wagon wheel endpoint at boundary + 1m
     const boundaryPlusOne = boundaryDist + 1
@@ -324,7 +285,7 @@ function App() {
     const boundaryEndScreen = fieldToScreen(boundaryEndField.x, boundaryEndField.y)
 
     return {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: newShotId(),
       endX: screen.x,
       endY: screen.y,
       boundaryEndX: boundaryEndScreen.x,
@@ -369,17 +330,24 @@ function App() {
       // thinks they are.
       const isLeftHanded = batterHand === 'left'
       const fielderIdToZone: Record<string, string> = {}
+      const nameCounts: Record<string, number> = {}
       const fieldConfig = fielderPositions.map(f => {
         const displayed = isLeftHanded ? { ...f, x: 100 - f.x } : f
         const field = screenToField(displayed.x, displayed.y)
-        // Zone name from the same displayed position the user sees
+        // Zone name from the same displayed position the user sees. Two
+        // fielders can share a nearest zone ('Spin Attack' has two Short
+        // Legs); the engine reports the fielder BY NAME, so the names it is
+        // given must be unique or the wrong dot animates and the result text
+        // is ambiguous. Suffix duplicates: "Short Leg", "Short Leg 2".
         const zones = calculateFielderZones([displayed], isLeftHanded)
-        const zoneName = zones[0]?.zoneName || 'fielder'
-        fielderIdToZone[f.id] = zoneName
+        const zoneName = zones[0]?.zoneName || 'Fielder'
+        const n = (nameCounts[zoneName] = (nameCounts[zoneName] ?? 0) + 1)
+        const uniqueName = n === 1 ? zoneName : `${zoneName} ${n}`
+        fielderIdToZone[f.id] = uniqueName
         return {
           x: field.x,
           y: field.y,
-          name: zoneName,
+          name: uniqueName,
         }
       })
 
@@ -389,7 +357,7 @@ function App() {
         angle,
         elevation,
         fieldConfig,
-        70.0,  // Match visual field radius
+        DEFAULT_BOUNDARY_RADIUS,  // matches the visual field radius
         difficulty
       )
 
@@ -451,8 +419,8 @@ function App() {
       const screen = fieldToScreen(endPos.x, endPos.y)
 
       // Calculate wagon wheel line endpoint at boundary + 1m
-      // The boundary_distance comes from the server (angle-specific)
-      const boundaryDist = result.boundary_distance || 70
+      // The boundary_distance comes from the engine (angle-specific)
+      const boundaryDist = result.boundary_distance || DEFAULT_BOUNDARY_RADIUS
       const endPosDist = Math.sqrt(endPos.x * endPos.x + endPos.y * endPos.y)
       // Direction unit vector from batter to end position
       const dirX = endPosDist > 0 ? endPos.x / endPosDist : 0
@@ -478,7 +446,7 @@ function App() {
       }
 
       const shotLine: ShotLine = {
-        id: Date.now().toString(),
+        id: newShotId(),
         endX: screen.x,
         endY: screen.y,
         boundaryEndX: boundaryEndScreen.x,
@@ -547,15 +515,6 @@ function App() {
     }
   }
 
-  const updateCurrentSession = (updater: (session: Session) => Session) => {
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== activeProfileId) return profile
-      const newSession = updater(profile.currentSession)
-      newSession.strikeRate = calculateStrikeRate(newSession.runs, newSession.balls)
-      return { ...profile, currentSession: newSession }
-    }))
-  }
-
   const addRuns = (runs: number, isBoundary: boolean = false, isWicket: boolean = false, isWide: boolean = false, isNoBall: boolean = false, skipWagonWheel: boolean = false) => {
     // Save current state for undo. Read the session through the ref, not the
     // render closure: simulateShot awaits the server before calling addRuns,
@@ -574,57 +533,21 @@ function App() {
     const liveSession = liveProfile ? liveProfile.currentSession : currentSession
     if (stillOnStrike) {
       setSessionHistory(prev => [...prev, {
-        session: { ...liveSession, overs: liveSession.overs.map(o => ({ ...o, balls: [...o.balls] })) },
+        session: cloneSession(liveSession),
         wagonWheelLength: wagonWheelRef.current.length,
         profileId: activeProfileId,
       }])
     }
 
-    let ballResult: BallResult
-    if (isNoBall) {
-      ballResult = 'nb'
-    } else if (isWide) {
-      ballResult = 'wd'
-    } else if (isWicket) {
-      ballResult = 'W'
-    } else if (runs === 0) {
-      ballResult = 'dot'
-    } else if (runs === 6) {
-      ballResult = '6'
-    } else if (runs === 4 && isBoundary) {
-      ballResult = '4'
-    } else {
-      ballResult = runs.toString() as BallResult
-    }
-
-    const isExtra = isWide || isNoBall
-
-    updateCurrentSession(session => {
-      const newOvers = [...session.overs]
-      const currentOverIndex = newOvers.length - 1
-      const currentOver = { ...newOvers[currentOverIndex] }
-
-      currentOver.balls = [...currentOver.balls, ballResult]
-      currentOver.runs += (isExtra ? 1 : (isWicket ? 0 : runs))
-      newOvers[currentOverIndex] = currentOver
-
-      // Count legal deliveries (not wides or no balls) to determine end of over
-      const legalBalls = currentOver.balls.filter(b => b !== 'wd' && b !== 'nb').length
-      if (legalBalls === 6) {
-        newOvers.push({ balls: [], runs: 0 })
-      }
-
-      return {
-        ...session,
-        runs: session.runs + (isExtra ? 1 : (isWicket ? 0 : runs)),
-        balls: isExtra ? session.balls : session.balls + 1, // Extras don't count as balls faced
-        fours: runs === 4 && isBoundary ? session.fours + 1 : session.fours,
-        sixes: runs === 6 ? session.sixes + 1 : session.sixes,
-        wickets: isWicket ? session.wickets + 1 : session.wickets,
-        isOut: isWicket ? true : session.isOut,
-        overs: newOvers,
-      }
-    })
+    // The scoring rules live in scoring.ts (pure, tested). Apply them to the
+    // profile's CURRENT session inside the state updater so two rapid taps
+    // both land (each sees the other's result, not a stale closure).
+    const input = { runs, isBoundary, isWicket, isWide, isNoBall }
+    const ballResult = applyDelivery(liveSession, input).ballResult
+    setProfiles(prev => prev.map(profile => {
+      if (profile.id !== activeProfileId) return profile
+      return { ...profile, currentSession: applyDelivery(profile.currentSession, input).session }
+    }))
 
     if (stillOnStrike) {
       setLastBall(ballResult)
@@ -665,16 +588,7 @@ function App() {
     }))
 
     // Set last ball to the previous ball (if any)
-    const prevOvers = previousSession.overs
-    const prevOver = prevOvers[prevOvers.length - 1]
-    if (prevOver.balls.length > 0) {
-      setLastBall(prevOver.balls[prevOver.balls.length - 1])
-    } else if (prevOvers.length > 1) {
-      const overBefore = prevOvers[prevOvers.length - 2]
-      setLastBall(overBefore.balls[overBefore.balls.length - 1])
-    } else {
-      setLastBall(null)
-    }
+    setLastBall(lastBallOf(previousSession))
 
     // Pop from history stack
     setSessionHistory(prev => prev.slice(0, -1))
@@ -786,13 +700,6 @@ function App() {
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
-
-  const formatOvers = (overs: Over[]): string => {
-    const countLegalBalls = (balls: BallResult[]) => balls.filter(b => b !== 'wd' && b !== 'nb').length
-    const completedOvers = overs.filter(o => countLegalBalls(o.balls) === 6).length
-    const ballsInCurrentOver = countLegalBalls(overs[overs.length - 1]?.balls || [])
-    return `${completedOvers}.${ballsInCurrentOver}`
   }
 
   const historyProfile = profiles.find(p => p.id === historyProfileId)
@@ -968,18 +875,8 @@ function App() {
             </div>
             <div className="over-balls">
               {currentOver.balls.map((ball, idx) => (
-                <span
-                  key={idx}
-                  className={`ball-result ${
-                    ball === '4' ? 'four' :
-                    ball === '6' ? 'six' :
-                    ball === 'W' ? 'wicket' :
-                    ball === 'wd' ? 'wide' :
-                    ball === 'nb' ? 'noball' :
-                    ball === 'dot' ? 'dot' : 'runs'
-                  }`}
-                >
-                  {ball === 'dot' ? '•' : ball === 'W' ? 'W' : ball === 'wd' ? 'wd' : ball === 'nb' ? 'nb' : ball}
+                <span key={idx} className={`ball-result ${ballClass(ball)}`}>
+                  {overSymbol(ball)}
                 </span>
               ))}
               {Array(Math.max(0, 6 - legalBallsInOver)).fill(null).map((_, idx) => (
@@ -994,7 +891,7 @@ function App() {
                       Ov {currentSession.overs.length - (currentSession.overs.slice(0, -1).slice(-4).length - idx)}
                     </span>
                     <span className="prev-over-balls">
-                      {over.balls.map(b => b === 'dot' ? '•' : b === 'W' ? 'W' : b === 'wd' ? 'wd' : b === 'nb' ? 'nb' : b).join(' ')}
+                      {over.balls.map(overSymbol).join(' ')}
                     </span>
                     <span className="prev-over-runs">{over.runs}</span>
                   </div>
@@ -1006,20 +903,8 @@ function App() {
           {/* Last Ball */}
           <div className="last-ball">
             <h3>Last Ball</h3>
-            <div className={`last-ball-result ${
-              lastBall === '4' ? 'four' :
-              lastBall === '6' ? 'six' :
-              lastBall === 'W' ? 'wicket' :
-              lastBall === 'wd' ? 'wide' :
-              lastBall === 'nb' ? 'noball' :
-              lastBall === 'dot' ? 'dot' : ''
-            }`}>
-              {lastBall === null ? '—' :
-               lastBall === 'dot' ? '•' :
-               lastBall === 'W' ? 'OUT!' :
-               lastBall === 'wd' ? 'WIDE' :
-               lastBall === 'nb' ? 'NO BALL' :
-               lastBall}
+            <div className={`last-ball-result ${lastBall === null ? '' : ballClass(lastBall) === 'runs' ? '' : ballClass(lastBall)}`}>
+              {lastBallLabel(lastBall)}
             </div>
           </div>
 

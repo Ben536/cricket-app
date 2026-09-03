@@ -4,54 +4,99 @@
  * Supports multiple ways to configure the server URL:
  * 1. URL query parameter: ?server=192.168.0.191:5002
  * 2. localStorage: cricket-app-server-url
- * 3. Environment variable: VITE_WS_URL (build time)
- * 4. Auto-discovery: tries cricketradar.local, raspberrypi.local, etc.
- * 5. Default fallback
+ * 3. The host that served this page (the Pi serves the UI itself)
+ * 4. Last working URL
+ * 5. Environment variable: VITE_WS_URL (build time)
+ * 6. Auto-discovery: tries cricketradar.local, raspberrypi.local
+ * 7. Default fallback
  */
 
 const STORAGE_KEY = 'cricket-app-server-url';
 const LAST_WORKING_KEY = 'cricket-app-last-working-url';
-const DEFAULT_PORT = 5002;
+export const DEFAULT_PORT = 5002;
+
+// The Pi's hostname is `cricketradar`; `raspberrypi.local` is the stock image
+// default, kept for a freshly-flashed card.
+export const DEFAULT_HOST = 'cricketradar.local';
 
 // Discovery URLs to try, in order
 const DISCOVERY_URLS = [
-  `ws://cricketradar.local:${DEFAULT_PORT}`,
+  `ws://${DEFAULT_HOST}:${DEFAULT_PORT}`,
   `ws://raspberrypi.local:${DEFAULT_PORT}`,
 ];
 
+/** The subset of window.location the discovery logic reads - injectable so
+ * the ordering rules can be tested without faking a browser origin. */
+export interface OriginInfo {
+  protocol: string;
+  hostname: string;
+  search: string;
+}
+
+function currentOrigin(): OriginInfo | null {
+  if (typeof window === 'undefined') return null;
+  const { protocol, hostname, search } = window.location;
+  return { protocol, hostname, search };
+}
+
+function normalizeWsUrl(value: string): string {
+  let normalized = value.trim();
+  if (!normalized.startsWith('ws://') && !normalized.startsWith('wss://')) {
+    normalized = `ws://${normalized}`;
+  }
+  // Append the default port only when the authority has none. (The previous
+  // check looked for ANY colon after index 5, which the `wss://` scheme
+  // itself satisfies - so a wss host never got its port.)
+  const authority = normalized.replace(/^wss?:\/\//, '').split('/')[0];
+  if (!/:\d+$/.test(authority)) {
+    normalized = `${normalized}:${DEFAULT_PORT}`;
+  }
+  return normalized;
+}
+
+function serverParamUrl(origin: OriginInfo | null): string | null {
+  if (!origin) return null;
+  const serverParam = new URLSearchParams(origin.search).get('server');
+  return serverParam ? normalizeWsUrl(serverParam) : null;
+}
+
+/**
+ * The server on the SAME HOST that served this page.
+ *
+ * At the nets the phone loads the UI from the Pi (its AP address or LAN IP),
+ * so the Pi's WebSocket is at that very hostname. mDNS names are exactly what
+ * did not resolve in the field, and every failed discovery candidate costs a
+ * 3s timeout before the operator gets to type the IP by hand. This candidate
+ * removes that path entirely. Excluded: https origins (they cannot open
+ * ws:// at all) and localhost (the Vite dev server - the Pi is not here).
+ */
+export function sameOriginServerUrl(origin: OriginInfo | null = currentOrigin()): string | null {
+  if (!origin) return null;
+  if (origin.protocol !== 'http:') return null;
+  const host = origin.hostname;
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return null;
+  return `ws://${host}:${DEFAULT_PORT}`;
+}
+
 /**
  * Get the WebSocket server URL from various sources.
- * Priority: URL param > localStorage > env var > default
+ * Priority: URL param > localStorage > same-origin host > env var > default
  */
-export function getServerUrl(): string {
-  // 1. Check URL query parameter (highest priority, for testing)
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    const serverParam = params.get('server');
-    if (serverParam) {
-      // Handle both "192.168.0.191:5002" and "ws://192.168.0.191:5002"
-      if (serverParam.startsWith('ws://') || serverParam.startsWith('wss://')) {
-        return serverParam;
-      }
-      return `ws://${serverParam}`;
-    }
-  }
+export function getServerUrl(origin: OriginInfo | null = currentOrigin()): string {
+  const fromParam = serverParamUrl(origin);
+  if (fromParam) return fromParam;
 
-  // 2. Check localStorage
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return stored;
-    }
-  }
+  const stored = getSavedServerUrl();
+  if (stored) return stored;
 
-  // 3. Check environment variable (set at build time)
+  const sameOrigin = sameOriginServerUrl(origin);
+  if (sameOrigin) return sameOrigin;
+
   if (import.meta.env.VITE_WS_URL) {
     return import.meta.env.VITE_WS_URL;
   }
 
-  // 4. Default - try raspberrypi.local first
-  return `ws://raspberrypi.local:${DEFAULT_PORT}`;
+  return `ws://${DEFAULT_HOST}:${DEFAULT_PORT}`;
 }
 
 /**
@@ -59,16 +104,7 @@ export function getServerUrl(): string {
  */
 export function saveServerUrl(url: string): void {
   if (typeof window !== 'undefined') {
-    // Normalize the URL
-    let normalized = url.trim();
-    if (!normalized.startsWith('ws://') && !normalized.startsWith('wss://')) {
-      normalized = `ws://${normalized}`;
-    }
-    // Ensure port is included
-    if (!normalized.includes(':', 5)) { // Check for port after ws://
-      normalized = `${normalized}:${DEFAULT_PORT}`;
-    }
-    localStorage.setItem(STORAGE_KEY, normalized);
+    localStorage.setItem(STORAGE_KEY, normalizeWsUrl(url));
   }
 }
 
@@ -121,42 +157,20 @@ export function saveLastWorkingUrl(url: string): void {
 }
 
 /**
- * Get the list of URLs to try for auto-discovery.
- * Includes: configured URL, last working URL, and discovery URLs.
+ * Get the list of URLs to try for auto-discovery, most likely first:
+ * explicit ?server= > saved > same-origin host > last working > mDNS names.
  */
-export function getDiscoveryUrls(): string[] {
+export function getDiscoveryUrls(origin: OriginInfo | null = currentOrigin()): string[] {
   const urls: string[] = [];
+  const push = (url: string | null) => {
+    if (url && !urls.includes(url)) urls.push(url);
+  };
 
-  // 1. Explicit configuration (highest priority)
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    const serverParam = params.get('server');
-    if (serverParam) {
-      const url = serverParam.startsWith('ws://') || serverParam.startsWith('wss://')
-        ? serverParam
-        : `ws://${serverParam}`;
-      urls.push(url);
-    }
-  }
-
-  // 2. Saved server URL
-  const saved = getSavedServerUrl();
-  if (saved && !urls.includes(saved)) {
-    urls.push(saved);
-  }
-
-  // 3. Last working URL
-  const lastWorking = getLastWorkingUrl();
-  if (lastWorking && !urls.includes(lastWorking)) {
-    urls.push(lastWorking);
-  }
-
-  // 4. Discovery URLs
-  for (const url of DISCOVERY_URLS) {
-    if (!urls.includes(url)) {
-      urls.push(url);
-    }
-  }
+  push(serverParamUrl(origin));
+  push(getSavedServerUrl());
+  push(sameOriginServerUrl(origin));
+  push(getLastWorkingUrl());
+  for (const url of DISCOVERY_URLS) push(url);
 
   return urls;
 }

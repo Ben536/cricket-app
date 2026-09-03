@@ -189,46 +189,6 @@
   color: var(--sky-gold);
 }
 
-/* Profile Button with History */
-.profile-btn-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.history-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--sky-gold);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.history-btn:hover {
-  background: var(--sky-gold);
-  color: var(--text-dark);
-  border-color: var(--sky-gold);
-}
-
-/* Edit Name */
-.edit-name-btn {
-  background: transparent;
-  border: none;
-  padding: 4px 6px;
-  cursor: pointer;
-  font-size: 12px;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.edit-name-btn:hover {
-  opacity: 1;
-}
-
 .profile-name-input {
   background: var(--sky-blue-dark);
   border: 2px solid var(--sky-gold);
@@ -1605,96 +1565,14 @@
   color: var(--white);
 }
 
-/* Connection Status */
-.connection-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sky-blue-dark);
-  z-index: 1000;
-}
-
-.connection-status {
-  text-align: center;
-  padding: 40px;
-  max-width: 400px;
-}
-
-.connection-status h2 {
-  font-family: 'Roboto Condensed', sans-serif;
-  font-size: 24px;
-  color: var(--white);
-  margin: 20px 0 10px;
-}
-
 .connection-status.error h2 {
   color: var(--sky-red);
-}
-
-.connection-error {
-  color: var(--grey);
-  font-size: 14px;
-  margin-bottom: 20px;
-}
-
-.connection-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(255, 255, 255, 0.1);
-  border-left-color: var(--sky-gold);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-}
-
-.disconnected-icon,
-.error-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--sky-red);
-  color: var(--white);
-  font-size: 28px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reconnect-btn {
-  background: var(--sky-gold);
-  color: var(--text-dark);
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reconnect-btn:hover {
-  background: var(--sky-gold-light);
-  transform: translateY(-1px);
 }
 
 /* Server Config Modal */
@@ -1995,30 +1873,6 @@
 
 .btn-delete:hover {
   filter: brightness(1.1);
-}
-
-/* Settings button in header */
-.settings-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #e2e8f0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-}
-
-.settings-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.settings-btn .status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
 }
 
 .settings-btn .status-indicator.connected {

@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { simulateDelivery as localSimulate, calculateTrajectory, type SimulationResult } from '../gameEngine'
 import type { FielderConfig } from '../gameEngine'
-import { getServerUrl, discoverServer, saveLastWorkingUrl } from '../api/config'
+import { getServerUrl, discoverServer, saveLastWorkingUrl, DEFAULT_HOST } from '../api/config'
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'discovering'
 
@@ -225,15 +225,26 @@ export function useServerSimulation(): UseServerSimulationResult {
 
           // Handle errors
           if (data.type === 'error') {
-            setError(data.payload?.message || 'Server error')
+            const message = data.payload?.message || 'Server error'
 
-            // Reject pending request if this is a reply
             if (data.in_reply_to) {
               const pending = pendingRequestsRef.current.get(data.in_reply_to)
               if (pending) {
+                // A server `error` reply to simulate_shot used to REJECT the
+                // shot - the only resolution path that lost the ball (no over
+                // entry, no wagon-wheel line), while a timeout or disconnect
+                // degraded to the local engine. Same seed, same outcome:
+                // resolve locally, exactly like the other failure paths.
                 clearTimeout(pending.timeout)
                 pendingRequestsRef.current.delete(data.in_reply_to)
-                pending.reject(new Error(data.payload?.message || 'Server error'))
+                console.warn(`Server rejected simulate_shot (${message}); using local engine`)
+                try {
+                  pending.resolve(pending.fallback())
+                } catch (e) {
+                  pending.reject(e instanceof Error ? e : new Error('Local simulation failed'))
+                }
+              } else {
+                setError(message)
               }
 
               // Also check generic pending
@@ -244,6 +255,9 @@ export function useServerSimulation(): UseServerSimulationResult {
                 // Resolve with error response so caller can handle it
                 genericPending.resolve(data)
               }
+            } else {
+              // Unsolicited error (not a reply): surface it globally
+              setError(message)
             }
           }
 
@@ -288,7 +302,7 @@ export function useServerSimulation(): UseServerSimulationResult {
       setError(
         'This page is https:// but the CricketRadar server only speaks ws:// - '
         + 'the browser blocks that combination. Open the app from the Pi instead: '
-        + 'http://cricketradar.local:5173'
+        + `http://${DEFAULT_HOST}:5173 (or the Pi's IP address)`
       )
       setStatusMessage(null)
       return // retrying cannot help; the user must switch origin
@@ -335,7 +349,10 @@ export function useServerSimulation(): UseServerSimulationResult {
         }, DISCOVERY_RETRY_MS)
       }
     } finally {
-      connectingRef.current = false
+      // Only the connect that OWNS the current generation may release the
+      // single-flight latch. A superseded discovery (reconnect() ran while it
+      // was awaiting) must not clear a latch that a newer connect holds.
+      if (gen === generationRef.current) connectingRef.current = false
     }
   }, [clearReconnectTimer, connectToUrl])
 
@@ -343,6 +360,13 @@ export function useServerSimulation(): UseServerSimulationResult {
 
   const disconnect = useCallback(() => {
     generationRef.current++ // invalidate all handlers/timers/continuations
+    // Release the single-flight latch too. "Save & Reconnect" during
+    // discovery calls disconnect() then connect(); with the latch still held
+    // by the orphaned discovery, connect() returned immediately, the orphan
+    // then bailed on its stale generation (skipping both the error message
+    // and the retry timer), and the app sat at `disconnected` with no
+    // socket, no error and no retry until a second tap.
+    connectingRef.current = false
     clearReconnectTimer()
     teardownSocket()
     settlePendingOnDisconnect()

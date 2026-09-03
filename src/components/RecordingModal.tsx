@@ -29,6 +29,10 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
   const [counts, setCounts] = useState<RecordingCounts>({ bowling: 0, batting: 0, both: 0 })
   const [error, setError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<string | null>(null)
+  // True when the server reports the radar was ABSENT and the frames are
+  // fabricated. The data-gathering modal has warned about this since 2026-07;
+  // this short-clip modal silently saved mock clips as if they were real.
+  const [isMock, setIsMock] = useState(false)
 
   const timerRef = useRef<number | null>(null)
   const maxDuration = 15
@@ -38,9 +42,10 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
     if (isConnected) {
       sendMessage('get_recording_status', {})
         .then((response: unknown) => {
-          const resp = response as { payload?: { is_recording?: boolean; counts?: RecordingCounts } }
+          const resp = response as { payload?: { is_recording?: boolean; counts?: RecordingCounts; mock?: boolean } }
           if (resp?.payload) {
             setIsRecording(resp.payload.is_recording || false)
+            if (resp.payload.is_recording) setIsMock(resp.payload.mock ?? false)
             if (resp.payload.counts) {
               setCounts(resp.payload.counts)
             }
@@ -93,12 +98,13 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
     try {
       const response = await sendMessage('start_recording', { session_type: sessionType }) as {
         type: string
-        payload?: { counts?: RecordingCounts }
+        payload?: { counts?: RecordingCounts; mock?: boolean }
       }
 
       if (response.type === 'recording_started') {
         setIsRecording(true)
         setElapsedSeconds(0)
+        setIsMock(response.payload?.mock ?? false)
         if (response.payload?.counts) {
           setCounts(response.payload.counts)
         }
@@ -125,6 +131,7 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
           duration_seconds?: number
           frame_count?: number
           counts?: RecordingCounts
+          mock?: boolean
         }
       }
 
@@ -133,7 +140,8 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
         setElapsedSeconds(0)
         if (response.payload) {
           setLastResult(
-            `Saved: ${response.payload.duration_seconds?.toFixed(1)}s, ` +
+            `Saved${response.payload.mock ? ' (MOCK DATA - radar was not detected)' : ''}: ` +
+            `${response.payload.duration_seconds?.toFixed(1)}s, ` +
             `${response.payload.frame_count} frames`
           )
           if (response.payload.counts) {
@@ -163,6 +171,13 @@ export function RecordingModal({ isConnected, onClose, sendMessage }: RecordingM
           {!isConnected && (
             <div className="recording-warning">
               Not connected to Pi server
+            </div>
+          )}
+          {isMock && isRecording && (
+            <div className="recording-warning">
+              ⚠️ RADAR NOT DETECTED — this clip records fabricated mock data,
+              not real radar. Check the radar's USB connection, then stop and
+              start again.
             </div>
           )}
 

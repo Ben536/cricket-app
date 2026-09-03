@@ -6,7 +6,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { getServerUrl, saveServerUrl, clearServerUrl } from '../api/config';
+import { getServerUrl, saveServerUrl, clearServerUrl, DEFAULT_HOST, DEFAULT_PORT } from '../api/config';
+
+const DEFAULT_ADDRESS = `${DEFAULT_HOST}:${DEFAULT_PORT}`;
 
 interface ServerConfigProps {
   isConnected: boolean;
@@ -25,7 +27,7 @@ export function ServerConfig({ isConnected, connectionState, statusMessage, erro
     // Load current server URL (just the host:port part)
     const currentUrl = getServerUrl();
     const match = currentUrl.match(/wss?:\/\/(.+)/);
-    setServerAddress(match ? match[1] : 'raspberrypi.local:5002');
+    setServerAddress(match ? match[1] : DEFAULT_ADDRESS);
   }, []);
 
   const handleSave = () => {
@@ -36,7 +38,7 @@ export function ServerConfig({ isConnected, connectionState, statusMessage, erro
 
   const handleReset = () => {
     clearServerUrl();
-    setServerAddress('raspberrypi.local:5002');
+    setServerAddress(DEFAULT_ADDRESS);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -74,9 +76,9 @@ export function ServerConfig({ isConnected, connectionState, statusMessage, erro
             type="text"
             value={serverAddress}
             onChange={e => setServerAddress(e.target.value)}
-            placeholder="raspberrypi.local:5002 or 192.168.0.191:5002"
+            placeholder={`${DEFAULT_ADDRESS} or 10.42.0.1:5002`}
           />
-          <small>Enter your Raspberry Pi's IP address or hostname with port</small>
+          <small>Enter your Raspberry Pi's IP address or hostname with port. If this page was served by the Pi, its address is tried first automatically.</small>
         </div>
 
         <div className="config-actions">
@@ -96,7 +98,8 @@ export function ServerConfig({ isConnected, connectionState, statusMessage, erro
           <ol>
             <li>On the Pi, run: <code>hostname -I</code></li>
             <li>Use the IP shown (e.g., 192.168.0.191)</li>
-            <li>Or use <code>raspberrypi.local</code> if mDNS works</li>
+            <li>Or use <code>{DEFAULT_HOST}</code> if mDNS works (it often does not at the nets)</li>
+            <li>On the CricketRadar hotspot the Pi is <code>10.42.0.1</code></li>
           </ol>
           <p><strong>Quick test:</strong> Add <code>?server=192.168.0.191:5002</code> to the URL</p>
         </div>

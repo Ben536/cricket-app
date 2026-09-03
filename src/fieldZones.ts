@@ -24,6 +24,8 @@
  * - Therefore batter is at (50%, 43.7%)
  */
 
+import PARAMS from '../engine/engine_params.json'
+
 // ============================================
 // VISUAL UI CONSTANTS (aligned to CSS)
 // ============================================
@@ -35,8 +37,13 @@ const SCREEN_FIELD_RADIUS = 50    // The circle fills 0-100%
 // ============================================
 // REAL WORLD DIMENSIONS (in meters)
 // ============================================
-const FIELD_RADIUS_METERS = 70
-const FIELD_CENTER_OFFSET_FROM_BATTER = 8.84  // Field center is 8.84m toward bowler from batter
+// The nominal boundary radius the UI draws and passes to the engine as
+// `boundaryDistance`. It is a session choice, not an engine constant, so it
+// lives here; the pitch geometry below comes from the shared engine params so
+// the drawn field and the simulated field can never disagree.
+export const DEFAULT_BOUNDARY_RADIUS = 70
+const FIELD_RADIUS_METERS = DEFAULT_BOUNDARY_RADIUS
+const FIELD_CENTER_OFFSET_FROM_BATTER: number = PARAMS.batter_offset_from_center  // 8.84m toward bowler from batter
 
 // Scale: 1% screen = how many meters
 const METERS_PER_PERCENT = FIELD_RADIUS_METERS / SCREEN_FIELD_RADIUS  // 70/50 = 1.4
@@ -53,7 +60,7 @@ const BATTER_SCREEN_Y = SCREEN_FIELD_CENTER_Y - BATTER_OFFSET_FROM_CENTER  // 50
 // ============================================
 // PITCH DIMENSIONS
 // ============================================
-const PITCH_LENGTH_METERS = 20.12  // Standard cricket pitch length
+const PITCH_LENGTH_METERS: number = PARAMS.pitch_length  // Standard cricket pitch length (20.12m)
 const PITCH_VISUAL_SCALE = 1.5     // Scale up length for visibility
 const PITCH_LENGTH_SCREEN = (PITCH_LENGTH_METERS / METERS_PER_PERCENT) * PITCH_VISUAL_SCALE  // ~21.6%
 const PITCH_WIDTH_SCREEN = 6       // Fixed width for visibility
