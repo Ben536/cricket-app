@@ -2,9 +2,11 @@
 Description=CricketRadar - WebSocket Server
 Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
 
-# Start after radar is configured (or after timeout)
-After=cricket-radar.service network-online.target
-Wants=network-online.target
+# Start after radar is configured (or after timeout). The server binds
+# 0.0.0.0 and needs no particular interface up, so it does NOT wait for
+# network-online.target - at the nets (no known WiFi) that wait blocks for the
+# full NetworkManager-wait-online timeout (~30s) before the app can be used.
+After=cricket-radar.service
 
 # Weak dependency - start even if radar config failed
 # This allows manual mode operation

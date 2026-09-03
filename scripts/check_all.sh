@@ -13,7 +13,7 @@
 #   - Node 22 with node_modules installed (npm ci)
 #
 set -u
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 FAST=0
 [ "${1:-}" = "--fast" ] && FAST=1
@@ -57,6 +57,7 @@ if [ $FAST -eq 0 ]; then
 fi
 
 # --- Ops sanity ------------------------------------------------------------
+if [ -x .venv/bin/shellcheck ]; then PATH="$PWD/.venv/bin:$PATH"; fi
 if command -v shellcheck >/dev/null 2>&1; then
   run_gate "shellcheck"      shellcheck -S warning scripts/*.sh
 else

@@ -7,18 +7,51 @@ on:
 
 jobs:
   python:
-    name: Python tests
+    name: Python tests (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 = Raspberry Pi OS bookworm; 3.9 = bullseye. The Pi runs the
+        # system python3, so the server must import and pass on both.
+        python: ["3.9", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest tests/ -q
+
+  drift:
+    name: Codebase drift + ops lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements-dev.txt
-      - run: python -m pytest tests/ -q
+      # Mechanical cross-references: message types vs handlers, engine params
+      # vs both engines, error codes vs docs, units vs installers.
+      - run: python3 tools/codebase_map.py --check --quiet
+      - run: sudo apt-get install -y shellcheck
+      - run: shellcheck -S warning scripts/*.sh
+      # systemd unit files: every directive must be valid for its section
+      # (a misplaced StartLimitIntervalSec is silently ignored on the Pi)
+      - run: pip install pytest && python -m pytest tests/test_systemd_units.py -q
+      - name: systemd-analyze verify
+        run: |
+          # Verifies syntax and directive placement with the real systemd.
+          # User= refers to a Pi-only account, which verify reports as an
+          # error we do not care about here; filter it and fail on the rest.
+          out=$(systemd-analyze verify scripts/systemd/*.service 2>&1 || true)
+          echo "$out"
+          if echo "$out" | grep -v -i 'user' | grep -v '^$' | grep -qiE 'unknown|failed|invalid|ignoring'; then
+            echo "systemd-analyze reported a real problem"; exit 1
+          fi
 
   frontend:
-    name: Frontend (tsc + eslint + vitest)
+    name: Frontend (tsc + eslint + vitest + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +61,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc -b
-      - run: npx eslint src
+      # Tests are excluded from the app build; type-check them separately
+      - run: npx tsc -p tsconfig.test.json
+      - run: npx eslint src tools/parity
       - run: npx vitest run
+      # dist/ is the artefact the phone receives - it must build, not just type-check
+      - run: npm run build
 
   engine-parity:
     name: Cross-engine golden parity

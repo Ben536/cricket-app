@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check": "bash scripts/check_all.sh",
+    "check:fast": "bash scripts/check_all.sh --fast"
   },
   "dependencies": {
     "react": "^18.2.0",

@@ -2,9 +2,9 @@
 Description=CricketRadar - Static UI Server
 Documentation=file:///home/bdrysdale/cricket-app/designs/001-boot-automation.md
 
-# Start after the WebSocket server
-After=cricket-server.service network-online.target
-Wants=network-online.target
+# Start after the WebSocket server. Binds 0.0.0.0; no network-online wait
+# (see cricket-server.service).
+After=cricket-server.service
 
 [Service]
 Type=simple

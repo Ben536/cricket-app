@@ -19,7 +19,7 @@ IFACE="wlan0"
 log() { logger -t autohotspot "$1"; echo "autohotspot: $1"; }
 
 # Poll up to ~45s for wlan0 to connect to a non-AP (station/client) network.
-for i in $(seq 1 15); do
+for _ in $(seq 1 15); do
   state=$(nmcli -t -f GENERAL.STATE device show "$IFACE" 2>/dev/null | cut -d: -f2)
   conn=$(nmcli -t -f GENERAL.CONNECTION device show "$IFACE" 2>/dev/null | cut -d: -f2)
   if echo "$state" | grep -q "connected" && [ -n "$conn" ] && [ "$conn" != "$AP" ]; then
