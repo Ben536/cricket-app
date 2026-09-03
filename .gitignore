@@ -42,3 +42,9 @@ secrets.local.md
 *.secret
 .env
 .env.*
+
+# Python virtualenv (uv venv .venv)
+.venv/
+
+# Health monitor reboot ledger (written on the Pi)
+.health-state.json
