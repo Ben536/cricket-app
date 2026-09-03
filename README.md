@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# CricketRadar
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A portable cricket training device: a Raspberry Pi with a TI IWR6843ISK-ODS
+mmWave radar mounted above the batter, a WebSocket server and game engine on
+the Pi, and a phone PWA that scores the session and simulates each shot's
+outcome against a fielding setup.
 
-Currently, two official plugins are available:
+- **Phone app** (`src/`, React + TypeScript, Vite): scoreboard, over tracker,
+  field editor, wagon wheel, shot simulator. Scores live in the phone's
+  localStorage. Served **by the Pi** at `http://<pi>:5173`.
+- **Engines** (`src/gameEngine.ts` and `engine/game_engine.py`): the same
+  fielding simulation in two languages, bit-identical for the same inputs and
+  seed - the phone uses the Pi's when connected and its own when not.
+- **Server** (`server/`): WebSocket on :5002; owns the radar UART; records
+  and streams radar frames; runs the Python engine for `simulate_shot`.
+- **Radar** (`radar/`): TLV parser, single-owner serial reader, crash-safe
+  JSONL recorder, and the ball detector (offline-tuned, not yet wired live).
+- **Ops** (`scripts/`): deploy over rsync, five systemd units, a watchdog.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Where to start
 
-## React Compiler
+- `CLAUDE.md` - the coordinate system, engine spec and the "Start here"
+  section for tooling and gates.
+- `vault/` - the engineering vault (open as an Obsidian vault):
+  `architecture/Codebase Map.md` (what everything is and the invariants),
+  `Review Playbook.md` (how this codebase is reviewed), `plans/` (every
+  review's findings), `learnings/` (hard-won Pi facts).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Develop
 
-## Expanding the ESLint configuration
+```bash
+# Python (server, radar, engine)
+uv venv --python 3.11 .venv
+uv pip install --python .venv/bin/python -r requirements-dev.txt
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Frontend
+npm ci
+npm run dev          # Vite dev server (the Pi is not at localhost - use ?server=<pi-ip>:5002)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Every gate in one command (pytest, drift check, tsc, eslint, vitest, build, parity, shellcheck)
+npm run check
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deploy to the Pi
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+./scripts/deploy_to_pi.sh [pi-address]     # default cricketradar.local
 ```
+
+Syncs the code and the built frontend, checks Python dependencies, installs
+the systemd units, takes an online backup of the database and migrates it,
+restarts the server, and verifies it answers. See
+`vault/learnings/Pi Deployment and Ops.md`.
+
+## Status (2026-09)
+
+Live: phone scoring, shot simulation on either engine, radar recording and
+live view, standalone boot with hotspot. Next: calibrate the overhead mount
+from a real nets session (`tools/replay_jsonl.py --fit-yaw`), then wire the
+detector to the engine. See `vault/plans/2026-09 Review — Findings & Plan.md`.
+
+## Security note
+
+A Pi login password was committed in 2026-06 and redacted from the tree, but
+it remains in this public repository's history. Rotate it on the device and
+scrub the history (`git filter-repo`) before relying on it.

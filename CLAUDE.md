@@ -1,26 +1,52 @@
 # Cricket App - Claude Code Instructions
 
-## Deployment Reminder
+## Start here
 
-**IMPORTANT**: This app is deployed via Vercel from GitHub. Changes are NOT visible in the UI until:
+**Reviewing or refactoring this codebase?** Read `vault/Review Playbook.md`
+first - it is the method three full reviews have converged on. Then
+`vault/architecture/Codebase Map.md` (what everything is, the invariants,
+the traps) and the generated `vault/architecture/Codebase Inventory.md`.
+The latest findings are in `vault/plans/2026-09 Review — Findings & Plan.md`.
 
-1. Code changes are committed to git
-2. Changes are pushed to GitHub (`git push origin master`)
-3. Vercel automatically deploys (takes ~1-2 minutes)
-
-After making changes to `src/gameEngine.ts` or any other file, always:
+**Toolchain** (this Mac has no Homebrew; `gh`, `node`, `uv` live in `~/.local`):
 ```bash
-npm run build  # Verify no TypeScript errors
-git add -A && git commit -m "description" && git push origin master
+uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements-dev.txt
+npm ci
+npm run check          # EVERY gate: pytest, drift, tsc, eslint, vitest, build, parity, shellcheck
+python3 tools/codebase_map.py --write   # refresh the inventory after structural changes
 ```
+Do not start changing code until `npm run check` is green. Commit in logical
+units with the gates green at each commit. The Pi runs its system python3
+(3.9 on bullseye, 3.11 on bookworm) - CI tests both; keep code 3.9-compatible
+(`from __future__ import annotations`, no `match`).
+
+## Deployment
+
+The field UI is served **by the Pi** (`cricket-ui.service`, `http://<pi>:5173`),
+not by Vercel. A Vercel copy exists for convenience but, being https, can
+never open the Pi's `ws://` socket - it is a demo, not the product.
+
+To ship a change to the device: `./scripts/deploy_to_pi.sh [pi-address]`. It
+builds `dist/`, rsyncs code + dist, checks Python deps, installs the systemd
+units, backs up and migrates the DB, restarts the server and verifies it.
+Pushing to `master` runs CI (and updates the Vercel demo).
 
 ## Project Structure
 
+- `src/App.tsx` - React UI (state, undo stack, wagon wheel, field editor)
+- `src/scoring.ts` - the scoring rules, pure and tested (extras, overs, wickets)
+- `src/settings.ts` - persisted session settings (field, hand, difficulty)
 - `src/gameEngine.ts` - TypeScript game engine (runs in browser)
-- `src/App.tsx` - React UI components
-- `src/App.css` - Styling
-- `src/fieldZones.ts` - Fielder position and zone calculations
-- `engine/game_engine.py` - Python game engine (reference implementation)
+- `src/hooks/useServerSimulation.ts` - connection lifecycle + simulate with local fallback
+- `src/api/config.ts` - server discovery (same-origin host first)
+- `src/fieldZones.ts` - screen<->field conversion, zone names, presets
+- `engine/game_engine.py` - Python game engine (the Pi's copy; same results)
+- `engine/engine_params.json` - the ONLY place a constant is tuned
+- `server/` - WebSocket server, router (validation), handlers
+- `radar/` - TLV parser, single-owner reader, recorder, detector, geometry, profile
+- `scripts/` - deploy, systemd units, health monitor, static server, check_all
+- `tools/parity/` - 3,320-shot cross-engine golden suite (CI-gated)
+- `tools/codebase_map.py` - mechanical inventory + drift check (CI-gated)
 
 ## Coordinate System
 
@@ -44,9 +70,13 @@ git add -A && git commit -m "description" && git push origin master
 > **Tuning happens in `engine/engine_params.json`** — the single source of
 > truth loaded by BOTH engines (`engine/game_engine.py` and
 > `src/gameEngine.ts`). Never change a constant in engine source code; that is
-> how the engines forked historically. After any engine change, run the golden
-> parity suite (`tools/parity/`, see its README) — 2,274 canonical shots must
-> produce identical results in both engines.
+> how the engines forked historically (`tools/codebase_map.py --check` fails
+> if a param is read by only one engine). After any engine change, run the
+> golden parity suite (`tools/parity/`, see its README) — 3,320 canonical
+> shots over nine fields must produce identical results in both engines.
+> The engine's input limits are exported as `ENGINE_LIMITS` (TS) and
+> `MAX_EXIT_SPEED` etc. (Python): speed 0-200 km/h, elevation 0-90°, angle
+> normalised to -180..180; non-finite inputs become 0 in both.
 >
 > **Randomness is seeded**: both engines use the same mulberry32 PRNG. Each
 > shot carries a `seed` (echoed in the result); the same seed reproduces the
