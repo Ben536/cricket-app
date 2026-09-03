@@ -108,6 +108,85 @@ class TestRadarStack:
         summary = recorder.list_recordings("racket")[0]
         assert "incomplete" not in summary and summary["frame_count"] > 3
 
+    def test_concurrent_starts_admit_exactly_one(self):
+        """T1.7: two clients starting at once used to BOTH build a session on
+        the singleton (leaked handle, two timers, cross-stopped recordings)."""
+        tmp = tempfile.mkdtemp()
+        src = RadarSource(serial_port="/dev/nonexistent")
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        results = []
+        barrier = threading.Barrier(4)
+
+        def go():
+            barrier.wait()
+            try:
+                results.append(("ok", rec.start_recording("both", max_duration_seconds=5)))
+            except ValueError as e:
+                results.append(("err", str(e)))
+
+        threads = [threading.Thread(target=go) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        oks = [r for r in results if r[0] == "ok"]
+        errs = [r for r in results if r[0] == "err"]
+        assert len(oks) == 1 and len(errs) == 3, results
+        assert all("Already recording" in e for _, e in errs)
+        assert rec._auto_stop_timer is not None
+        rec.stop_recording()
+        assert not rec.is_recording
+
+    def test_same_second_starts_get_distinct_files(self):
+        tmp = tempfile.mkdtemp()
+        src = RadarSource(serial_port="/dev/nonexistent")
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        paths = set()
+        for _ in range(3):
+            s = rec.start_recording("racket", max_duration_seconds=5)
+            paths.add(s.file_path)
+            rec.stop_recording()
+        assert len(paths) == 3, paths
+
+    def test_write_failure_stops_the_recording_and_is_reported(self):
+        """A full card made write() raise inside the frame callback, which
+        the reader swallowed: the recording silently stopped writing while
+        the UI still said 'recording'."""
+        tmp = tempfile.mkdtemp()
+        src = RadarSource(serial_port="/dev/nonexistent")
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        rec.start_recording("both", max_duration_seconds=30)
+        time.sleep(0.3)  # a few real frames first
+
+        real = rec._jsonl
+
+        class FullCard:
+            def write(self, s):
+                raise OSError(28, "No space left on device")
+
+            def flush(self):
+                pass
+
+            def fileno(self):
+                return real.fileno()
+
+            def close(self):
+                real.close()
+
+        with rec._lock:
+            rec._jsonl = FullCard()
+
+        # The next frame trips the failure and the recording stops itself
+        deadline = time.time() + 3
+        while rec.is_recording and time.time() < deadline:
+            time.sleep(0.05)
+        assert not rec.is_recording, "recording must stop itself on a write failure"
+        assert rec.write_error and "No space" in rec.write_error
+        last = rec.stop_recording()  # idempotent: returns the finished session
+        assert last is not None and last.error and "No space" in last.error
+        assert last.frame_count > 0
+
     def test_crashed_file_recovery(self):
         tmp = tempfile.mkdtemp()
         recorder = RadarRecorder(recordings_dir=tmp, source=RadarSource("/dev/nonexistent"))

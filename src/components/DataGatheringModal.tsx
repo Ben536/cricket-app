@@ -38,6 +38,8 @@ interface StatusPayload {
   current_session_type?: string
   current_start_time?: string
   mock?: boolean
+  // Why the last recording stopped ITSELF (card full / I/O error), if it did
+  last_error?: string | null
 }
 
 // Wagon-wheel geometry (SVG viewBox is SIZE x SIZE, batter at centre)
@@ -109,9 +111,14 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
           setMarkCount(p.annotation_count ?? 0)
           if (p.mock != null) setIsMock(p.mock)
           if (p.is_recording === false) {
-            // Server auto-stopped (hit max duration)
+            // Server stopped on its own: max duration, or a write failure
+            // (card full) - the two must not read the same on the phone.
             setIsRecording(false)
-            setLastMark('Auto-stopped (max duration reached)')
+            if (p.last_error) {
+              setError(`Recording STOPPED - write failed: ${p.last_error}. The file is truncated; free space on the Pi.`)
+            } else {
+              setLastMark('Auto-stopped (max duration reached)')
+            }
           }
         })
         .catch(() => {})
@@ -145,7 +152,7 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
     try {
       const resp = await sendMessage('stop_recording', {}) as {
         type: string
-        payload?: { frame_count?: number; annotation_count?: number; duration_seconds?: number; mock?: boolean; message?: string }
+        payload?: { frame_count?: number; annotation_count?: number; duration_seconds?: number; mock?: boolean; message?: string; error?: string | null }
       }
       setIsRecording(false)
       if (resp.type === 'recording_stopped' && resp.payload) {
@@ -153,6 +160,9 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
           `Saved${resp.payload.mock ? ' (MOCK DATA)' : ''}: ${resp.payload.duration_seconds?.toFixed(0)}s, ` +
           `${resp.payload.frame_count} frames, ${resp.payload.annotation_count} marks`
         )
+        if (resp.payload.error) {
+          setError(`Write failed during this recording: ${resp.payload.error}. The file is truncated.`)
+        }
       } else if (resp.type === 'error') {
         setError(resp.payload?.message ?? 'Failed to stop')
       }

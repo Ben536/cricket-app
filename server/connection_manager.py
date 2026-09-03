@@ -90,7 +90,16 @@ class ConnectionManager:
     - Handle reconnection with state recovery
     """
 
-    def __init__(self) -> None:
+    # How long one send may block before the client is treated as gone.
+    # websockets' send() awaits drain(), which never completes while a
+    # peer's TCP window is full - a phone that walked out of AP range keeps
+    # the kernel retransmitting for ~15 minutes. Broadcasts and the
+    # heartbeat loop (which IS the reaper) used to park on that one socket
+    # for the whole window, so nobody else got a heartbeat and the dead
+    # client could not be reaped by the code that was stuck on it.
+    DEFAULT_SEND_TIMEOUT = 5.0
+
+    def __init__(self, send_timeout: float = DEFAULT_SEND_TIMEOUT) -> None:
         # Map client_id -> ClientConnection
         self._clients: dict[str, ClientConnection] = {}
 
@@ -99,6 +108,11 @@ class ConnectionManager:
 
         # Lock for thread-safe operations
         self._lock = asyncio.Lock()
+
+        self.send_timeout = send_timeout
+        # Background close() tasks for evicted sockets - kept referenced so
+        # they are not garbage-collected mid-flight.
+        self._background: set[asyncio.Task] = set()
 
         logger.info("ConnectionManager initialized")
 
@@ -285,7 +299,9 @@ class ConnectionManager:
 
         try:
             message_json = json.dumps(message)
-            await connection.websocket.send(message_json)
+            await asyncio.wait_for(
+                connection.websocket.send(message_json), timeout=self.send_timeout
+            )
             # NOTE: last_activity is deliberately NOT updated here. Activity
             # means INBOUND traffic - if outbound sends refreshed it, the 30s
             # heartbeat broadcast would forever reset the 60s dead-client
@@ -301,6 +317,13 @@ class ConnectionManager:
             )
             return True
 
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"Send to {client_id} did not complete within {self.send_timeout}s "
+                f"(half-open connection?) - evicting"
+            )
+            await self._evict(client_id, connection, code=1011, reason="Send timeout")
+            return False
         except websockets.exceptions.ConnectionClosed:
             logger.warning(f"Connection closed while sending to {client_id}")
             await self.remove_client(client_id)
@@ -308,6 +331,22 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Error sending to {client_id}: {e}")
             return False
+
+    async def _evict(self, client_id: str, connection: ClientConnection, code: int, reason: str) -> None:
+        """Drop a client we can no longer talk to. The close handshake is run
+        in the background: it can itself block on the same dead socket, and
+        the caller (a broadcast, the heartbeat loop) must not wait for it."""
+        await self.remove_client(client_id)
+
+        async def _close() -> None:
+            try:
+                await asyncio.wait_for(connection.websocket.close(code, reason), timeout=self.send_timeout)
+            except Exception:
+                pass
+
+        task = asyncio.create_task(_close())
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
 
     async def broadcast_to_session(
         self,
@@ -334,11 +373,7 @@ class ConnectionManager:
         if not client_ids:
             return 0
 
-        # Send to all clients
-        sent_count = 0
-        for client_id in client_ids:
-            if await self.send_to_client(client_id, message):
-                sent_count += 1
+        sent_count = await self._fan_out(client_ids, message)
 
         logger.debug(
             f"Broadcast to session {session_id}: "
@@ -346,6 +381,15 @@ class ConnectionManager:
         )
 
         return sent_count
+
+    async def _fan_out(self, client_ids: set[str], message: dict[str, Any]) -> int:
+        """Send to every client CONCURRENTLY. Sequential awaits meant one
+        slow client delayed every client after it in the loop."""
+        results = await asyncio.gather(
+            *(self.send_to_client(cid, message) for cid in client_ids),
+            return_exceptions=True,
+        )
+        return sum(1 for r in results if r is True)
 
     async def broadcast_to_all(
         self,
@@ -367,10 +411,7 @@ class ConnectionManager:
         if exclude_client:
             client_ids.discard(exclude_client)
 
-        sent_count = 0
-        for client_id in client_ids:
-            if await self.send_to_client(client_id, message):
-                sent_count += 1
+        sent_count = await self._fan_out(client_ids, message) if client_ids else 0
 
         logger.debug(
             f"Broadcast to all: type={message.get('type')}, "

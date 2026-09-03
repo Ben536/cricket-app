@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 # Local imports
 from server.session_manager import SessionManager, ActiveSessionState
@@ -244,6 +245,29 @@ def build_wagon_wheel_update(
 
 
 # =============================================================================
+# RADAR STREAM FAN-OUT
+# =============================================================================
+
+# Frames buffered per streaming client. At 20Hz this is 250ms of lag before
+# the oldest frame is dropped for that client. The live view wants the
+# freshest frame, not a backlog; a slow phone gets fewer frames, never a
+# growing pile of tasks.
+STREAM_QUEUE_MAX = 5
+STREAM_DROP_LOG_EVERY = 100
+
+
+@dataclass
+class _StreamSubscription:
+    """One client's live radar stream: the streamer callback (runs on the
+    radar dispatch thread), the bounded queue it feeds, and the loop task
+    that drains the queue into the socket."""
+    callback: Callable[[dict], None]
+    queue: asyncio.Queue
+    task: asyncio.Task
+    dropped: int = 0
+
+
+# =============================================================================
 # HANDLERS CLASS
 # =============================================================================
 
@@ -267,8 +291,8 @@ class MessageHandlers:
         self.session_manager = session_manager
         self.connection_manager = connection_manager
 
-        # client_id -> radar stream frame callback (for deregistration)
-        self._stream_callbacks: dict[str, Any] = {}
+        # client_id -> live radar stream subscription
+        self._streams: dict[str, _StreamSubscription] = {}
 
         logger.info("MessageHandlers initialized")
 
@@ -286,14 +310,10 @@ class MessageHandlers:
         leak in the DB, and radar stream callbacks keep firing at frame rate
         into a dead connection forever (holding the serial port open).
         """
-        # 1. Radar stream: deregister this client's callback; stop the
-        #    streamer (and release the port) when no subscribers remain.
-        callback = self._stream_callbacks.pop(client_id, None)
-        if callback is not None:
-            streamer = get_streamer()
-            streamer.remove_callback(callback)
-            if not self._stream_callbacks and streamer.is_streaming:
-                await asyncio.to_thread(streamer.stop)
+        # 1. Radar stream: deregister this client's callback, cancel its
+        #    drain task; stop the streamer (and release the port) when no
+        #    subscribers remain.
+        if await self._release_stream(client_id):
             logger.info(f"Deregistered radar stream for disconnected client {client_id[:8]}")
 
         # 2. Session: persist completion and drop all trackers. The client_id
@@ -1065,6 +1085,9 @@ class MessageHandlers:
             # No progress callbacks here: clients poll get_recording_status
             # (recorder callbacks are sync and cannot await a websocket send).
             # start_recording opens the serial port (blocking) - off the loop.
+            # The `is_recording` check above is only a fast path: two clients
+            # can both pass it before either reaches this await. The recorder
+            # itself makes the check-and-start atomic and raises for the loser.
             session = await asyncio.to_thread(
                 recorder.start_recording, session_type, max_duration_seconds=max_duration
             )
@@ -1090,6 +1113,16 @@ class MessageHandlers:
                 },
             }
 
+        except ValueError as e:
+            # The recorder's own refusals: lost a start race, or not enough
+            # disk for the requested duration. Both are user-facing messages.
+            lost_race = "already recording" in str(e).lower()
+            logger.warning(f"Recording not started: {e}")
+            return create_extended_error(
+                ERROR_ALREADY_RECORDING if lost_race else ERROR_RECORDING_START_FAILED,
+                in_reply_to=message_id,
+                message_override=str(e) if lost_race else f"Failed to start recording: {e}",
+            )
         except Exception as e:
             logger.error(f"Failed to start recording: {e}")
             return create_extended_error(
@@ -1142,6 +1175,10 @@ class MessageHandlers:
                         "annotation_count": session.annotation_count,
                         "mock": session.is_mock,
                         "file_path": session.file_path,
+                        # Set when the recording stopped ITSELF because a
+                        # write failed (card full, I/O error) - the file is
+                        # truncated at that point and the UI must say so.
+                        "error": session.error,
                         "counts": counts,
                     },
                 }
@@ -1172,6 +1209,7 @@ class MessageHandlers:
 
         recorder = get_recorder()
         current = recorder.current_session
+        last = recorder.last_session
 
         # Directory glob - polled every 2s by the UI, keep it off the loop
         counts = await asyncio.to_thread(recorder.get_recording_counts)
@@ -1188,6 +1226,11 @@ class MessageHandlers:
                 "frame_count": current.frame_count if current else 0,
                 "annotation_count": current.annotation_count if current else 0,
                 "mock": current.is_mock if current else False,
+                # Why the LAST recording stopped, if it stopped itself on a
+                # write failure. A polling UI that sees is_recording flip to
+                # false reads this to tell "hit max duration" from "the card
+                # is full and the file is truncated".
+                "last_error": last.error if last else None,
                 "counts": counts,
             },
         }
@@ -1239,42 +1282,64 @@ class MessageHandlers:
     ) -> dict[str, Any]:
         """
         Start streaming radar data to this client.
+
+        Frames arrive on the radar dispatch thread and are handed to the
+        event loop through a BOUNDED per-client queue drained by one
+        long-lived task. The previous design scheduled one
+        run_coroutine_threadsafe() per frame and discarded the Future: no
+        bound, no backpressure, and any exception was stored in the dropped
+        Future and never seen. Measured then: pending sends grew 5 -> 18 in
+        3s against a slow socket and 18 stayed parked after unsubscribing -
+        ~72,000 tasks per hour per stuck client on a 1GB Pi.
         """
         message_id = message.get("message_id")
 
         streamer = get_streamer()
-
-        # Capture the current event loop for thread-safe scheduling
-        import asyncio
         main_loop = asyncio.get_running_loop()
-
-        # Create callback that sends frames to this client
-        async def send_frame(frame_data: dict):
-            msg = {
-                "type": "radar_frame",
-                "message_id": generate_message_id(),
-                "timestamp": create_timestamp(),
-                "payload": frame_data,
-            }
-            await self.connection_manager.send_to_client(client_id, msg)
-
-        # Thread-safe wrapper using run_coroutine_threadsafe
-        def frame_callback(frame_data: dict):
-            try:
-                asyncio.run_coroutine_threadsafe(send_frame(frame_data), main_loop)
-            except Exception as e:
-                logger.error(f"Frame send error: {e}")
 
         # A repeat start from the same client must not leave the old closure
         # registered in the streamer (duplicate frames, unremovable callback).
-        old_callback = self._stream_callbacks.pop(client_id, None)
-        if old_callback is not None:
-            streamer.remove_callback(old_callback)
+        await self._release_stream(client_id)
 
-        # Store callback reference for cleanup
-        self._stream_callbacks[client_id] = frame_callback
+        frame_queue: asyncio.Queue = asyncio.Queue(maxsize=STREAM_QUEUE_MAX)
+        holder: dict[str, _StreamSubscription] = {}
 
-        # Add callback and start if not running
+        def enqueue(frame_data: dict) -> None:
+            """Runs ON the event loop. Drop the OLDEST frame when full: the
+            live view wants the freshest frame, not a backlog."""
+            if frame_queue.full():
+                try:
+                    frame_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                sub = holder.get("sub")
+                if sub is not None:
+                    sub.dropped += 1
+                    if sub.dropped % STREAM_DROP_LOG_EVERY == 1:
+                        logger.warning(
+                            f"Radar stream to {client_id[:8]} is slow - dropped oldest frame "
+                            f"[{sub.dropped} dropped so far]"
+                        )
+            try:
+                frame_queue.put_nowait(frame_data)
+            except asyncio.QueueFull:
+                pass
+
+        def frame_callback(frame_data: dict) -> None:
+            """Runs on the radar dispatch thread. Must not block."""
+            try:
+                main_loop.call_soon_threadsafe(enqueue, frame_data)
+            except RuntimeError:
+                # Loop is closed (server shutting down) - nothing to deliver to
+                pass
+
+        task = main_loop.create_task(
+            self._drain_stream(client_id, frame_queue), name=f"radar-stream-{client_id[:8]}"
+        )
+        sub = _StreamSubscription(callback=frame_callback, queue=frame_queue, task=task)
+        holder["sub"] = sub
+        self._streams[client_id] = sub
+
         streamer.add_callback(frame_callback)
         if not streamer.is_streaming:
             streamer.start()
@@ -1291,6 +1356,56 @@ class MessageHandlers:
             },
         }
 
+    async def _drain_stream(self, client_id: str, frame_queue: asyncio.Queue) -> None:
+        """Deliver queued frames to one client until cancelled or the client
+        becomes unreachable. Exceptions are logged here, not lost."""
+        try:
+            while True:
+                frame_data = await frame_queue.get()
+                msg = {
+                    "type": "radar_frame",
+                    "message_id": generate_message_id(),
+                    "timestamp": create_timestamp(),
+                    "payload": frame_data,
+                }
+                if not await self.connection_manager.send_to_client(client_id, msg):
+                    logger.info(f"Radar stream to {client_id[:8]} ended: client unreachable")
+                    break
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.exception(f"Radar stream task for {client_id[:8]} crashed: {e}")
+        finally:
+            # Exited on our own (not via _release_stream): deregister so the
+            # dispatch thread stops queuing frames for a dead client.
+            sub = self._streams.get(client_id)
+            if sub is not None and sub.task is asyncio.current_task():
+                self._streams.pop(client_id, None)
+                streamer = get_streamer()
+                streamer.remove_callback(sub.callback)
+                if not self._streams and streamer.is_streaming:
+                    await asyncio.to_thread(streamer.stop)
+
+    async def _release_stream(self, client_id: str) -> bool:
+        """Tear down a client's stream subscription. Returns True if one existed."""
+        sub = self._streams.pop(client_id, None)
+        if sub is None:
+            return False
+        streamer = get_streamer()
+        streamer.remove_callback(sub.callback)
+        if sub.task is not asyncio.current_task():
+            sub.task.cancel()
+            try:
+                await sub.task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if not self._streams and streamer.is_streaming:
+            # Joins the reader thread - off the loop
+            await asyncio.to_thread(streamer.stop)
+        if sub.dropped:
+            logger.info(f"Radar stream for {client_id[:8]} dropped {sub.dropped} frame(s) to a slow socket")
+        return True
+
     async def handle_stop_radar_stream(
         self,
         client_id: str,
@@ -1301,16 +1416,9 @@ class MessageHandlers:
         """
         message_id = message.get("message_id")
 
-        streamer = get_streamer()
-
-        # Remove this client's callback
-        callback = self._stream_callbacks.pop(client_id, None)
-        if callback is not None:
-            streamer.remove_callback(callback)
-
-            # Stop streamer if no more callbacks (joins the thread - off the loop)
-            if not self._stream_callbacks and streamer.is_streaming:
-                await asyncio.to_thread(streamer.stop)
+        sub = self._streams.get(client_id)
+        dropped = sub.dropped if sub else 0
+        await self._release_stream(client_id)
 
         logger.info(f"Stopped radar stream for client {client_id[:8]}")
 
@@ -1321,6 +1429,7 @@ class MessageHandlers:
             "in_reply_to": message_id,
             "payload": {
                 "status": "stopped",
+                "frames_dropped": dropped,
             },
         }
 

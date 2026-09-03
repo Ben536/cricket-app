@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Optional
@@ -204,6 +205,35 @@ class ValidationResult:
     parsed_message: Optional[dict[str, Any]] = None
 
 
+# Upper bound on fielders in one field. The UI sends 10; a custom field
+# could carry a few more. Anything beyond this is not a field.
+MAX_FIELDERS = 50
+# The engine's own documented input ranges (engine/game_engine.py,
+# CLAUDE.md). The engine clamps out-of-range values itself; the router
+# only rejects values that are not numbers at all.
+SIMULATE_DIFFICULTIES = ("easy", "medium", "hard")
+
+
+def _is_number(value: Any) -> bool:
+    """A finite int/float. bool is an int subclass and is rejected: JSON
+    `true` must not silently become exit_speed=1."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _is_fielder(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and _is_number(value.get("x"))
+        and _is_number(value.get("y"))
+        and (value.get("name") is None or isinstance(value.get("name"), str))
+    )
+
+
+def _is_id(value: Any) -> bool:
+    """profile_id / session_id: a string or an int (not bool, not None)."""
+    return isinstance(value, str) or (isinstance(value, int) and not isinstance(value, bool))
+
+
 class MessageRouter:
     """
     Routes incoming WebSocket messages to appropriate handlers.
@@ -370,6 +400,19 @@ class MessageRouter:
                 ),
             )
 
+        # The payload, when present, must be an object. Every check below and
+        # every handler does `payload.get(...)`; a JSON array or string here
+        # raised AttributeError straight through the connection handler.
+        if "payload" in message and not isinstance(message["payload"], dict):
+            return ValidationResult(
+                valid=False,
+                error=create_error_response(
+                    ErrorCode.INVALID_MESSAGE_FORMAT,
+                    in_reply_to=message_id,
+                    details={"field": "payload", "reason": "must be an object"},
+                ),
+            )
+
         # Check type-specific required fields
         required_fields = MESSAGE_REQUIRED_FIELDS.get(msg_type, [])
         for field_path in required_fields:
@@ -397,62 +440,112 @@ class MessageRouter:
         message: dict[str, Any],
         message_id: str,
     ) -> Optional[dict[str, Any]]:
-        """Validate type-specific fields."""
+        """Validate type-specific fields.
+
+        Every comparison here is preceded by a type check. These used to do
+        bare `len()` / `<` on untrusted values, so `boundary_distance: null`
+        or `fielders: 3` raised TypeError out of the router, through the
+        connection handler's catch-all, into a `finally` that marked the
+        session complete - a malformed payload force-ended the innings.
+        """
         msg_type = message["type"]
         payload = message.get("payload", {})
 
+        def invalid(field: str, value: Any) -> dict[str, Any]:
+            return create_error_response(
+                ErrorCode.INVALID_FIELD_VALUE,
+                in_reply_to=message_id,
+                details={"field": field, "value": _describe(value)},
+            )
+
+        def out_of_range(field: str, lo: Any, hi: Any) -> dict[str, Any]:
+            return create_error_response(
+                ErrorCode.FIELD_OUT_OF_RANGE,
+                in_reply_to=message_id,
+                details={"field": field, "min": lo, "max": hi},
+            )
+
         if msg_type == "set_difficulty":
             difficulty = payload.get("difficulty")
-            if difficulty not in ["easy", "medium", "hard"]:
-                return create_error_response(
-                    ErrorCode.INVALID_FIELD_VALUE,
-                    in_reply_to=message_id,
-                    details={"field": "difficulty", "value": difficulty},
-                )
+            if difficulty not in SIMULATE_DIFFICULTIES:
+                return invalid("difficulty", difficulty)
 
         elif msg_type == "manual_input":
             result = payload.get("result")
             valid_results = ["dot", "1", "2", "3", "4", "6", "W", "wd", "nb"]
             if result not in valid_results:
-                return create_error_response(
-                    ErrorCode.INVALID_FIELD_VALUE,
-                    in_reply_to=message_id,
-                    details={"field": "result", "value": result},
-                )
+                return invalid("result", result)
 
-        elif msg_type == "create_profile":
+        elif msg_type in ("create_profile", "update_profile"):
             batting_hand = payload.get("batting_hand")
-            if batting_hand not in ["right", "left"]:
-                return create_error_response(
-                    ErrorCode.INVALID_FIELD_VALUE,
-                    in_reply_to=message_id,
-                    details={"field": "batting_hand", "value": batting_hand},
-                )
+            if msg_type == "create_profile" or batting_hand is not None:
+                if batting_hand not in ["right", "left"]:
+                    return invalid("batting_hand", batting_hand)
 
-            name = payload.get("name", "")
-            if not name or len(name) > 100:
-                return create_error_response(
-                    ErrorCode.FIELD_OUT_OF_RANGE,
-                    in_reply_to=message_id,
-                    details={"field": "name", "min": 1, "max": 100},
-                )
+            name = payload.get("name")
+            if msg_type == "create_profile" or name is not None:
+                if not isinstance(name, str):
+                    return invalid("name", name)
+                if not name.strip() or len(name) > 100:
+                    return out_of_range("name", 1, 100)
+
+            if msg_type == "update_profile" and not _is_id(payload.get("profile_id")):
+                return invalid("profile_id", payload.get("profile_id"))
+
+        elif msg_type in ("select_profile", "start_session"):
+            if not _is_id(payload.get("profile_id")):
+                return invalid("profile_id", payload.get("profile_id"))
+            if msg_type == "start_session":
+                fc = payload.get("field_config")
+                if fc is not None and not (isinstance(fc, list) and len(fc) <= MAX_FIELDERS and all(_is_fielder(f) for f in fc)):
+                    return invalid("field_config", fc)
+                diff = payload.get("difficulty")
+                if diff is not None and diff not in SIMULATE_DIFFICULTIES:
+                    return invalid("difficulty", diff)
+
+        elif msg_type in ("end_session", "undo"):
+            if not _is_id(payload.get("session_id")):
+                return invalid("session_id", payload.get("session_id"))
 
         elif msg_type == "set_field":
-            fielders = payload.get("fielders", [])
+            fielders = payload.get("fielders")
+            if not isinstance(fielders, list) or not all(_is_fielder(f) for f in fielders):
+                return invalid("fielders", fielders)
             if not fielders or len(fielders) > 11:
-                return create_error_response(
-                    ErrorCode.FIELD_OUT_OF_RANGE,
-                    in_reply_to=message_id,
-                    details={"field": "fielders", "min": 1, "max": 11},
-                )
+                return out_of_range("fielders", 1, 11)
 
             boundary = payload.get("boundary_distance", 70)
+            if not _is_number(boundary):
+                return invalid("boundary_distance", boundary)
             if boundary < 50 or boundary > 100:
-                return create_error_response(
-                    ErrorCode.FIELD_OUT_OF_RANGE,
-                    in_reply_to=message_id,
-                    details={"field": "boundary_distance", "min": 50, "max": 100},
-                )
+                return out_of_range("boundary_distance", 50, 100)
+
+        elif msg_type == "simulate_shot":
+            # The live path. The engine clamps ranges itself (speed 0-200,
+            # elevation 0-90, angle normalised) and documents that; what it
+            # cannot survive is a non-number, which used to reach
+            # _calculate_trajectory as a str/None/bool and raise (or, for a
+            # bool, silently simulate exit_speed=1).
+            for field in ("exit_speed", "horizontal_angle", "vertical_angle"):
+                if not _is_number(payload.get(field)):
+                    return invalid(field, payload.get(field))
+            fc = payload.get("field_config")
+            if not isinstance(fc, list) or len(fc) > MAX_FIELDERS or not all(_is_fielder(f) for f in fc):
+                return invalid("field_config", fc)
+            boundary = payload.get("boundary_distance")
+            if boundary is not None and (not _is_number(boundary) or boundary <= 0):
+                return invalid("boundary_distance", boundary)
+            diff = payload.get("difficulty")
+            if diff is not None and diff not in SIMULATE_DIFFICULTIES:
+                return invalid("difficulty", diff)
+            seed = payload.get("seed")
+            if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+                return invalid("seed", seed)
+
+        elif msg_type == "add_annotation":
+            # Stored verbatim as ground truth; keep it a small flat object.
+            if len(payload) > 32:
+                return out_of_range("payload", 0, 32)
 
         elif msg_type == "start_recording":
             from radar.recorder import SESSION_TYPES
@@ -545,8 +638,18 @@ class MessageRouter:
         # Log incoming message
         logger.debug(f"Received from {client_id}: {raw_message[:200]}...")
 
-        # Validate
-        result = self.validate_message(raw_message)
+        # Validate. Validation itself must never escape: an exception here
+        # used to propagate out of the connection's `async for`, close the
+        # socket with code 1000 and auto-complete the session. A message we
+        # cannot parse is answered with an error frame, like any other.
+        try:
+            result = self.validate_message(raw_message)
+        except Exception as e:  # defensive: validation is over untrusted input
+            logger.exception(f"Validation crashed on message from {client_id}: {e}")
+            return create_error_response(
+                ErrorCode.INVALID_MESSAGE_FORMAT,
+                details={"validation_error": type(e).__name__},
+            )
 
         if not result.valid:
             logger.warning(
@@ -598,3 +701,11 @@ class MessageRouter:
     def get_registered_types(self) -> list[str]:
         """Get list of registered message types."""
         return list(self._handlers.keys())
+
+
+def _describe(value: Any) -> Any:
+    """A JSON-safe, bounded description of a rejected value for the error
+    frame - never echo a large or unserialisable payload back."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value if not isinstance(value, str) or len(value) <= 100 else value[:100] + "..."
+    return f"<{type(value).__name__}>"

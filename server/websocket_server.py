@@ -365,12 +365,23 @@ class CricketWebSocketServer:
                             pass
                         await self.connection_manager.remove_client(client_id)
 
-                # Send per-client heartbeats (session_state differs per client)
-                for client in self.connection_manager.get_all_clients():
-                    await self.connection_manager.send_to_client(
-                        client.client_id,
-                        self._build_connection_status(client.client_id),
-                    )
+                # Send per-client heartbeats (session_state differs per
+                # client) CONCURRENTLY. This loop is also the reaper: a
+                # sequential await parked it on the first half-open socket
+                # for the whole TCP retransmit window, so no other client got
+                # a heartbeat and the dead one was never reaped. send_to_client
+                # now times out and evicts on its own.
+                clients = self.connection_manager.get_all_clients()
+                await asyncio.gather(
+                    *(
+                        self.connection_manager.send_to_client(
+                            client.client_id,
+                            self._build_connection_status(client.client_id),
+                        )
+                        for client in clients
+                    ),
+                    return_exceptions=True,
+                )
 
                 logger.debug(
                     f"Heartbeat sent to {self.connection_manager.client_count} clients"

@@ -71,6 +71,9 @@ class RecordingSession:
     is_mock: bool = False  # True = radar absent at start, frames are FABRICATED
     annotations: list[dict] = field(default_factory=list)
     file_path: Optional[str] = None
+    # Set when the recording stopped ITSELF because a write failed (card
+    # full, I/O error). The file is truncated at that point.
+    error: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -82,6 +85,7 @@ class RecordingSession:
             "annotation_count": self.annotation_count,
             "is_mock": self.is_mock,
             "annotations": self.annotations,
+            "error": self.error,
         }
 
 
@@ -105,10 +109,16 @@ class RadarRecorder:
         for session_type in SESSION_TYPES:
             (self.recordings_dir / session_type).mkdir(parents=True, exist_ok=True)
 
-        # Recording state (all mutations under _lock; stop is serialized by
-        # _stop_lock so a manual stop racing the auto-stop timer is safe)
+        # Recording state. File writes and counters are guarded by _lock.
+        # Start and stop are serialised by _lifecycle_lock, which covers the
+        # is_recording CHECK together with the ASSIGNMENT: two clients whose
+        # start_recording calls interleaved used to both pass the check and
+        # both build a session on this one singleton - the second open()
+        # leaked the first file handle, two auto-stop timers were armed, and
+        # whichever fired first stopped the other client's recording. The
+        # lock also makes a manual stop racing the auto-stop timer safe.
         self._lock = threading.Lock()
-        self._stop_lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self._current_session: Optional[RecordingSession] = None
         self._last_session: Optional[RecordingSession] = None
         self._start_time: Optional[float] = None
@@ -119,6 +129,9 @@ class RadarRecorder:
         self._max_duration = float(MAX_RECORDING_SECONDS)
         self._last_mock: bool = False
         self._auto_stop_timer: Optional[threading.Timer] = None
+        # First write failure of the current recording (card full, I/O
+        # error). Once set, the recording stops itself and reports it.
+        self.write_error: Optional[str] = None
 
         logger.info(f"RadarRecorder initialized, recordings_dir={self.recordings_dir}")
 
@@ -129,6 +142,11 @@ class RadarRecorder:
     @property
     def current_session(self) -> Optional[RecordingSession]:
         return self._current_session
+
+    @property
+    def last_session(self) -> Optional[RecordingSession]:
+        """The most recently finished recording (None if none has finished)."""
+        return self._last_session
 
     def start_recording(
         self,
@@ -149,80 +167,100 @@ class RadarRecorder:
             absent the session records FABRICATED mock frames.
 
         Raises:
-            ValueError: If already recording or invalid session type
+            ValueError: If already recording, invalid session type, or not
+                enough free disk for the requested duration
         """
-        if self.is_recording:
-            raise ValueError("Already recording")
+        with self._lifecycle_lock:
+            if self.is_recording:
+                raise ValueError("Already recording")
 
-        if session_type not in SESSION_TYPES:
-            raise ValueError(f"Invalid session type: {session_type}")
+            if session_type not in SESSION_TYPES:
+                raise ValueError(f"Invalid session type: {session_type}")
 
-        # Resolve and clamp the duration cap
-        if max_duration_seconds is None:
-            self._max_duration = float(MAX_RECORDING_SECONDS)
-        else:
-            self._max_duration = max(1.0, min(float(max_duration_seconds), MAX_GATHERING_SECONDS))
+            # Resolve and clamp the duration cap
+            if max_duration_seconds is None:
+                self._max_duration = float(MAX_RECORDING_SECONDS)
+            else:
+                self._max_duration = max(1.0, min(float(max_duration_seconds), MAX_GATHERING_SECONDS))
 
-        self._check_disk_space(self._max_duration)
+            self._check_disk_space(self._max_duration)
 
-        # Resolve mock/real BEFORE subscribing, so the meta line and the first
-        # frames agree. A missing radar must never silently produce a
-        # plausible-looking dataset - it is flagged in the file and response.
-        self._source.ensure_running()
-        self._source.wait_until_ready(timeout=2.0)
-        is_mock = self._source.is_mock
+            # Resolve mock/real BEFORE subscribing, so the meta line and the
+            # first frames agree. A missing radar must never silently produce
+            # a plausible-looking dataset - it is flagged in the file and
+            # response.
+            self._source.ensure_running()
+            self._source.wait_until_ready(timeout=2.0)
+            is_mock = self._source.is_mock
 
-        # Create session
-        start_time = datetime.now(timezone.utc)
-        self._current_session = RecordingSession(
-            session_type=session_type,
-            start_time=start_time.isoformat(),
-            max_duration_seconds=self._max_duration,
-            is_mock=is_mock,
-        )
-        self._last_mock = is_mock
-        if is_mock:
-            logger.warning(
-                "Radar unavailable - this session records MOCK data "
-                "(flagged in the file and the start_recording response)"
+            # Create session
+            start_time = datetime.now(timezone.utc)
+            session = RecordingSession(
+                session_type=session_type,
+                start_time=start_time.isoformat(),
+                max_duration_seconds=self._max_duration,
+                is_mock=is_mock,
             )
+            self._last_mock = is_mock
+            if is_mock:
+                logger.warning(
+                    "Radar unavailable - this session records MOCK data "
+                    "(flagged in the file and the start_recording response)"
+                )
 
-        # Open the crash-safe JSONL output file now and write a meta header.
-        # Frames and annotations are appended line-by-line as they occur, so a
-        # crash/disconnect mid-session keeps everything captured so far.
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        type_dir = self.recordings_dir / session_type
-        type_dir.mkdir(parents=True, exist_ok=True)
-        file_path = type_dir / f"{timestamp}.jsonl"
-        self._frame_count = 0
-        self._annotation_count = 0
-        self._jsonl = open(file_path, "w")
-        self._current_session.file_path = str(file_path)
-        self._start_time = time.time()
-        self._last_fsync = self._start_time
+            # Open the crash-safe JSONL output file now and write a meta
+            # header. Frames and annotations are appended line-by-line as
+            # they occur, so a crash/disconnect mid-session keeps everything
+            # captured so far.
+            type_dir = self.recordings_dir / session_type
+            type_dir.mkdir(parents=True, exist_ok=True)
+            file_path = self._unique_file_path(type_dir)
+            self.write_error = None
+            self._frame_count = 0
+            self._annotation_count = 0
+            self._jsonl = open(file_path, "w")
+            session.file_path = str(file_path)
+            self._start_time = time.time()
+            self._last_fsync = self._start_time
+            # Publish the session only once everything it needs exists
+            self._current_session = session
 
-        self._write_line({
-            "type": "meta",
-            "session_type": session_type,
-            "start_time": self._current_session.start_time,
-            "max_duration_seconds": self._max_duration,
-            "mock": is_mock,
-        })
+            self._write_line({
+                "type": "meta",
+                "session_type": session_type,
+                "start_time": session.start_time,
+                "max_duration_seconds": self._max_duration,
+                "mock": is_mock,
+            })
 
-        # Frames start flowing only now, with mode already classified
-        self._source.subscribe(self._on_frame)
+            # Frames start flowing only now, with mode already classified
+            self._source.subscribe(self._on_frame)
 
-        # Auto-stop timer replaces the old per-recording thread
-        self._auto_stop_timer = threading.Timer(self._max_duration, self._auto_stop)
-        self._auto_stop_timer.daemon = True
-        self._auto_stop_timer.start()
+            # Auto-stop timer replaces the old per-recording thread
+            self._auto_stop_timer = threading.Timer(self._max_duration, self._auto_stop)
+            self._auto_stop_timer.daemon = True
+            self._auto_stop_timer.start()
 
-        logger.info(
-            f"Started recording: type={session_type}, "
-            f"max_duration={self._max_duration:.0f}s, file={file_path.name}, "
-            f"mock={is_mock}"
-        )
-        return self._current_session
+            logger.info(
+                f"Started recording: type={session_type}, "
+                f"max_duration={self._max_duration:.0f}s, file={file_path.name}, "
+                f"mock={is_mock}"
+            )
+            return session
+
+    @staticmethod
+    def _unique_file_path(type_dir: Path) -> Path:
+        """Millisecond-resolution name, plus a counter if it still collides.
+        One-second resolution meant two same-second starts of the same type
+        truncated each other's file."""
+        now = datetime.now()
+        stem = now.strftime("%Y-%m-%d_%H-%M-%S") + f"-{now.microsecond // 1000:03d}"
+        path = type_dir / f"{stem}.jsonl"
+        n = 1
+        while path.exists():
+            n += 1
+            path = type_dir / f"{stem}_{n}.jsonl"
+        return path
 
     def _check_disk_space(self, duration_seconds: float) -> None:
         """Refuse to start a recording the card cannot hold.
@@ -246,12 +284,24 @@ class RadarRecorder:
             )
 
     def _write_line(self, obj: dict) -> None:
-        """Thread-safe append of one JSON object as a line to the JSONL file."""
+        """Thread-safe append of one JSON object as a line to the JSONL file.
+
+        A failed write (card full, I/O error) is recorded in `write_error`
+        rather than raised: raising here reached the reader's dispatch loop,
+        which logged and swallowed it, so the recording silently stopped
+        writing while the UI still said "recording". The frame path checks
+        the flag and stops the recording so the state is honest.
+        """
         with self._lock:
-            if self._jsonl is None:
+            if self._jsonl is None or self.write_error is not None:
                 return
-            self._jsonl.write(json.dumps(obj) + "\n")
-            self._jsonl.flush()
+            try:
+                self._jsonl.write(json.dumps(obj) + "\n")
+                self._jsonl.flush()
+            except OSError as e:
+                self.write_error = str(e)
+                logger.error(f"Recording write failed ({e}) - the recording will stop")
+                return
             # flush() only moves bytes into the OS page cache. The realistic
             # failure at the nets is a battery/power cut, which loses everything
             # still dirty there - up to ~30s of a session that cannot be
@@ -264,11 +314,20 @@ class RadarRecorder:
                     os.fsync(self._jsonl.fileno())
                     self._last_fsync = now
                 except OSError as e:
-                    logger.error(f"fsync failed (disk full?): {e}")
+                    self.write_error = f"fsync failed: {e}"
+                    logger.error(f"fsync failed (disk full?): {e} - the recording will stop")
+
+    def _stop_on_write_error(self) -> None:
+        """Called on the frame/annotation path once a write has failed."""
+        logger.error(f"Stopping recording after write failure: {self.write_error}")
+        self.stop_recording()
 
     def _on_frame(self, frame: RadarFrame) -> None:
         """RadarSource subscriber: write one frame to the JSONL stream."""
         if not self.is_recording or self._start_time is None:
+            return
+        if self.write_error is not None:
+            self._stop_on_write_error()
             return
 
         # Radar plugged/unplugged mid-session: record the transition so the
@@ -295,6 +354,8 @@ class RadarRecorder:
             self._frame_count += 1
             if self._current_session is not None:
                 self._current_session.frame_count = self._frame_count
+        if self.write_error is not None:
+            self._stop_on_write_error()
 
     def add_annotation(self, mark: Optional[dict] = None) -> Optional[dict]:
         """
@@ -336,7 +397,7 @@ class RadarRecorder:
         Returns:
             The completed RecordingSession, or None if never recorded
         """
-        with self._stop_lock:
+        with self._lifecycle_lock:
             if not self.is_recording:
                 return self._last_session
 
@@ -370,6 +431,7 @@ class RadarRecorder:
         session.duration_seconds = (time.time() - self._start_time) if self._start_time else 0.0
         session.frame_count = self._frame_count
         session.annotation_count = self._annotation_count
+        session.error = self.write_error
 
         self._write_line({
             "type": "end",

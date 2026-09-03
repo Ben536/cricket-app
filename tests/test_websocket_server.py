@@ -116,6 +116,39 @@ async def test_seeded_simulate_shot_is_reproducible(server):
 
 
 @pytest.mark.asyncio
+async def test_malformed_payload_keeps_connection_and_session(server):
+    """T1.13 end to end: a malformed payload used to raise out of the router,
+    close the socket with code 1000 and auto-complete the session."""
+    async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
+        await recv_type(ws, "connection_status")
+        state = await request(ws, "create_profile", {"name": "M", "batting_hand": "right"},
+                              expect="session_state")
+        profile_id = state["payload"]["profiles"][0]["id"]
+        state = await request(ws, "start_session", {"profile_id": profile_id},
+                              expect="session_state")
+        session_id = int(state["payload"]["session"]["id"])
+
+        for msg_type, payload in [
+            ("set_field", {"fielders": [{"x": 1, "y": 2, "name": "a"}], "boundary_distance": None}),
+            ("set_field", {"fielders": 3}),
+            ("create_profile", {"name": 12345, "batting_hand": "right"}),
+            ("simulate_shot", {"exit_speed": "fast", "horizontal_angle": 0,
+                               "vertical_angle": 0, "field_config": []}),
+        ]:
+            err = await request(ws, msg_type, payload, expect="error")
+            assert err["payload"]["code"].startswith("E3"), err
+
+        # Still connected, session still active, scoring still works
+        pong = await request(ws, "ping", expect="pong")
+        assert pong["type"] == "pong"
+        state = await request(ws, "manual_input", {"result": "4"}, expect="session_state")
+        assert state["payload"]["session"]["runs"] == 4
+
+    await asyncio.sleep(0.2)
+    assert server.repository.get_session(session_id).is_completed  # normal close cleanup
+
+
+@pytest.mark.asyncio
 async def test_invalid_message_gets_error(server):
     async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
         await recv_type(ws, "connection_status")
