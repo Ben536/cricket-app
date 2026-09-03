@@ -1,0 +1,7 @@
+{
+  "mount_height_m": 3.0,
+  "yaw_deg": 0.0,
+  "mirror": false,
+  "calibrated": false,
+  "notes": "NOT CALIBRATED. Record a 'both' session with wagon-wheel taps, then: python3 tools/replay_jsonl.py <recording> --fit-yaw. Set mount_height_m to the measured sensor height above the ground. Until calibrated is true the detector reports directions in the SENSOR frame only."
+}
