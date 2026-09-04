@@ -83,14 +83,14 @@ https, can never open the Pi's ws:// socket - it is a demo, not the field UI.
 | File | Responsibility | Invariants / traps |
 |---|---|---|
 | `serial_utils.py` | Open the data UART with `exclusive=True` and **HUPCL disabled**. | DTR on this board resets the IWR6843. Never open/close the UART casually (the health monitor only `stat()`s it). |
-| `reader.py` | `RadarSource`: the **single owner** of `/dev/ttyUSB1`. Reader thread -> bounded queue (50) -> dispatch thread -> subscribers. Mock frames when the port is absent, flagged `is_mock`. | Subscribers must not block the reader; backpressure drops whole frames (counted), never bytes. Falls back to mock and retries the port every 5s. |
+| `reader.py` | `RadarSource`: the **single owner** of `/dev/ttyUSB1`. Reader thread -> bounded queue (50) -> dispatch thread -> subscribers. Mock frames when the port is absent, flagged `is_mock`. | Subscribers must not block the reader; backpressure drops whole frames (counted), never bytes. Falls back to mock and retries the port every 5s. Each start is a **generation** with its own stop event and a thread-local serial handle; a start joins the previous generation first (a stop/start race used to leave two readers on one tty). |
 | `tlv.py` | TI TLV parser with structural + physical validation. | Drops a frame unless numTLVs matches, the walk reaches the packet end (32B padding slack), points are finite and within 100m / 200 m/s. Counts drops, length rejections, frame-counter gaps. Cap 64KB (8KB went blind at ~350 points). |
 | `recorder.py` | Crash-safe JSONL (meta / frame / annotation / mode_change / end). | Start is atomic under a lifecycle lock; ms filenames; fsync each 1s; refuses to start without disk; **a failed write stops the recording and reports `error`**. `t_ms` is HOST time (jittery within a serial batch) - `frame_number`/`cpu_time_ms` are the hardware clock. |
 | `streamer.py` | Fans frames (as `to_stream_dict`) to WebSocket callbacks. | A subscription, nothing more. |
 | `profile_cfg.py` | Parses `config/profile_cricket.cfg`; derives v_max (13.0 m/s base, x3 = 39 m/s with extendedMaxVelocity), v_res, frame rate, range FOV. | The cfg comment's "145 km/h" is 140; without extendedMaxVelocity every cricket shot aliases to ~static. |
 | `geometry.py` | **Overhead-mount axes** (y = down/range, ground plane = x/z), launch elevation (gravity-compensated), `MountCalibration` (yaw, mirror, height; refuses field-frame angles until `calibrated`), `fit_yaw` from wagon-wheel taps. | Verified on the one real recording: y is sign-constrained (0.6% negative). Field direction = sensor direction - yaw (mirror flips). Engine angle = -field direction. |
 | `mount.json` | The calibration. **Not calibrated yet.** | Until `calibrated: true`, `BallEvent.horizontal_angle_deg` is None and nothing may feed the engine. |
-| `detector.py` | Gate -> cluster in (x,y,z,doppler) -> predict-and-gate tracking with global assignment -> per-point cos-corrected, de-aliased doppler speed -> consistency checks -> `BallEvent`. | Uses the hardware frame clock when `frame_period_ms` is set. Rejects tracks whose doppler disagrees with their displacement (the ghost signature). Speed cap = engine limit (200). |
+| `detector.py` | Gate -> cluster in (x,y,z,doppler) -> predict-and-gate tracking with global assignment -> per-point cos-corrected, de-aliased doppler speed -> consistency checks -> `BallEvent`. | Uses the hardware frame clock when `frame_period_ms` is set, kept **monotonic across a frame-counter reset** (radar restart closes all live tracks). Rejects tracks whose doppler disagrees with their displacement (the ghost signature). Speed cap = engine limit (200). |
 
 ### `db/` - SQLite (layer 3)
 
@@ -127,7 +127,7 @@ missing) and only the TS one has consumers (`src/api/__tests__/types.test.ts`
 tests its type guards). Regenerating both from the JSON is the right fix,
 deferred until layer 3 is decided.
 
-### `tests/` (pytest, 175) and `src/__tests__/` (vitest, 96)
+### `tests/` (pytest, 192) and `src/__tests__/` (vitest, 101)
 
 The inventory lists which test imports which module. Modules with **no
 direct test**: `server/rest_api.py`, `server/session_manager.py` (exercised
@@ -212,8 +212,8 @@ the transport. Frontend changes reach the phone only via `dist/` on the Pi.
 
 | Gate | Catches | Blind to |
 |---|---|---|
-| pytest (175) | server protocol, router, recorder, TLV, detector mechanics on synthetic overhead data, health monitor, migrations, unit files | anything needing the radar or the Pi |
-| vitest (96) | scoring law, engine guards, PRNG, discovery order, hook lifecycle with a fake socket | rendering, touch, CSS, real WebSocket |
+| pytest (192) | server protocol, router, recorder, TLV, detector mechanics on synthetic overhead data, health monitor, migrations, unit files, deploy ordering | anything needing the radar or the Pi |
+| vitest (101) | scoring law, engine guards, PRNG, discovery order, hook lifecycle with a fake socket | rendering, touch, CSS, real WebSocket |
 | parity (3,320) | any engine divergence on the sampled inputs | inputs outside the grid; NaN/Inf (not JSON) |
 | tsc / eslint | types, unused code | logic |
 | `codebase_map.py --check` | message/handler/param/error-code/unit drift | semantics |

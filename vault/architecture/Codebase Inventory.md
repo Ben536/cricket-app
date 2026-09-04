@@ -8,16 +8,16 @@ in the tool's docstring. Narrative lives in [[Codebase Map]].
 
 | area | total | breakdown |
 |---|---:|---|
-| frontend | 8537 | .ts 3848, .tsx 2550, .css 2073, .html 41, .json 25 |
-| engine (python) | 1879 | .py 1831, .json 48 |
-| server | 3395 | .py 3395 |
-| radar | 2003 | .py 1996, .json 7 |
+| frontend | 8612 | .ts 3912, .tsx 2576, .css 2058, .html 41, .json 25 |
+| engine (python) | 1894 | .py 1846, .json 48 |
+| server | 3438 | .py 3438 |
+| radar | 2100 | .py 2093, .json 7 |
 | db | 1874 | .py 1271, .sql 603 |
-| ops | 1341 | .py 839, .sh 331, .service 171 |
+| ops | 1375 | .py 858, .sh 346, .service 171 |
 | contracts | 3600 | .json 2073, .md 554, .py 411, .ts 384, .sql 178 |
-| tools | 1391 | .py 1073, .html 226, .ts 58, .md 34 |
-| tests (python) | 1816 | .py 1816 |
-| docs | 3767 | .md 3767 |
+| tools | 1464 | .py 1146, .html 226, .ts 58, .md 34 |
+| tests (python) | 1977 | .py 1977 |
+| docs | 3889 | .md 3889 |
 | other | 153 | .json 114, .cfg 33, .ts 6 |
 
 ## Python import graph (intra-repo)
@@ -47,7 +47,7 @@ in the tool's docstring. Narrative lives in [[Codebase Map]].
 - `server.message_router` -> `radar.recorder`
 - `server.rest_api` -> `db.repository`
 - `server.session_manager` -> (leaf)
-- `server.websocket_server` -> `db.repository`, `radar.streamer`, `server.connection_manager`, `server.handlers`, `server.message_router`, `server.session_manager`
+- `server.websocket_server` -> `db.repository`, `radar.recorder`, `radar.streamer`, `server.connection_manager`, `server.handlers`, `server.message_router`, `server.session_manager`
 - `tools.codebase_map` -> (leaf)
 - `tools.parity.compare` -> (leaf)
 - `tools.parity.gen_shots` -> (leaf)
@@ -137,4 +137,5 @@ in the tool's docstring. Narrative lives in [[Codebase Map]].
 ## systemd units
 
 - Units shipped: ['cricket-autohotspot.service', 'cricket-health.service', 'cricket-radar.service', 'cricket-server.service', 'cricket-ui.service']
-- Installed by deploy/install scripts: ['cricket-autohotspot.service', 'cricket-health.service', 'cricket-radar.service', 'cricket-server.service', 'cricket-ui.service']
+- Enabled by deploy_to_pi.sh: ['cricket-autohotspot.service', 'cricket-health.service', 'cricket-radar.service', 'cricket-server.service', 'cricket-ui.service']
+- Enabled by install_services.sh: ['cricket-autohotspot.service', 'cricket-health.service', 'cricket-radar.service', 'cricket-server.service', 'cricket-ui.service']

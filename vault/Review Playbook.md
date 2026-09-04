@@ -182,6 +182,18 @@ they land. Update [[Home]] status and, if the shape changed, [[Codebase Map]].
 
 ---
 
+## 5b. Have the diff reviewed before pushing
+
+Once the work is committed, spawn independent reviewers over the diff
+(`git diff <baseline>..HEAD`), one per area (frontend; server + radar;
+engines + ops + tools), with the same reproduction bar and the instruction
+to modify nothing. In 2026-09 this found seven P2s the author had missed -
+among them a stale timer stopping the wrong recording, a tracking clock that
+went backwards on a radar restart, and a prototype-chain hole in an input
+guard. Fix the P2s, list the P3s with their status in the review page, and
+only then push. Budget for the reviewers being cut off by rate limits:
+resume them with a message rather than restarting.
+
 ## 6. Hand-off checklist
 
 - [ ] `npm run check` green; CI green on the pushed commit

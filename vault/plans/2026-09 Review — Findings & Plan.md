@@ -22,8 +22,13 @@
    the live/dormant message split are re-derived mechanically instead of by
    hand, and `scripts/check_all.sh` so "green" means one command.
 5. For each finding: a reproduction, a fix in the smallest coherent unit, and
-   a test that fails without the fix. 175 pytest (was 73) and 96 vitest (was
+   a test that fails without the fix. 192 pytest (was 73) and 101 vitest (was
    47, all of which tested contract type guards and none of the live code).
+6. **The diff itself was then reviewed adversarially by three independent
+   agents** (frontend; server + radar; engines + ops + tools), each told to
+   report only what they verified by reading the exact code or running it.
+   Their P2 findings are listed in section "Review of this review" and were
+   all fixed before the push; the P3s are listed with their status.
 
 Every finding below was read AND run. Where a claim could not be verified
 without hardware it is in "Needs the Pi", not in the findings.
@@ -160,6 +165,40 @@ duration".
 | T3.18 unknown difficulty NaN | degrade to medium | `gameEngine.test.ts` |
 | T3.19 unguarded sqrt | radicand clamped, both engines | parity shot at boundary=5 |
 | T3.20 simulate_shot unvalidated | typed validation | router tests |
+
+---
+
+## Review of this review (independent, adversarial)
+
+Three agents reviewed `c4a0451..3830e47` with no stake in it. Verdicts:
+frontend "safe to push"; server/radar and engines/ops "needs fixes". Every
+P2 was fixed (commits `4b386a0` and the follow-up); the engines/ops agent
+also fuzzed both engines over 22,000 shots (in-contract: 0 divergences;
+adversarial: only the three classes below, all fixed).
+
+| # | Finding | Sev | Status |
+|---|---|---|---|
+| R1 | `simulate_result` with no `simulation` cleared the timeout then threw → promise never settled, ball lost | P2 | fixed + test |
+| R2 | `handle_set_field` did `f["name"]` on a fielder the router accepts without a name → KeyError → E3001 | P2 | fixed + e2e test |
+| R3 | Recorder auto-stop timer carried no session identity: fired late (manual stop held the lock) it stopped the NEXT recording, silently | P2 | fixed (timer bound to its session) + test |
+| R4 | Detector tracking clock followed a frame-counter reset backwards → live tracks neither associated nor expired for minutes | P2 | fixed (monotonic clock, tracks closed at reset) + test |
+| R5 | `RadarSource` restart race (pre-existing, newly exercised): a start during a stop cleared the shared stop event → two dispatch threads, potentially two readers on one tty; old thread's `finally` closed the NEW port | P2 | fixed (per-generation events, thread-local serial handle, join before restart) + test |
+| R6 | TS difficulty guard used `in` (prototype chain): `'constructor'` passed and indexed a function → NaN catch probability; 41/6000 fuzz diverged | P2 | fixed (`Object.hasOwn`) + test |
+| R7 | Deploy rsynced code BEFORE the deps gate and the build, so a failure left new code on disk for the next restart | P2 | fixed (all gates before the first rsync) + test |
+| R8 | Python echoed the raw seed (TS echoes `seed >>> 0`); bool passed Python's number check (TS rejects) | P3 | fixed (parity) + tests |
+| R9 | Boundary radius ≤ batter offset: sign-of-zero libm difference flipped dot/4 at exactly 8.84 | P3 | fixed: both engines treat ≤ 8.84 as unset (70) |
+| R10 | `normalizeWsUrl` appended the port after a path (`192.168.1.5/` → port 80) | P3 | fixed (URL parser) + tests |
+| R11 | Router: `max_duration` NaN became a 1s recording; `10**400` overflowed; non-string `type` raised; NaN echoed as bare `NaN` (invalid JSON) | P3 | fixed + tests |
+| R12 | Static server: 404 under `/assets/` sent `immutable`; no HEAD; `%00` traceback | P3 | fixed + tests |
+| R13 | Recorder: annotation keys could override `type`/`t_ms`; `_start_time` read unlocked; open() failure left a subscriber-less reader | P3 | fixed |
+| R14 | `codebase_map.py` regexes fooled by comments / `.get()` / bracket access; `*.service` glob masked an un-enabled unit | P3 | fixed (AST + comment stripping + name check) |
+| R15 | CI `systemd-analyze` grep could pass a real error / fail on runner noise | P3 | anchored on parse-error patterns |
+| R16 | `install_services.sh` blocked up to 300s on the radar unit with no radar | P3 | `--no-block` |
+| R17 | journald drop-in never applied until reboot; volatile journal | P3 | restart journald; `Storage=persistent` |
+| R18 | Scoring extraction gated tallies on the tracker symbol (unreachable combos) | P3 | restored input-flag semantics + tests |
+| R19 | Settings written on every drag event | P3 | debounced |
+| R20 | `websocket_server.stop()` left evict tasks and a live recording | P3 | drains + finishes the recording |
+| — | `discoverServer` keeps probing after `reconnect()` (harmless duplicate probes); 5.5s generation test; `test_websocket_server` fixed port | P3 | probes: noted; port: ephemeral |
 
 ---
 
