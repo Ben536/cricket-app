@@ -16,7 +16,9 @@ Two things this server has to get right that the stock handler does not:
 
 2. Cache headers. Vite content-hashes everything under /assets/, so those
    are immutable; index.html (the shell) must always be revalidated or a
-   phone can keep serving a shell whose bundles no longer exist.
+   phone can keep serving a shell whose bundles no longer exist. A 404 for
+   an /assets/ path is NOT immutable - a transient miss during a deploy
+   must not be cached for a year.
 """
 
 from __future__ import annotations
@@ -39,25 +41,45 @@ class SPAHandler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def __init__(self, *args, directory: str | None = None, **kwargs):
+        self._cache_control = CACHE_REVALIDATE
         super().__init__(*args, directory=directory or str(DIST_DIR), **kwargs)
 
-    def do_GET(self):
+    def _resolve(self) -> bool:
+        """Apply SPA routing to self.path and decide the cache policy.
+        Returns False if the request must be rejected."""
+        self._cache_control = CACHE_REVALIDATE
+        request_path = self.path.split("?", 1)[0]
+        if "\x00" in request_path or "%00" in request_path.lower():
+            self.send_error(400, "Bad request")
+            return False
         path = self.translate_path(self.path)
-        if not (os.path.exists(path) and os.path.isfile(path)):
+        exists = os.path.exists(path) and os.path.isfile(path)
+        if not exists:
             # SPA route (no extension) -> shell. A missing file WITH an
             # extension (e.g. a purged /assets/*.js) must 404 honestly so the
             # service worker can react, not be answered with HTML.
-            if not os.path.splitext(self.path.split("?", 1)[0])[1]:
+            if not os.path.splitext(request_path)[1]:
                 self.path = "/index.html"
-        return super().do_GET()
+        elif request_path.startswith("/assets/"):
+            self._cache_control = CACHE_IMMUTABLE
+        return True
+
+    def do_GET(self):
+        if self._resolve():
+            return super().do_GET()
+
+    def do_HEAD(self):
+        if self._resolve():
+            return super().do_HEAD()
 
     def end_headers(self):
-        request_path = self.path.split("?", 1)[0]
-        if request_path.startswith("/assets/"):
-            self.send_header("Cache-Control", CACHE_IMMUTABLE)
-        else:
-            self.send_header("Cache-Control", CACHE_REVALIDATE)
+        self.send_header("Cache-Control", self._cache_control)
         super().end_headers()
+
+    def send_error(self, code, message=None, explain=None):
+        # Errors are never cacheable, whatever path they were for
+        self._cache_control = CACHE_REVALIDATE
+        super().send_error(code, message, explain)
 
     def log_message(self, format, *args):
         """Log to stdout for journald. `format % args` handles every arity

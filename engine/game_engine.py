@@ -308,8 +308,19 @@ def _clamp(value: float, min_val: float, max_val: float) -> float:
 
 
 def _is_valid_number(value: float) -> bool:
-    """Check if value is a valid finite number."""
-    return isinstance(value, (int, float)) and math.isfinite(value)
+    """Check if value is a valid finite number.
+
+    bool is rejected (it is an int subclass; JSON `true` must not simulate
+    as 1 km/h - TypeScript's Number.isFinite(true) is false). Integers too
+    large for a float make math.isfinite raise OverflowError; they are not
+    finite numbers either.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _validate_and_sanitize_inputs(
@@ -378,8 +389,10 @@ def _validate_and_sanitize_inputs(
         warnings.append(f"max_height={max_height} out of range, clamping")
         max_height = _clamp(max_height, 0, MAX_HEIGHT)
 
-    # Boundary distance
-    if not _is_valid_number(boundary_distance) or boundary_distance <= 0:
+    # Boundary distance. At or inside the batter's offset from the pitch
+    # centre the rope would pass through the batter; treat as unset (both
+    # engines). Contract range is 50-100.
+    if not _is_valid_number(boundary_distance) or boundary_distance <= BATTER_OFFSET_FROM_CENTER:
         warnings.append(f"Invalid boundary_distance={boundary_distance}, using 70")
         boundary_distance = 70.0
 
@@ -2068,6 +2081,9 @@ def simulate_delivery(
     """
     if seed is None:
         seed = random.getrandbits(32)
+    # Echo the seed the PRNG actually used (32-bit), as TypeScript echoes
+    # `seed >>> 0`; a raw -1 or 2**40 would otherwise round-trip differently.
+    seed = int(seed) & 0xFFFFFFFF
     rand = mulberry32(seed)
     # Validate and sanitize inputs
     (exit_speed, horizontal_angle, vertical_angle, landing_x, landing_y,

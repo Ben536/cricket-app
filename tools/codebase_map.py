@@ -20,10 +20,13 @@ reviewer's notes.
   - an engine parameter exists in engine_params.json but only one engine reads it
   - an engine reads a parameter the params file does not define
   - an error code appears in code but not in contracts/error_codes.md
-  - a systemd unit ships in scripts/systemd/ but nothing installs it
+  - a systemd unit ships in scripts/systemd/ but a deploy/install script does not enable it
 
 Everything else (dormant handlers, untested modules, dead CSS) is reported,
 not failed: those are review findings, not build breaks.
+
+Python facts are read from the AST (comments and dead strings cannot fool
+them); TypeScript facts are read after stripping comments.
 """
 
 from __future__ import annotations
@@ -82,12 +85,34 @@ def rel(p: Path) -> str:
 def read(p: Path) -> str:
     try:
         return p.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
+    except (UnicodeDecodeError, FileNotFoundError):
         return ""
 
 
 def count_loc(p: Path) -> int:
     return sum(1 for line in read(p).splitlines() if line.strip())
+
+
+def py_tree(p: Path):
+    try:
+        return ast.parse(read(p))
+    except SyntaxError:
+        return None
+
+
+_TS_BLOCK_COMMENT = re.compile(r"/\*[\s\S]*?\*/")
+# A `//` that starts a line or follows whitespace. (Not one inside "ws://".)
+_TS_LINE_COMMENT = re.compile(r"(^|\s)//[^\n]*")
+
+
+def strip_ts_comments(text: str) -> str:
+    text = _TS_BLOCK_COMMENT.sub("", text)
+    return _TS_LINE_COMMENT.sub(r"\1", text)
+
+
+def sh_code_lines(text: str) -> list[str]:
+    """Non-comment lines of a shell script."""
+    return [line for line in text.splitlines() if not line.strip().startswith("#")]
 
 
 # ---------------------------------------------------------------------------
@@ -129,9 +154,8 @@ def python_modules() -> dict[str, Path]:
 def python_import_graph(mods: dict[str, Path]) -> dict[str, set[str]]:
     graph: dict[str, set[str]] = {m: set() for m in mods}
     for mod, path in mods.items():
-        try:
-            tree = ast.parse(read(path))
-        except SyntaxError:
+        tree = py_tree(path)
+        if tree is None:
             continue
         for node in ast.walk(tree):
             names: list[str] = []
@@ -144,10 +168,9 @@ def python_import_graph(mods: dict[str, Path]) -> dict[str, set[str]]:
             for n in names:
                 top = n.split(".")[0]
                 if top in PY_PACKAGES:
-                    # Scripts/tests sometimes import a sibling by bare name
-                    # after sys.path hacks (e.g. `from health_monitor import`).
                     target = n
                 elif f"scripts.{n}" in mods:
+                    # Scripts/tests import a sibling by bare name after sys.path hacks
                     target = f"scripts.{n}"
                 else:
                     continue
@@ -193,7 +216,7 @@ def ts_import_graph() -> dict[str, set[str]]:
     files = [p for p in iter_files(".ts", ".tsx") if rel(p).startswith(("src/", "tools/parity/"))]
     for p in files:
         deps = set()
-        for target in TS_IMPORT_RE.findall(read(p)):
+        for target in TS_IMPORT_RE.findall(strip_ts_comments(read(p))):
             if not target.startswith("."):
                 continue
             resolved = (p.parent / target).resolve()
@@ -213,32 +236,69 @@ def ts_import_graph() -> dict[str, set[str]]:
 # 4. websocket message cross-reference
 # ---------------------------------------------------------------------------
 
+def _const_str(node) -> str | None:
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+
+def registered_handler_types(path: Path) -> set[str]:
+    """register_handler("<type>", ...) calls, from the AST."""
+    out = set()
+    tree = py_tree(path)
+    if tree is None:
+        return out
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "register_handler" and node.args):
+            t = _const_str(node.args[0])
+            if t:
+                out.add(t)
+    return out
+
+
+def assigned_string_set(path: Path, name: str) -> set[str]:
+    """The string constants in `NAME = { ... }` / `[ ... ]`."""
+    tree = py_tree(path)
+    if tree is None:
+        return set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            if isinstance(node.value, (ast.Set, ast.List, ast.Tuple)):
+                return {s for s in (_const_str(e) for e in node.value.elts) if s}
+    return set()
+
+
+def emitted_message_types(paths) -> set[str]:
+    """Dict literals with a "type": "<x>" entry, from the AST."""
+    out = set()
+    for p in paths:
+        tree = py_tree(p)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Dict):
+                for k, v in zip(node.keys, node.values):
+                    if k is not None and _const_str(k) == "type":
+                        t = _const_str(v)
+                        if t:
+                            out.add(t)
+    return out
+
+
 def message_xref() -> dict[str, set[str]]:
     src = ROOT / "src"
     server = ROOT / "server"
     xref: dict[str, set[str]] = defaultdict(set)
 
-    # server: handlers registered + router-validated types
-    handlers = read(server / "handlers.py")
-    xref["server_registered"] = set(re.findall(r'register_handler\("([a-z_]+)"', handlers))
-    router = read(server / "message_router.py")
-    m = re.search(r"VALID_CLIENT_TYPES\s*=\s*\{(.*?)\}", router, re.S)
-    xref["router_valid"] = set(re.findall(r'"([a-z_]+)"', m.group(1))) if m else set()
-    m = re.search(r"MESSAGE_REQUIRED_FIELDS[^{]*\{(.*?)\n\}", router, re.S)
-    xref["router_required_fields"] = set(re.findall(r'^\s*"([a-z_]+)":', m.group(1), re.M)) if m else set()
-
-    # server -> client types actually emitted
-    emitted = set()
-    for p in server.glob("*.py"):
-        emitted |= set(re.findall(r'"type":\s*"([a-z_]+)"', read(p)))
-    xref["server_emits"] = emitted
+    xref["server_registered"] = registered_handler_types(server / "handlers.py")
+    xref["router_valid"] = assigned_string_set(server / "message_router.py", "VALID_CLIENT_TYPES")
+    xref["server_emits"] = emitted_message_types(server.glob("*.py"))
 
     # frontend: sent types (sendMessage('x') and raw type: 'x') and consumed types
     sent, consumed = set(), set()
     for p in src.rglob("*.ts*"):
         if "__tests__" in p.parts:
             continue
-        text = read(p)
+        text = strip_ts_comments(read(p))
         sent |= set(re.findall(r"sendMessage\(\s*['\"]([a-z_]+)['\"]", text))
         sent |= set(re.findall(r"type:\s*['\"]([a-z_]+)['\"]\s*,\s*\n?\s*message_id", text))
         consumed |= set(re.findall(r"type\s*===\s*['\"]([a-z_]+)['\"]", text))
@@ -246,14 +306,12 @@ def message_xref() -> dict[str, set[str]]:
     xref["frontend_consumes"] = consumed
 
     # contracts
-    ts_contract = read(ROOT / "contracts" / "api_types.ts")
+    ts_contract = strip_ts_comments(read(ROOT / "contracts" / "api_types.ts"))
     xref["contract_ts_types"] = set(re.findall(r'^\s*type:\s*"([a-z_]+)"', ts_contract, re.M))
     try:
         proto = json.loads(read(ROOT / "contracts" / "websocket_protocol.json"))
-        c2s = proto.get("clientToServer", {})
-        s2c = proto.get("serverToClient", {})
-        xref["contract_json_client"] = set(_message_keys(c2s))
-        xref["contract_json_server"] = set(_message_keys(s2c))
+        xref["contract_json_client"] = set(_message_keys(proto.get("clientToServer", {})))
+        xref["contract_json_server"] = set(_message_keys(proto.get("serverToClient", {})))
     except (json.JSONDecodeError, FileNotFoundError):
         pass
     return xref
@@ -286,13 +344,39 @@ def _message_keys(section) -> list[str]:
 # 5. engine parameter cross-reference
 # ---------------------------------------------------------------------------
 
+def py_params_used(path: Path, name: str = "_PARAMS") -> set[str]:
+    """_PARAMS["x"], _PARAMS['x'] and _PARAMS.get("x") from the AST."""
+    out = set()
+    tree = py_tree(path)
+    if tree is None:
+        return out
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == name:
+            k = _const_str(node.slice)
+            if k:
+                out.add(k)
+        elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+              and isinstance(node.func.value, ast.Name) and node.func.value.id == name
+              and node.func.attr == "get" and node.args):
+            k = _const_str(node.args[0])
+            if k:
+                out.add(k)
+    return out
+
+
+def ts_params_used(text: str, name: str = "PARAMS") -> set[str]:
+    """PARAMS.x and PARAMS['x'] / PARAMS["x"], comments stripped."""
+    text = strip_ts_comments(text)
+    used = set(re.findall(rf"\b{name}\.([a-z_][a-z0-9_]*)", text))
+    used |= set(re.findall(rf"\b{name}\[['\"]([a-z_][a-z0-9_]*)['\"]\]", text))
+    return used
+
+
 def engine_params_xref() -> dict[str, set[str]]:
     params = json.loads(read(ROOT / "engine" / "engine_params.json"))
     keys = {k for k in params if not k.startswith("_")}
-    ts = read(ROOT / "src" / "gameEngine.ts")
-    py = read(ROOT / "engine" / "game_engine.py")
-    ts_used = set(re.findall(r"PARAMS\.([a-z_]+)", ts))
-    py_used = set(re.findall(r'_PARAMS\["([a-z_]+)"\]', py))
+    ts_used = ts_params_used(read(ROOT / "src" / "gameEngine.ts")) | ts_params_used(read(ROOT / "src" / "fieldZones.ts"))
+    py_used = py_params_used(ROOT / "engine" / "game_engine.py")
     return {"defined": keys, "ts_used": ts_used, "py_used": py_used}
 
 
@@ -300,7 +384,8 @@ def engine_params_xref() -> dict[str, set[str]]:
 # 6. tests -> modules
 # ---------------------------------------------------------------------------
 
-def test_coverage_map(mods: dict[str, Path], graph: dict[str, set[str]]) -> dict[str, set[str]]:
+def test_coverage_map(graph: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Only DIRECT imports count as 'has a test' - transitive coverage hides gaps."""
     covered: dict[str, set[str]] = defaultdict(set)
     for mod, deps in graph.items():
         if not mod.startswith("tests."):
@@ -308,8 +393,6 @@ def test_coverage_map(mods: dict[str, Path], graph: dict[str, set[str]]) -> dict
         for d in deps:
             if not d.startswith("tests."):
                 covered[d].add(mod)
-    # transitive: a module imported by a tested module is exercised too, but
-    # only DIRECT imports count as "has a test" - transitive coverage hides gaps.
     return covered
 
 
@@ -324,7 +407,13 @@ def vitest_files() -> list[str]:
 def error_code_xref() -> dict[str, set[str]]:
     in_code = set()
     for p in list((ROOT / "server").glob("*.py")) + list((ROOT / "db").glob("*.py")):
-        in_code |= set(re.findall(r'"(E\d{4})"', read(p)))
+        tree = py_tree(p)
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            s = _const_str(node)
+            if s and re.fullmatch(r"E\d{4}", s):
+                in_code.add(s)
     documented = set(re.findall(r"\b(E\d{4})\b", read(ROOT / "contracts" / "error_codes.md")))
     return {"in_code": in_code, "documented": documented}
 
@@ -335,16 +424,19 @@ def error_code_xref() -> dict[str, set[str]]:
 
 def systemd_xref() -> dict[str, set[str]]:
     units = {p.name for p in (ROOT / "scripts" / "systemd").glob("*.service")}
-    deploy = read(ROOT / "scripts" / "deploy_to_pi.sh")
-    install = read(ROOT / "scripts" / "install_services.sh")
-    referenced = set()
-    for name in units:
-        stem = name.removesuffix(".service")
-        if stem in deploy or "*.service" in deploy:
-            referenced.add(name)
-        if stem in install or "*.service" in install:
-            referenced.add(name)
-    return {"units": units, "installed_by_scripts": referenced}
+    deploy_code = "\n".join(sh_code_lines(read(ROOT / "scripts" / "deploy_to_pi.sh")))
+    install_code = "\n".join(sh_code_lines(read(ROOT / "scripts" / "install_services.sh")))
+    # The deploy enables units BY NAME; a `cp *.service` glob installs the
+    # file but does not enable it, so a name is required.
+    enabled_by_deploy = {u for u in units if u.removesuffix(".service") in deploy_code}
+    # The on-device installer loops over every shipped unit
+    install_all = '"$UNIT_DIR"/*.service' in install_code
+    enabled_by_install = units if install_all else {u for u in units if u.removesuffix(".service") in install_code}
+    return {
+        "units": units,
+        "enabled_by_deploy": enabled_by_deploy,
+        "enabled_by_install": enabled_by_install,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +546,7 @@ def build_report() -> tuple[str, list[str]]:
 
     # --- tests
     h("Test coverage map (which test file imports which module)")
-    covered = test_coverage_map(mods, graph)
+    covered = test_coverage_map(graph)
     product_mods = sorted(m for m in mods if not m.startswith(("tests.", "tools.")) and mods[m].name != "__init__.py")
     for m in product_mods:
         tests = sorted(covered.get(m, ()))
@@ -476,11 +568,12 @@ def build_report() -> tuple[str, list[str]]:
     h("systemd units")
     su = systemd_xref()
     lines.append(f"- Units shipped: {sorted(su['units'])}")
-    orphans = su["units"] - su["installed_by_scripts"]
-    lines.append(f"- Installed by deploy/install scripts: {sorted(su['installed_by_scripts'])}")
-    if orphans:
-        lines.append(f"- **Shipped but installed by nothing**: {sorted(orphans)}")
-        drift += [f"systemd unit {u} is shipped but no script installs it" for u in sorted(orphans)]
+    lines.append(f"- Enabled by deploy_to_pi.sh: {sorted(su['enabled_by_deploy'])}")
+    lines.append(f"- Enabled by install_services.sh: {sorted(su['enabled_by_install'])}")
+    for u in sorted(su["units"] - su["enabled_by_deploy"]):
+        drift.append(f"systemd unit {u} is shipped but deploy_to_pi.sh does not enable it")
+    for u in sorted(su["units"] - su["enabled_by_install"]):
+        drift.append(f"systemd unit {u} is shipped but install_services.sh does not enable it")
 
     return "\n".join(lines) + "\n", drift
 

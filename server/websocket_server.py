@@ -185,12 +185,31 @@ class CricketWebSocketServer:
             except asyncio.CancelledError:
                 pass
 
+        # Release every live radar stream (cancels drain tasks) and finish a
+        # recording in progress so its file gets an end marker instead of
+        # being recovered later as "incomplete".
+        if self._handlers:
+            for client_id in list(self._handlers._streams):
+                try:
+                    await self._handlers._release_stream(client_id)
+                except Exception as e:
+                    logger.warning(f"Releasing stream for {client_id[:8]} on stop: {e}")
+        try:
+            from radar.recorder import get_recorder
+            recorder = get_recorder()
+            if recorder.is_recording:
+                logger.info("Stopping the recording in progress before shutdown")
+                await asyncio.to_thread(recorder.stop_recording)
+        except Exception as e:
+            logger.warning(f"Could not stop recording on shutdown: {e}")
+
         # Close all client connections
         for client in self.connection_manager.get_all_clients():
             try:
-                await client.websocket.close(1001, "Server shutting down")
+                await asyncio.wait_for(client.websocket.close(1001, "Server shutting down"), timeout=5)
             except Exception:
                 pass
+        await self.connection_manager.drain_background()
 
         # Close server
         if self._server:

@@ -185,15 +185,29 @@ class RadarRecorder:
 
             self._check_disk_space(self._max_duration)
 
+            # Open the crash-safe JSONL output file now and write a meta
+            # header. Frames and annotations are appended line-by-line as
+            # they occur, so a crash/disconnect mid-session keeps everything
+            # captured so far. The file is opened BEFORE the reader is
+            # started: an open() failure must not leave a subscriber-less
+            # reader generating frames into a queue nobody drains.
+            type_dir = self.recordings_dir / session_type
+            type_dir.mkdir(parents=True, exist_ok=True)
+            file_path = self._unique_file_path(type_dir)
+            jsonl = open(file_path, "w")
+
             # Resolve mock/real BEFORE subscribing, so the meta line and the
             # first frames agree. A missing radar must never silently produce
             # a plausible-looking dataset - it is flagged in the file and
             # response.
-            self._source.ensure_running()
-            self._source.wait_until_ready(timeout=2.0)
+            try:
+                self._source.ensure_running()
+                self._source.wait_until_ready(timeout=2.0)
+            except Exception:
+                jsonl.close()
+                raise
             is_mock = self._source.is_mock
 
-            # Create session
             start_time = datetime.now(timezone.utc)
             session = RecordingSession(
                 session_type=session_type,
@@ -208,17 +222,10 @@ class RadarRecorder:
                     "(flagged in the file and the start_recording response)"
                 )
 
-            # Open the crash-safe JSONL output file now and write a meta
-            # header. Frames and annotations are appended line-by-line as
-            # they occur, so a crash/disconnect mid-session keeps everything
-            # captured so far.
-            type_dir = self.recordings_dir / session_type
-            type_dir.mkdir(parents=True, exist_ok=True)
-            file_path = self._unique_file_path(type_dir)
             self.write_error = None
             self._frame_count = 0
             self._annotation_count = 0
-            self._jsonl = open(file_path, "w")
+            self._jsonl = jsonl
             session.file_path = str(file_path)
             self._start_time = time.time()
             self._last_fsync = self._start_time
@@ -236,8 +243,12 @@ class RadarRecorder:
             # Frames start flowing only now, with mode already classified
             self._source.subscribe(self._on_frame)
 
-            # Auto-stop timer replaces the old per-recording thread
-            self._auto_stop_timer = threading.Timer(self._max_duration, self._auto_stop)
+            # Auto-stop timer replaces the old per-recording thread. It
+            # carries the session it was armed for: a timer that fired while
+            # a manual stop held the lock (a join can take seconds) used to
+            # run AFTER that stop, and if a new recording had started in
+            # between it stopped the NEW one, silently.
+            self._auto_stop_timer = threading.Timer(self._max_duration, self._auto_stop, args=(session,))
             self._auto_stop_timer.daemon = True
             self._auto_stop_timer.start()
 
@@ -368,11 +379,19 @@ class RadarRecorder:
         The timestamp (t_ms) aligns the mark to the radar frames captured around
         it. Returns the stored annotation, or None if not recording.
         """
-        if not self.is_recording or self._start_time is None:
+        # Snapshot the start time under the lock: a stop on another thread
+        # nulls it between a check and a read.
+        with self._lock:
+            start_time = self._start_time
+            recording = self._current_session is not None
+        if not recording or start_time is None:
             return None
 
-        t_ms = int((time.time() - self._start_time) * 1000)
-        annotation = {"type": "annotation", "t_ms": t_ms, **(mark or {})}
+        t_ms = int((time.time() - start_time) * 1000)
+        # The mark's own keys never override the record's type or clock: a
+        # mark {"type": "frame"} was counted as a frame by the crash
+        # recovery scan, and a string t_ms broke its max().
+        annotation = {**(mark or {}), "type": "annotation", "t_ms": t_ms}
         self._write_line(annotation)
         with self._lock:
             self._annotation_count += 1
@@ -380,12 +399,18 @@ class RadarRecorder:
                 self._current_session.annotations.append(annotation)
                 self._current_session.annotation_count = self._annotation_count
         logger.info(f"Annotation @ {t_ms}ms: {mark}")
+        if self.write_error is not None:
+            self._stop_on_write_error()
         return annotation
 
-    def _auto_stop(self) -> None:
-        """Timer callback: max duration reached."""
-        logger.info("Max recording duration reached, auto-stopping")
-        self.stop_recording()
+    def _auto_stop(self, session: RecordingSession) -> None:
+        """Timer callback: max duration reached for THIS session only."""
+        with self._lifecycle_lock:
+            if self._current_session is not session:
+                logger.debug("Auto-stop timer fired for a session that already ended - ignoring")
+                return
+            logger.info("Max recording duration reached, auto-stopping")
+            self._stop_locked()
 
     def stop_recording(self) -> Optional[RecordingSession]:
         """
@@ -400,21 +425,24 @@ class RadarRecorder:
         with self._lifecycle_lock:
             if not self.is_recording:
                 return self._last_session
+            return self._stop_locked()
 
-            # Order matters: unsubscribe first so no frame callback can write
-            # to the file while it is being finalized.
-            self._source.unsubscribe(self._on_frame)
-            if self._auto_stop_timer is not None:
-                self._auto_stop_timer.cancel()
-                self._auto_stop_timer = None
+    def _stop_locked(self) -> RecordingSession:
+        """Stop the current recording. Caller holds _lifecycle_lock."""
+        # Order matters: unsubscribe first so no frame callback can write
+        # to the file while it is being finalized.
+        self._source.unsubscribe(self._on_frame)
+        if self._auto_stop_timer is not None:
+            self._auto_stop_timer.cancel()
+            self._auto_stop_timer = None
 
-            session = self._finalize_session()
+        session = self._finalize_session()
 
-            logger.info(
-                f"Stopped recording: type={session.session_type}, "
-                f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
-            )
-            return session
+        logger.info(
+            f"Stopped recording: type={session.session_type}, "
+            f"frames={session.frame_count}, duration={session.duration_seconds:.1f}s"
+        )
+        return session
 
     def _finalize_session(self) -> RecordingSession:
         """Finalize the current session: append an end marker and close the file.
@@ -455,9 +483,10 @@ class RadarRecorder:
         )
 
         # Clear current session (keep it as last for idempotent stop)
-        self._current_session = None
-        self._start_time = None
-        self._last_session = session
+        with self._lock:
+            self._current_session = None
+            self._start_time = None
+            self._last_session = session
 
         return session
 

@@ -83,6 +83,30 @@ def test_prng_golden_vectors():
         assert [r() for _ in range(5)] == expected, seed
 
 
+def test_inputs_that_typescript_rejects_are_rejected_here_too():
+    """bool is an int subclass: exit_speed=True simulated as 1 km/h while the
+    browser (Number.isFinite(true) is false) used 0. Huge ints overflowed
+    math.isfinite. Seeds are echoed masked to 32 bits like `seed >>> 0`."""
+    base = dict(horizontal_angle=20, vertical_angle=15, landing_x=30, landing_y=45,
+                projected_distance=60, max_height=8, field_config=FIELD, seed=5)
+    assert simulate_delivery(exit_speed=True, **base) == simulate_delivery(exit_speed=0, **base)
+    assert simulate_delivery(exit_speed=10 ** 400, **base) == simulate_delivery(exit_speed=0, **base)
+    r = simulate_delivery(exit_speed=90, horizontal_angle=20, vertical_angle=15, landing_x=30,
+                          landing_y=45, projected_distance=60, max_height=8, field_config=FIELD, seed=-1)
+    assert r["seed"] == 4294967295
+    assert r == {**simulate_delivery(exit_speed=90, horizontal_angle=20, vertical_angle=15, landing_x=30,
+                                      landing_y=45, projected_distance=60, max_height=8,
+                                      field_config=FIELD, seed=4294967295)}
+
+
+def test_boundary_inside_batter_offset_is_treated_as_unset():
+    kwargs = dict(exit_speed=100, horizontal_angle=90, vertical_angle=10, landing_x=-40,
+                  landing_y=0, projected_distance=60, max_height=3, field_config=FIELD, seed=3)
+    nominal = simulate_delivery(boundary_distance=70, **kwargs)
+    for bad in (5, 8.84, 0, -1, float("nan"), float("inf")):
+        assert simulate_delivery(boundary_distance=bad, **kwargs) == nominal, bad
+
+
 def test_boundary_radicand_is_clamped():
     """R < 8.84*|sin(theta)| used to raise ValueError (shot lost); TS returned
     NaN. Both now return the tangent-point distance."""

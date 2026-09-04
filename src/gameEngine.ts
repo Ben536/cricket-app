@@ -1163,13 +1163,18 @@ export function simulateDelivery(
   landingY = finite(landingY, 0)
   projectedDistance = Math.max(0, Math.min(ENGINE_LIMITS.projectedDistanceM.max, finite(projectedDistance, 0)))
   maxHeight = Math.max(0, Math.min(ENGINE_LIMITS.maxHeightM.max, finite(maxHeight, 0)))
-  if (!Number.isFinite(boundaryDistance) || boundaryDistance <= 0) boundaryDistance = 70.0
+  // A boundary radius at or inside the batter's offset from the pitch centre
+  // has no geometry (the batter would be on or outside the rope); both
+  // engines treat it as unset. Contract range is 50-100.
+  if (!Number.isFinite(boundaryDistance) || boundaryDistance <= BATTER_OFFSET_FROM_CENTER) boundaryDistance = 70.0
   // The union type is erased at runtime and this value arrives from a server
   // payload. An unknown string used to index the probability tables as
   // `undefined`: NaN comparisons made every catch a drop, then `.stopped`
   // threw and took the local fallback down with it. Python degrades to
-  // 'medium' with a warning; do the same.
-  if (!(difficulty in GROUND_FIELDING_PROBS)) {
+  // 'medium' with a warning; do the same. (Own-property check: `in` walks
+  // the prototype chain, so 'constructor' / 'toString' passed it and indexed
+  // a function.)
+  if (typeof difficulty !== 'string' || !Object.hasOwn(GROUND_FIELDING_PROBS, difficulty)) {
     console.warn(`Unknown difficulty '${String(difficulty)}', using 'medium'`)
     difficulty = 'medium'
   }

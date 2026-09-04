@@ -118,8 +118,17 @@ describe('simulateDelivery guards', () => {
 
   it('degrades an unknown difficulty to medium instead of throwing', () => {
     const medium = simulate(90, 20, 15, { difficulty: 'medium', seed: 11 })
-    const bogus = simulate(90, 20, 15, { difficulty: 'god' as unknown as 'medium', seed: 11 })
-    expect(bogus).toEqual(medium)
+    for (const bogus of ['god', 'constructor', '__proto__', 'toString', 'hasOwnProperty', '', 42, null, undefined]) {
+      const r = simulate(90, 20, 15, { difficulty: bogus as unknown as 'medium', seed: 11 })
+      expect(r, String(bogus)).toEqual(medium)
+    }
+  })
+
+  it('treats a boundary radius inside the batter offset as unset (70)', () => {
+    const nominal = simulate(100, 90, 10, { boundary: 70, seed: 3 })
+    for (const bad of [5, 8.84, 0, -1, NaN, Infinity]) {
+      expect(simulate(100, 90, 10, { boundary: bad, seed: 3 })).toEqual(nominal)
+    }
   })
 
   it('survives NaN everywhere and still produces an outcome', () => {

@@ -348,6 +348,17 @@ class ConnectionManager:
         self._background.add(task)
         task.add_done_callback(self._background.discard)
 
+    async def drain_background(self, timeout: float = 5.0) -> None:
+        """Wait (bounded) for evicted sockets' close handshakes - for shutdown."""
+        if not self._background:
+            return
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self._background, return_exceptions=True), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"{len(self._background)} background close task(s) did not finish in {timeout}s")
+
     async def broadcast_to_session(
         self,
         session_id: str,

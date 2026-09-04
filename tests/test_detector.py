@@ -223,6 +223,39 @@ def test_hardware_frame_clock_beats_jittered_host_timestamps():
     # recording turned a 0.3m step into a 75 m/s teleport.)
 
 
+def test_frame_counter_reset_does_not_strand_tracks():
+    """A radar restart (or the mock source restarting at 1) sends the
+    hardware frame counter backwards. The tracking clock used to follow it,
+    so a live track was neither associated nor expired until the counter
+    caught up - minutes. Now the clock stays monotonic, live tracks are
+    closed at the reset, and the next ball is detected on its own."""
+    speed_ms = 100 / 3.6
+    detector = BallDetector(DetectorParams(frame_period_ms=FRAME_DT_MS))
+    events = []
+    host_t = 0
+    # Ball 1 on frames 300..306 (counter high) with its track still LIVE when
+    # the counter resets to 1 on the very next frame; ball 2 on frames 8..14.
+    schedule = [(300 + i, True, i) for i in range(7)] + [(1 + i, 7 <= i <= 13, i - 7) for i in range(30)]
+    first_event_at = None
+    for idx, (fn, ball, k) in enumerate(schedule):
+        host_t += FRAME_DT_MS
+        points = []
+        if ball:
+            x, y, z, doppler = overhead_ball(k * FRAME_DT_MS / 1000.0, speed_ms, 30.0)
+            points.append(RadarPoint(x=x, y=y, z=z, doppler=doppler, snr=17.0, noise=5.0))
+        out = detector.process_frame(make_frame(fn, points), host_t)
+        if out and first_event_at is None:
+            first_event_at = idx
+        events.extend(out)
+    events.extend(detector.flush())
+    assert len(events) == 2, [e.to_dict() for e in events]
+    for ev in events:
+        assert abs(ev.speed_kmh - 100) / 100 < 0.05
+    # The first ball's event was emitted AT the reset frame (idx 7), not
+    # stranded until flush() at the end of the stream
+    assert first_event_at == 7, first_event_at
+
+
 def test_bat_swing_cluster_rejected():
     events = run_ball_crossing(with_bat=True)
     assert len(events) == 1, "bat cluster must not create a second ball event"

@@ -260,16 +260,45 @@ class BallDetector:
         self.calibration = calibration
         self._tracks: list[Track] = []
         self._last_t_ms: Optional[int] = None
+        # Hardware-clock bookkeeping: the tracking clock must be monotonic
+        # even when the radar's frame counter restarts (radar reboot, USB
+        # re-enumeration, the mock source restarting at 1).
+        self._last_frame_number: Optional[int] = None
+        self._last_t_track: int = 0
+        self._clock_reset_pending = False
 
     # -- stage 1: gating ----------------------------------------------------
 
     def _tracking_time(self, frame: RadarFrame, t_ms: int) -> int:
         """Hardware frame time when the period is known and the counter is
-        real; otherwise the host clock."""
+        real; otherwise the host clock.
+
+        The clock is kept MONOTONIC across a frame-counter reset: a reset
+        used to send t_track backwards, so every live track was neither
+        associated nor expired until the counter caught up - minutes later.
+        A reset is a discontinuity (the radar restarted): the frame is
+        placed one period after the last one and, in process_frame, every
+        live track is closed first.
+        """
         p = self.params
-        if p.frame_period_ms and frame.frame_number > 0:
-            return int(round(frame.frame_number * p.frame_period_ms))
-        return t_ms
+        if not p.frame_period_ms or frame.frame_number <= 0:
+            self._last_frame_number = None
+            return t_ms
+        fn = frame.frame_number
+        if self._last_frame_number is None:
+            t = int(round(fn * p.frame_period_ms))
+        elif fn > self._last_frame_number:
+            t = self._last_t_track + int(round((fn - self._last_frame_number) * p.frame_period_ms))
+        else:
+            # Counter went backwards (or repeated): radar restarted
+            t = self._last_t_track + int(round(p.frame_period_ms))
+            self._clock_reset_pending = True
+            logger.warning(
+                f"Radar frame counter reset ({self._last_frame_number} -> {fn}) - closing live tracks"
+            )
+        self._last_frame_number = fn
+        self._last_t_track = t
+        return t
 
     def _gate(self, frame: RadarFrame, t_ms: int, t_track: int) -> tuple[list[Detection], list[Detection]]:
         """Split points into primary (ball-like doppler) and secondary
@@ -417,10 +446,14 @@ class BallDetector:
         frame period is known (see DetectorParams.frame_period_ms).
         """
         t_track = self._tracking_time(frame, t_ms)
+        completed: list[BallEvent] = []
+        if self._clock_reset_pending:
+            # Nothing before a radar restart continues after it
+            self._clock_reset_pending = False
+            completed.extend(self.flush())
         primary_raw, secondary_raw = self._gate(frame, t_ms, t_track)
         candidates = self._cluster(primary_raw)
         bridge_candidates = self._cluster(secondary_raw)
-        completed: list[BallEvent] = []
 
         assignments, unmatched, _ = self._associate(t_track, candidates, bridge_candidates)
         assigned_tracks = set()
@@ -548,7 +581,7 @@ class BallDetector:
         # is large and their displacement is nearly perpendicular to every
         # line of sight (the old code divided by a floored cos and rejected
         # them as ">250 km/h"; this is the same physics stated directly).
-        if len(samples) < p.min_doppler_samples:
+        if not samples or len(samples) < p.min_doppler_samples:
             return None
         if consistent / len(samples) < p.min_doppler_consistency:
             return None

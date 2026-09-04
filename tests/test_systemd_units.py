@@ -130,7 +130,18 @@ def test_radar_unit_uses_the_repo_profile():
 def test_every_shipped_unit_is_installed_by_both_scripts():
     deploy = (UNIT_DIR.parent / "deploy_to_pi.sh").read_text()
     install = (UNIT_DIR.parent / "install_services.sh").read_text()
-    assert "systemd/*.service" in deploy
+    code = "\n".join(line for line in deploy.splitlines() if not line.strip().startswith("#"))
+    assert "systemd/*.service" in code
     assert '"$UNIT_DIR"/*.service' in install
     for unit in UNITS:
-        assert unit.stem in deploy, f"deploy_to_pi.sh does not enable {unit.name}"
+        assert unit.stem in code, f"deploy_to_pi.sh does not enable {unit.name}"
+
+
+def test_deploy_gates_run_before_any_file_lands_on_the_pi():
+    """The deps check and the frontend build must precede the first rsync:
+    a failure after code has landed leaves new code waiting to start against
+    an unmigrated DB on the next restart."""
+    deploy = (UNIT_DIR.parent / "deploy_to_pi.sh").read_text()
+    first_rsync = deploy.index("rsync -az")
+    assert deploy.index("import websockets, serial") < first_rsync
+    assert deploy.index("npm run build") < first_rsync

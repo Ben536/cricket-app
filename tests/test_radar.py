@@ -138,6 +138,55 @@ class TestRadarStack:
         rec.stop_recording()
         assert not rec.is_recording
 
+    def test_stale_auto_stop_timer_cannot_end_the_next_recording(self):
+        """A timer that fired while a manual stop held the lock ran AFTER it,
+        and if a new recording had started meanwhile it stopped THAT one."""
+        tmp = tempfile.mkdtemp()
+        src = RadarSource(serial_port="/dev/nonexistent")
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        first = rec.start_recording("both", max_duration_seconds=60)
+        rec.stop_recording()
+        second = rec.start_recording("both", max_duration_seconds=60)
+        rec._auto_stop(first)  # the stale timer's callback, late
+        assert rec.is_recording and rec.current_session is second
+        rec._auto_stop(second)  # the right one still works
+        assert not rec.is_recording
+
+    def test_annotation_keys_cannot_override_record_type_or_clock(self):
+        tmp = tempfile.mkdtemp()
+        src = RadarSource(serial_port="/dev/nonexistent")
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        rec.start_recording("both", max_duration_seconds=10)
+        ann = rec.add_annotation({"type": "frame", "t_ms": "later", "direction_deg": 12.0})
+        assert ann["type"] == "annotation" and isinstance(ann["t_ms"], int)
+        assert ann["direction_deg"] == 12.0
+        done = rec.stop_recording()
+        assert done.annotation_count == 1
+
+    def test_restart_after_stop_leaves_exactly_one_generation(self):
+        """unsubscribe() sets the stop event and joins OUTSIDE the lock; a
+        concurrent subscribe() used to clear the same event and start new
+        threads while the old ones were still running - two dispatch
+        threads, and with a real port two readers on one tty."""
+        src = RadarSource(serial_port="/dev/nonexistent")
+        got_a, got_b = [], []
+        for _ in range(5):
+            src.subscribe(got_a.append)
+            time.sleep(0.15)
+            stopper = threading.Thread(target=src.unsubscribe, args=(got_a.append,))
+            stopper.start()
+            src.subscribe(got_b.append)  # races the stop
+            stopper.join(timeout=5)
+            time.sleep(0.3)
+            alive = [t.name for t in threading.enumerate() if t.name.startswith("radar-")]
+            assert sorted(alive) == ["radar-dispatch", "radar-reader"], alive
+            before = len(got_b)
+            time.sleep(0.2)
+            assert len(got_b) > before, "the surviving generation must deliver frames"
+            src.unsubscribe(got_b.append)
+            time.sleep(0.1)
+            assert not [t for t in threading.enumerate() if t.name.startswith("radar-")]
+
     def test_same_second_starts_get_distinct_files(self):
         tmp = tempfile.mkdtemp()
         src = RadarSource(serial_port="/dev/nonexistent")

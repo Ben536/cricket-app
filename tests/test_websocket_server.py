@@ -14,7 +14,18 @@ import websockets
 
 from server.websocket_server import CricketWebSocketServer
 
-PORT = 5099  # away from the real 5002 so tests can run beside a live server
+import socket
+
+
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# A free ephemeral port: away from the real 5002, and safe when several test
+# processes run at once (a fixed 5099 collided).
+PORT = _free_port()
 
 
 def envelope(msg_type, payload=None):
@@ -134,9 +145,17 @@ async def test_malformed_payload_keeps_connection_and_session(server):
             ("create_profile", {"name": 12345, "batting_hand": "right"}),
             ("simulate_shot", {"exit_speed": "fast", "horizontal_angle": 0,
                                "vertical_angle": 0, "field_config": []}),
+            ("start_recording", {"session_type": "both", "max_duration": float("nan")}),
         ]:
             err = await request(ws, msg_type, payload, expect="error")
             assert err["payload"]["code"].startswith("E3"), err
+
+        # A fielder with no name is VALID on the wire; the handler used to
+        # KeyError on it (the router deliberately accepts it).
+        state = await request(ws, "set_field", {"fielders": [{"x": 1, "y": 2}, {"x": 5, "y": 9}]},
+                              expect="session_state")
+        names = [f["name"] for f in state["payload"]["field_config"]]
+        assert names == ["fielder_0", "fielder_1"]
 
         # Still connected, session still active, scoring still works
         pong = await request(ws, "ping", expect="pong")

@@ -216,8 +216,14 @@ SIMULATE_DIFFICULTIES = ("easy", "medium", "hard")
 
 def _is_number(value: Any) -> bool:
     """A finite int/float. bool is an int subclass and is rejected: JSON
-    `true` must not silently become exit_speed=1."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    `true` must not silently become exit_speed=1. An int too large for a
+    float makes math.isfinite raise; it is not a usable number either."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _is_fielder(value: Any) -> bool:
@@ -343,15 +349,16 @@ class MessageRouter:
 
         msg_type = message.get("type")
 
-        # Validate message type
-        if msg_type not in VALID_CLIENT_TYPES:
+        # Validate message type (a list/dict here would make the membership
+        # test itself raise TypeError)
+        if not isinstance(msg_type, str) or msg_type not in VALID_CLIENT_TYPES:
             logger.warning(f"Unknown message type: {msg_type}")
             return ValidationResult(
                 valid=False,
                 error=create_error_response(
                     ErrorCode.INVALID_MESSAGE_TYPE,
                     in_reply_to=message_id,
-                    details={"type": msg_type},
+                    details={"type": _describe(msg_type)},
                 ),
             )
 
@@ -550,24 +557,14 @@ class MessageRouter:
         elif msg_type == "start_recording":
             from radar.recorder import SESSION_TYPES
             session_type = payload.get("session_type")
-            if session_type not in SESSION_TYPES:
-                return create_error_response(
-                    ErrorCode.INVALID_FIELD_VALUE,
-                    in_reply_to=message_id,
-                    details={"field": "session_type", "value": session_type},
-                )
+            if not isinstance(session_type, str) or session_type not in SESSION_TYPES:
+                return invalid("session_type", session_type)
 
-            # bool is an int subclass, so reject it explicitly
+            # Finite number only: NaN silently became a 1-second recording
+            # (max(1, min(nan, 7200)) is 1), 10**400 raised OverflowError.
             max_duration = payload.get("max_duration")
-            if max_duration is not None and (
-                isinstance(max_duration, bool)
-                or not isinstance(max_duration, (int, float))
-            ):
-                return create_error_response(
-                    ErrorCode.INVALID_FIELD_VALUE,
-                    in_reply_to=message_id,
-                    details={"field": "max_duration", "value": max_duration},
-                )
+            if max_duration is not None and not _is_number(max_duration):
+                return invalid("max_duration", max_duration)
 
         return None
 
@@ -705,7 +702,17 @@ class MessageRouter:
 
 def _describe(value: Any) -> Any:
     """A JSON-safe, bounded description of a rejected value for the error
-    frame - never echo a large or unserialisable payload back."""
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value if not isinstance(value, str) or len(value) <= 100 else value[:100] + "..."
+    frame - never echo a large or unserialisable payload back. Non-finite
+    floats become strings: json.dumps would emit a bare NaN, which the
+    browser's JSON.parse rejects, so the client would never see the error."""
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, int):
+        return value if abs(value) < 10 ** 15 else f"{str(value)[:20]}..."
+    if isinstance(value, float):
+        return value
+    if isinstance(value, str):
+        return value if len(value) <= 100 else value[:100] + "..."
     return f"<{type(value).__name__}>"

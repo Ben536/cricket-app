@@ -86,6 +86,11 @@ MALFORMED = [
     ("simulate_shot", {**GOOD_SIM, "seed": True}),
     ("simulate_shot", {**GOOD_SIM, "seed": "42"}),
     ("start_recording", {"session_type": "both", "max_duration": "long"}),
+    ("start_recording", {"session_type": "both", "max_duration": float("nan")}),
+    ("start_recording", {"session_type": "both", "max_duration": float("inf")}),
+    ("start_recording", {"session_type": "both", "max_duration": 10 ** 400}),
+    ("start_recording", {"session_type": ["both"]}),
+    ("simulate_shot", {**GOOD_SIM, "exit_speed": 10 ** 400}),
     ("add_annotation", {f"k{i}": i for i in range(40)}),
 ]
 
@@ -115,6 +120,27 @@ async def test_error_frames_echo_the_message_id_and_a_bounded_value(router):
     response = await router.route("client", raw)
     assert response["in_reply_to"] == msg_id
     assert len(response["payload"]["details"]["value"]) < 200
+
+
+@pytest.mark.asyncio
+async def test_error_frames_are_always_valid_json(router):
+    """A rejected NaN used to be echoed as a bare NaN literal, which the
+    browser's JSON.parse rejects - the client never saw the error."""
+    for payload in ({**GOOD_SIM, "exit_speed": float("nan")},
+                    {**GOOD_SIM, "boundary_distance": float("inf")}):
+        response = await router.route("client", envelope("simulate_shot", payload))
+        assert response["type"] == "error"
+        encoded = json.dumps(response, allow_nan=False)  # raises on NaN/Infinity
+        assert "NaN" not in encoded.replace('"nan"', "")
+
+
+@pytest.mark.asyncio
+async def test_non_string_type_is_an_error_frame(router):
+    for bad in (["ping"], {"t": "ping"}, 7, None):
+        response = await router.route("client", envelope("ping", type=bad))
+        assert response["type"] == "error"
+        assert response["payload"]["code"] in (ErrorCode.INVALID_MESSAGE_TYPE.value,
+                                               ErrorCode.MISSING_REQUIRED_FIELD.value)
 
 
 @pytest.mark.asyncio

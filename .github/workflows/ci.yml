@@ -42,12 +42,14 @@ jobs:
       - name: systemd-analyze verify
         run: |
           # Verifies syntax and directive placement with the real systemd.
-          # User= refers to a Pi-only account, which verify reports as an
-          # error we do not care about here; filter it and fail on the rest.
+          # Only unit-file parse problems fail the job (a misplaced or
+          # misspelled directive, a missing '='). Runner-environment noise -
+          # User= naming a Pi-only account, other units on the runner
+          # failing to load - is ignored.
           out=$(systemd-analyze verify scripts/systemd/*.service 2>&1 || true)
           echo "$out"
-          if echo "$out" | grep -v -i 'user' | grep -v '^$' | grep -qiE 'unknown|failed|invalid|ignoring'; then
-            echo "systemd-analyze reported a real problem"; exit 1
+          if echo "$out" | grep -E "cricket-[a-z]+\.service" | grep -qE "Unknown (key name|section)|Missing '='|Failed to parse|Invalid (value|argument)|Assignment outside of section"; then
+            echo "systemd-analyze reported a unit-file problem"; exit 1
           fi
 
   frontend:

@@ -134,6 +134,8 @@ def parse_profile(text: str) -> RadarProfile:
 
     if num_tx < 1 or num_loops < 1 or period_ms <= 0:
         raise ValueError("frameCfg values out of range")
+    if start_freq <= 0 or (idle + ramp_end) <= 0:
+        raise ValueError("profileCfg start frequency and chirp time must be positive")
     if chirp_ids and (chirp_end - chirp_start + 1) > len(chirp_ids):
         raise ValueError("frameCfg references more chirps than chirpCfg defines")
 

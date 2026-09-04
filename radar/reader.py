@@ -12,6 +12,15 @@ Lifecycle: the reader thread starts with the first subscriber and stops
 mid-stream (USB unplug), the reader falls back to mock frames and retries the
 real port with backoff - subscribers keep receiving frames either way and can
 check `is_mock` to know what they're getting.
+
+Generations: every start creates a fresh stop Event that its two threads
+capture, and a start joins the previous generation's threads first. A single
+shared Event used to be cleared by a new start while the old threads were
+still winding down (the last unsubscribe sets the event and joins OUTSIDE the
+lock), so the old threads never saw the stop - two dispatch threads, and with
+a real port two readers on one tty. The serial handle is likewise local to
+the reader thread: an old thread's `finally` used to close whatever handle
+the instance held, i.e. the NEW thread's port.
 """
 
 from __future__ import annotations
@@ -38,6 +47,10 @@ SERIAL_RETRY_SECONDS = 5.0  # how often to re-try the real port while mocking
 # short enough that a wedged subscriber cannot accumulate memory.
 FRAME_QUEUE_MAX = 50
 
+# How long a start waits for the previous generation's threads to exit.
+# The reader blocks at most one serial read timeout (0.1s) per loop.
+GENERATION_JOIN_SECONDS = 2.0
+
 FrameCallback = Callable[[RadarFrame], None]
 
 
@@ -56,8 +69,11 @@ class RadarSource:
         self._subscribers: list[FrameCallback] = []
         self._thread: Optional[threading.Thread] = None
         self._dispatch_thread: Optional[threading.Thread] = None
+        # The CURRENT generation's stop event (threads capture their own)
         self._stop_event = threading.Event()
-        self._serial = None
+        # Threads of a generation that has been told to stop but may still be
+        # running; the next start joins them before opening the port again.
+        self._retired: list[threading.Thread] = []
         self._is_mock = True
         self._mode_known = threading.Event()  # set after the first port attempt
 
@@ -99,18 +115,29 @@ class RadarSource:
         the first frames it receives are already correctly classified.
         """
         with self._lock:
-            if not self.is_running:
-                self._stop_event.clear()
-                self._mode_known.clear()
-                self._dispatch_thread = threading.Thread(
-                    target=self._dispatch_loop, daemon=True, name="radar-dispatch"
-                )
-                self._dispatch_thread.start()
-                self._thread = threading.Thread(
-                    target=self._run, daemon=True, name="radar-reader"
-                )
-                self._thread.start()
-                logger.info("Radar reader started")
+            if self.is_running:
+                return
+            # Let the previous generation finish before opening the port
+            # again (it holds the port exclusively until its loop exits).
+            for t in self._retired:
+                if t is not threading.current_thread():
+                    t.join(timeout=GENERATION_JOIN_SECONDS)
+            self._retired = [t for t in self._retired if t.is_alive() and t is not threading.current_thread()]
+            if self._retired:
+                logger.warning(f"{len(self._retired)} previous radar thread(s) still alive at restart")
+
+            stop_event = threading.Event()
+            self._stop_event = stop_event
+            self._mode_known.clear()
+            self._dispatch_thread = threading.Thread(
+                target=self._dispatch_loop, args=(stop_event,), daemon=True, name="radar-dispatch"
+            )
+            self._dispatch_thread.start()
+            self._thread = threading.Thread(
+                target=self._run, args=(stop_event,), daemon=True, name="radar-reader"
+            )
+            self._thread.start()
+            logger.info("Radar reader started")
 
     def wait_until_ready(self, timeout: float = 2.0) -> bool:
         """Block until the first serial-port attempt has resolved mock/real
@@ -118,7 +145,7 @@ class RadarSource:
         return self._mode_known.wait(timeout)
 
     def subscribe(self, callback: FrameCallback) -> None:
-        """Register a frame callback (invoked on the reader thread).
+        """Register a frame callback (invoked on the dispatch thread).
 
         Starts the reader on the first subscription.
         """
@@ -136,6 +163,7 @@ class RadarSource:
             if not self._subscribers and self.is_running:
                 self._stop_event.set()
                 stop_threads = [t for t in (self._thread, self._dispatch_thread) if t]
+                self._retired.extend(stop_threads)
                 self._thread = None
                 self._dispatch_thread = None
 
@@ -144,8 +172,10 @@ class RadarSource:
         # (the recorder's auto-stop does), so both need the self-join guard.
         for t in stop_threads:
             if t is not threading.current_thread():
-                t.join(timeout=2.0)
+                t.join(timeout=GENERATION_JOIN_SECONDS)
         if stop_threads:
+            with self._lock:
+                self._retired = [t for t in self._retired if t.is_alive()]
             logger.info("Radar reader stopped (no subscribers)")
 
     def _dispatch(self, frame: RadarFrame) -> None:
@@ -173,9 +203,9 @@ class RadarSource:
                     f"[{self.frames_dropped_backpressure} dropped so far]"
                 )
 
-    def _dispatch_loop(self) -> None:
+    def _dispatch_loop(self, stop_event: threading.Event) -> None:
         """Deliver queued frames to subscribers, off the reader thread."""
-        while not self._stop_event.is_set():
+        while not stop_event.is_set():
             try:
                 frame = self._frame_queue.get(timeout=0.2)
             except queue.Empty:
@@ -188,49 +218,54 @@ class RadarSource:
                 except Exception as e:
                     logger.error(f"Radar subscriber error: {e}")
 
-    def _open_serial(self) -> None:
-        """Try to open the real port; update mock state on transitions."""
-        self._serial = open_radar_serial(self.serial_port, self.baud_rate)
+    def _open_serial(self):
+        """Try to open the real port; update mock state on transitions.
+        Returns the handle (or None); the caller owns it."""
+        ser = open_radar_serial(self.serial_port, self.baud_rate)
         was_mock = self._is_mock
-        self._is_mock = self._serial is None
+        self._is_mock = ser is None
         self._mode_known.set()
         if was_mock and not self._is_mock:
             logger.info("Radar serial acquired - streaming REAL data")
         elif not was_mock and self._is_mock:
             logger.warning("Radar serial lost - falling back to MOCK data")
+        return ser
 
-    def _close_serial(self) -> None:
-        if self._serial is not None:
+    @staticmethod
+    def _close_serial(ser) -> None:
+        if ser is not None:
             try:
-                self._serial.close()
+                ser.close()
             except Exception:
                 pass
-            self._serial = None
 
-    def _run(self) -> None:
+    def _run(self, stop_event: threading.Event) -> None:
         """Reader loop: real serial when available, mock otherwise, with
-        periodic retries of the real port."""
+        periodic retries of the real port. The serial handle is LOCAL to
+        this thread."""
         parser = TLVParser()
+        ser = None
         next_retry = 0.0
         mock_start = time.time()
         mock_frame_number = 0
 
         try:
-            while not self._stop_event.is_set():
+            while not stop_event.is_set():
                 # (Re)try the real port on schedule
-                if self._serial is None and time.time() >= next_retry:
-                    self._open_serial()
-                    if self._serial is None:
+                if ser is None and time.time() >= next_retry:
+                    ser = self._open_serial()
+                    if ser is None:
                         next_retry = time.time() + SERIAL_RETRY_SECONDS
                     else:
                         parser = TLVParser()
 
-                if self._serial is not None:
+                if ser is not None:
                     try:
-                        data = self._serial.read(4096)
+                        data = ser.read(4096)
                     except Exception as e:
                         logger.warning(f"Radar serial read failed: {e}")
-                        self._close_serial()
+                        self._close_serial(ser)
+                        ser = None
                         self._is_mock = True
                         next_retry = time.time() + 1.0
                         continue
@@ -240,7 +275,7 @@ class RadarSource:
                 else:
                     # Mock frame: a "ball" sweeping through every few seconds
                     # plus some noise points, so the UI has something to show.
-                    if self._stop_event.wait(MOCK_FRAME_INTERVAL):
+                    if stop_event.wait(MOCK_FRAME_INTERVAL):
                         break
                     mock_frame_number += 1
                     elapsed = time.time() - mock_start
@@ -273,8 +308,11 @@ class RadarSource:
         except Exception as e:
             logger.error(f"Radar reader crashed: {e}")
         finally:
-            self._close_serial()
-            self._is_mock = True
+            self._close_serial(ser)
+            # Only this generation may report mock: a later generation may
+            # already have the real port.
+            if self._stop_event is stop_event:
+                self._is_mock = True
 
 
 # Singleton

@@ -712,10 +712,12 @@ class MessageHandlers:
         fielders = payload["fielders"]
         boundary_distance = payload.get("boundary_distance", 70.0)
 
-        # Convert fielders to internal format
+        # Convert fielders to internal format. `name` is optional on the wire
+        # (the router accepts a fielder without one); default it the way the
+        # engine does rather than KeyError on a valid message.
         field_config = [
-            {"x": f["x"], "y": f["y"], "name": f["name"]}
-            for f in fielders
+            {"x": f["x"], "y": f["y"], "name": f.get("name") or f"fielder_{i}"}
+            for i, f in enumerate(fielders)
         ]
 
         # Get active session
@@ -1065,11 +1067,11 @@ class MessageHandlers:
         session_type = payload.get("session_type", "both")
         max_duration = payload.get("max_duration")  # seconds; None = short-clip default
 
-        if session_type not in SESSION_TYPES:
+        if not isinstance(session_type, str) or session_type not in SESSION_TYPES:
             return create_error_response(
                 ErrorCode.INVALID_FIELD_VALUE,
                 in_reply_to=message_id,
-                details={"field": "session_type", "value": session_type},
+                details={"field": "session_type", "value": str(session_type)[:100]},
             )
 
         recorder = get_recorder()
@@ -1397,7 +1399,13 @@ class MessageHandlers:
             sub.task.cancel()
             try:
                 await sub.task
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError:
+                # Swallow the drain task's cancellation only. If WE are being
+                # cancelled (the awaiting task), the same exception surfaces
+                # here and must propagate to the caller.
+                if not sub.task.cancelled():
+                    raise
+            except Exception:
                 pass
         if not self._streams and streamer.is_streaming:
             # Joins the reader thread - off the loop

@@ -77,3 +77,28 @@ def test_missing_asset_is_a_real_404_not_a_connection_reset(served):
 def test_query_string_does_not_break_routing(served):
     status, _, body = get(f"{served}/?server=10.42.0.1:5002")
     assert status == 200 and b"shell" in body
+
+
+def test_a_404_under_assets_is_never_immutable(served):
+    """A transient miss during a deploy window must not be cached for a year."""
+    with pytest.raises(HTTPError) as exc:
+        get(f"{served}/assets/index-NEWHASH.js")
+    assert exc.value.code == 404
+    assert exc.value.headers["Cache-Control"] == CACHE_REVALIDATE
+
+
+def test_head_mirrors_get_routing(served):
+    from urllib.request import Request
+    req = Request(f"{served}/session/history", method="HEAD")
+    with urlopen(req, timeout=5) as resp:
+        assert resp.status == 200
+    req = Request(f"{served}/assets/index-abc123.js", method="HEAD")
+    with urlopen(req, timeout=5) as resp:
+        assert resp.status == 200
+        assert resp.headers["Cache-Control"] == CACHE_IMMUTABLE
+
+
+def test_embedded_null_byte_is_a_400_not_a_traceback(served):
+    with pytest.raises(HTTPError) as exc:
+        get(f"{served}/foo%00.js")
+    assert exc.value.code == 400

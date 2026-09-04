@@ -61,6 +61,8 @@ fi
 
 echo "3. Reloading systemd..."
 systemctl daemon-reload
+# The journald cap only applies once journald re-reads its config
+systemctl restart systemd-journald || echo "   (journald restart failed - cap applies after reboot)"
 # Surface any directive systemd would silently ignore
 systemd-analyze verify "$SYSTEMD_DIR"/cricket-*.service 2>&1 | grep -v '^$' || true
 
@@ -72,8 +74,11 @@ done
 echo "5. Starting services now..."
 # autohotspot is a boot-time decision (it starts the AP if no known WiFi
 # appears); enabling it is enough - starting it now on a LAN would do nothing.
-systemctl start cricket-radar.service
-echo "   Waiting for radar configuration..."
+# The radar unit waits up to 120s for the device: start it WITHOUT blocking,
+# or a fresh card with no radar attached sits here until the timeout and
+# never starts the server, UI or health monitor.
+systemctl start --no-block cricket-radar.service
+echo "   Radar configuration started in the background (waits for /dev/ttyUSB0)"
 systemctl start cricket-server.service cricket-ui.service cricket-health.service
 
 echo ""
