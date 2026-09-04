@@ -15,6 +15,7 @@ import {
   DEFAULT_PORT,
   getDiscoveryUrls,
   getServerUrl,
+  normalizeWsUrl,
   sameOriginServerUrl,
   saveLastWorkingUrl,
   saveServerUrl,
@@ -88,9 +89,21 @@ describe('saveServerUrl normalisation', () => {
   it('keeps an explicit port and a wss scheme', () => {
     saveServerUrl('ws://pi.local:6000')
     expect(getSavedServerUrl()).toBe('ws://pi.local:6000')
-    // The old check looked for any ':' after index 5, which "wss://" itself
-    // satisfies - so a wss host never got a port appended.
     saveServerUrl('wss://pi.example')
     expect(getSavedServerUrl()).toBe('wss://pi.example:5002')
+  })
+
+  it('drops paths and queries and keeps IPv6 literals intact', () => {
+    // "192.168.1.5/" used to become "ws://192.168.1.5/:5002" - port 80, path "/:5002"
+    expect(normalizeWsUrl('192.168.1.5/')).toBe('ws://192.168.1.5:5002')
+    expect(normalizeWsUrl('ws://host/path')).toBe('ws://host:5002')
+    expect(normalizeWsUrl('ws://host:5002?x=1')).toBe('ws://host:5002')
+    expect(normalizeWsUrl('[::1]')).toBe('ws://[::1]:5002')
+    expect(normalizeWsUrl('[::1]:6000')).toBe('ws://[::1]:6000')
+    expect(normalizeWsUrl('WS://Pi.Local')).toBe('ws://pi.local:5002')
+  })
+
+  it('applies the same normalisation to ?server=', () => {
+    expect(getDiscoveryUrls({ ...fromDev, search: '?server=10.0.0.7/' })[0]).toBe('ws://10.0.0.7:5002')
   })
 })

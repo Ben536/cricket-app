@@ -190,9 +190,12 @@ function App() {
     saveCustomFields(customFields)
   }, [customFields])
 
-  // Persist the current session's settings whenever they change
+  // Persist the current session's settings whenever they change. Debounced:
+  // dragging a fielder updates positions on every pointer move, and a
+  // synchronous localStorage write per move is wasted work on a phone.
   useEffect(() => {
-    saveSettings({ fielderPositions, batterHand, difficulty })
+    const timer = window.setTimeout(() => saveSettings({ fielderPositions, batterHand, difficulty }), 250)
+    return () => window.clearTimeout(timer)
   }, [fielderPositions, batterHand, difficulty])
 
   // Undo history, wagon wheel and last ball all describe the CURRENT innings,

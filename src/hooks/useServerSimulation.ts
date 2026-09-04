@@ -219,7 +219,21 @@ export function useServerSimulation(): UseServerSimulationResult {
             if (pending) {
               clearTimeout(pending.timeout)
               pendingRequestsRef.current.delete(data.in_reply_to)
-              pending.resolve(data.payload.simulation)
+              // A reply with no simulation in it (malformed server) used to
+              // throw here AFTER the timeout was cleared, so the promise never
+              // settled and the ball was silently lost. Same rule as every
+              // other failure path: fall back to the local engine, same seed.
+              const simulation = data.payload?.simulation
+              if (simulation && typeof simulation === 'object') {
+                pending.resolve(simulation)
+              } else {
+                console.warn('simulate_result without a simulation payload; using local engine')
+                try {
+                  pending.resolve(pending.fallback())
+                } catch (e) {
+                  pending.reject(e instanceof Error ? e : new Error('Local simulation failed'))
+                }
+              }
             }
           }
 

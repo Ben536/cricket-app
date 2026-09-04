@@ -190,6 +190,23 @@ describe('useServerSimulation', () => {
     expect(latest!.error).toBeNull()
   })
 
+  it('a simulate_result with no simulation in it falls back locally instead of hanging', async () => {
+    await mount()
+    const live = await connectFully()
+    let resolved: Awaited<ReturnType<Hook['simulateAsync']>> | null = null
+    const promise = latest!.simulateAsync(90, 20, 15, FIELD, 70, 'medium').then((r) => { resolved = r })
+    await flush()
+    const sent = live.lastSent<{ message_id: string; payload: { seed: number } }>()
+    // Timeout was cleared and the entry deleted BEFORE reading payload.simulation,
+    // so a malformed reply used to leave the promise pending forever.
+    await act(async () => {
+      live.receive({ type: 'simulate_result', message_id: 'm', in_reply_to: sent.message_id })
+    })
+    await promise
+    expect(resolved).not.toBeNull()
+    expect(resolved!.seed).toBe(sent.payload.seed)
+  })
+
   it('resolves a simulate_result reply with the server payload', async () => {
     await mount()
     const live = await connectFully()

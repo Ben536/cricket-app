@@ -117,12 +117,19 @@ export function runsScored(input: DeliveryInput): number {
  * Score one delivery. Returns a NEW session (the input is not mutated) and
  * the ball symbol that was recorded. Rolls the over when the sixth legal
  * ball is bowled.
+ *
+ * The tallies use the INPUT FLAGS, exactly as the original inline code in
+ * App.tsx did, not the single symbol on the tracker: a wicket flag always
+ * counts a wicket even when the symbol shows 'wd' (a stumping off a wide is
+ * a real dismissal), and a boundary flag always counts a four. The UI never
+ * combines a wicket or an extra with runs, so the only reachable inputs are
+ * the plain ones - but the rule is pinned so that it stays true.
  */
 export function applyDelivery(session: Session, input: DeliveryInput): { session: Session; ballResult: BallResult } {
   const ballResult = classifyDelivery(input)
-  const extra = isExtra(ballResult)
+  const extra = Boolean(input.isWide || input.isNoBall)
+  const isWicket = Boolean(input.isWicket)
   const scored = runsScored(input)
-  const isWicket = ballResult === 'W'
 
   const overs = session.overs.map((o) => ({ ...o, balls: [...o.balls] }))
   const current = overs[overs.length - 1]
@@ -138,8 +145,8 @@ export function applyDelivery(session: Session, input: DeliveryInput): { session
     ...session,
     runs,
     balls,
-    fours: input.runs === 4 && input.isBoundary && !isWicket && !extra ? session.fours + 1 : session.fours,
-    sixes: input.runs === 6 && !isWicket && !extra ? session.sixes + 1 : session.sixes,
+    fours: input.runs === 4 && input.isBoundary ? session.fours + 1 : session.fours,
+    sixes: input.runs === 6 ? session.sixes + 1 : session.sixes,
     wickets: isWicket ? session.wickets + 1 : session.wickets,
     isOut: session.isOut || isWicket,
     overs,

@@ -39,19 +39,25 @@ function currentOrigin(): OriginInfo | null {
   return { protocol, hostname, search };
 }
 
-function normalizeWsUrl(value: string): string {
-  let normalized = value.trim();
-  if (!normalized.startsWith('ws://') && !normalized.startsWith('wss://')) {
-    normalized = `ws://${normalized}`;
+/**
+ * "host", "host:port", "ws://host[:port][/anything]" -> "ws://host:port".
+ *
+ * The server ignores paths and queries, so only the authority is kept: a
+ * user typing "192.168.1.5/" must not end up with "ws://192.168.1.5/:5002"
+ * (port 80, path "/:5002"). IPv6 literals ("[::1]") are handled by URL.
+ */
+export function normalizeWsUrl(value: string): string {
+  let raw = value.trim();
+  if (!/^wss?:\/\//i.test(raw)) {
+    raw = `ws://${raw}`;
   }
-  // Append the default port only when the authority has none. (The previous
-  // check looked for ANY colon after index 5, which the `wss://` scheme
-  // itself satisfies - so a wss host never got its port.)
-  const authority = normalized.replace(/^wss?:\/\//, '').split('/')[0];
-  if (!/:\d+$/.test(authority)) {
-    normalized = `${normalized}:${DEFAULT_PORT}`;
+  try {
+    const url = new URL(raw);
+    if (!url.port) url.port = String(DEFAULT_PORT);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return raw; // unparseable: let the WebSocket constructor report it
   }
-  return normalized;
 }
 
 function serverParamUrl(origin: OriginInfo | null): string | null {

@@ -124,6 +124,20 @@ describe('applyDelivery', () => {
   it('strike rate is 0 with no balls faced (no division by zero)', () => {
     expect(play([wide]).strikeRate).toBe(0)
   })
+
+  it('tallies follow the input flags, as the original inline code did (unreachable combos pinned)', () => {
+    // A wicket off a wide: the tracker shows 'wd', but it IS a dismissal
+    const stumpedOffWide = play([{ runs: 0, isWide: true, isWicket: true }])
+    expect(stumpedOffWide.overs[0].balls).toEqual(['wd'])
+    expect(stumpedOffWide.wickets).toBe(1)
+    expect(stumpedOffWide.isOut).toBe(true)
+    expect(stumpedOffWide.runs).toBe(1)
+    expect(stumpedOffWide.balls).toBe(0)
+    // A boundary flag counts a four regardless of other flags; six likewise
+    expect(play([{ runs: 4, isBoundary: true, isWicket: true }]).fours).toBe(1)
+    expect(play([{ runs: 6, isNoBall: true }]).sixes).toBe(1)
+    expect(play([{ runs: 6, isNoBall: true }]).runs).toBe(1) // extras score one
+  })
 })
 
 describe('undo via snapshots', () => {

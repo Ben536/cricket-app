@@ -71,7 +71,14 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
       .then((resp) => {
         if (cancelled) return
         const p = (resp as { payload?: StatusPayload })?.payload
-        if (!p?.is_recording) return
+        if (!p?.is_recording) {
+          // The last recording stopped itself (card full) while this modal
+          // was closed: say so on open, not only while polling.
+          if (p?.last_error) {
+            setError(`Last recording STOPPED - write failed: ${p.last_error}. The file is truncated; free space on the Pi.`)
+          }
+          return
+        }
         setIsRecording(true)
         setIsMock(p.mock ?? false)
         setFrameCount(p.frame_count ?? 0)
