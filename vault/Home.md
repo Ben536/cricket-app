@@ -17,6 +17,7 @@ Design decisions, learnings, and plans for the CricketRadar project. Open this f
 - [[0002 - shotEvent + central processing (deferred)]]
 
 ### 📐 Plans
+- [[Nets Session Checklist]] — **next up**: what to capture at the nets and why (run `scripts/preflight.py` first)
 - [[Development Roadmap]] — phased next steps
 - [[Data Gathering Mode]] — capture shot data to tune the system
 - [[2026-09 Review — Findings & Plan]] — **current**: third full review; all software items executed; hardware + owner items open
