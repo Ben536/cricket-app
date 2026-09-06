@@ -58,6 +58,53 @@ a FAIL rather than a historical footnote.
 
 ---
 
+## 0. Connecting the phone
+
+**The app connects automatically - but only if you open it from the Pi's own
+address.** Discovery tries, in order: an explicit `?server=`, a saved
+address, **the host that served the page**, the last address that worked,
+then the mDNS names. Because the Pi serves the UI itself, its own address is
+already the first candidate, so there is no waiting on timeouts.
+
+The one manual step is joining the right WiFi. Two situations:
+
+| Where | What the Pi does | On the phone |
+|---|---|---|
+| **At home** | Joins Drysdale Home | Stay on Drysdale Home, open `http://cricketradar.local:5173` (or `http://192.168.0.191:5173`) |
+| **At the nets** | Finds no known WiFi within ~45s, brings up its own AP | Join the **CricketRadar** WiFi, then open `http://10.42.0.1:5173` |
+
+Notes that matter in the field:
+
+- **Never use the Vercel URL.** It is served over https and browsers forbid
+  an https page from opening the Pi's `ws://` socket. The app shows an orange
+  banner saying exactly this, with the addresses that do work.
+- **mDNS is unreliable at the nets** - `cricketradar.local` has failed to
+  resolve there before. Know the IP. On the AP it is always `10.42.0.1`.
+- **iOS/Android will say the network has no internet.** That is expected;
+  local traffic still routes. Do not let the phone "helpfully" switch back to
+  mobile data - if the app cannot connect, check you are still on
+  CricketRadar.
+- **Add it to your home screen** once it loads. It is a PWA, so the shell is
+  cached and it opens full-screen without browser chrome.
+- The status pill at the top reads **Pi** when connected and **Offline** when
+  not; tap it for the address it is trying.
+
+### Dress rehearsal before you leave (10 minutes, worth it)
+
+At home the Pi will join the house WiFi and therefore will **not** start its
+access point, so test the two halves separately:
+
+1. **The app, over the house WiFi.** Open `http://192.168.0.191:5173` on the
+   phone, confirm the pill says **Pi**, then record 30 seconds with a few
+   wheel taps and check the Recordings tab shows it with the marks. That
+   proves the entire chain end to end.
+2. **The access point.** On the Pi, `sudo nmcli connection up CricketRadar`,
+   then confirm the SSID appears on your phone and you can join it. **Confirm
+   the password now, not at the nets** - `sudo nmcli -s -t -f
+   802-11-wireless-security.psk connection show CricketRadar`. Then
+   `sudo nmcli connection down CricketRadar` to put the Pi back on the house
+   WiFi.
+
 ## 1. At the nets: power up, then pre-flight
 
 ```bash
