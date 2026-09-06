@@ -87,6 +87,32 @@ def test_empty_and_garbage_input_do_not_raise():
     assert analyse_capture(frames_with([5.0]), None)["vmax_verdict"] == "UNKNOWN"
 
 
+def test_power_flags_are_decoded_and_graded():
+    """0x50000 = under-voltage + throttling HAVE occurred, but not now (the
+    state the Pi was found in on 2026-09-06, on a phone charger)."""
+    from preflight import Report, check_undervoltage, describe_throttled
+
+    assert "under-voltage has occurred" in describe_throttled(0x50000)
+    assert "throttling has occurred" in describe_throttled(0x50000)
+    assert "NOW" not in describe_throttled(0x50000)
+    assert describe_throttled(0) == "0x0 (clean)"
+
+    def grade(before=None, after=None):
+        r = Report()
+        check_undervoltage(r, before, after)
+        return r.checks[0]
+
+    assert grade(after=0).status == "PASS"
+    assert grade(after=0x50000).status == "WARN"      # historical only
+    assert grade(after=0xd0005).status == "FAIL"      # under-voltage NOW
+    # The case that matters: clean before the sample, latched during it
+    sagged = grade(before=0x0, after=0x50000)
+    assert sagged.status == "FAIL"
+    assert "DURING" in sagged.detail
+    # Unchanged across the sample is not a new fault
+    assert grade(before=0x50000, after=0x50000).status == "WARN"
+
+
 def test_mock_data_never_yields_a_hardware_verdict():
     """19 of the 20 recordings this project holds are mock. Fabricated
     frames must produce no conclusion about the radar at all."""

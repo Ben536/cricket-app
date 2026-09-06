@@ -226,29 +226,67 @@ def check_services(report: Report) -> None:
                        f"journalctl -u {svc} -n 50 --no-pager")
 
 
-def check_undervoltage(report: Report) -> None:
-    """Undervoltage clamps USB power and the radar never enumerates - the
-    root cause of the 2026-06 'radar not detected' saga."""
+# vcgencmd get_throttled bit meanings
+THROTTLE_NOW = {0x1: "under-voltage NOW", 0x2: "ARM frequency capped NOW",
+                0x4: "throttled NOW", 0x8: "soft temperature limit NOW"}
+THROTTLE_EVER = {0x10000: "under-voltage has occurred", 0x20000: "frequency capping has occurred",
+                 0x40000: "throttling has occurred", 0x80000: "soft temp limit has occurred"}
+
+PSU_ADVICE = (
+    "A Pi 3B+ needs 5.1V/2.5A. A phone charger is typically 5V/1A - about a "
+    "third of that - and the radar's draw on top is what browns it out. Use "
+    "the official supply or a power bank rated 2.5A+, and prefer a powered hub "
+    "for the radar. An undervolted Pi clamps USB power, so the radar never "
+    "enumerates."
+)
+
+
+def read_throttled() -> Optional[int]:
+    """The raw vcgencmd get_throttled bitmask, or None if unavailable."""
     try:
         r = subprocess.run(["vcgencmd", "get_throttled"], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
+        return int(r.stdout.strip().split("=")[1], 16)
+    except (OSError, subprocess.SubprocessError, IndexError, ValueError):
+        return None
+
+
+def describe_throttled(value: int) -> str:
+    flags = [name for bit, name in {**THROTTLE_NOW, **THROTTLE_EVER}.items() if value & bit]
+    return f"0x{value:x}" + (f" ({', '.join(flags)})" if flags else " (clean)")
+
+
+def check_undervoltage(report: Report, before: Optional[int] = None, after: Optional[int] = None) -> None:
+    """Undervoltage clamps USB power and the radar never enumerates - the
+    root cause of the 2026-06 saga AND the 2026-09 boot cycling.
+
+    `before`/`after` bracket the live radar sample. A flag that appears
+    BETWEEN them means the supply sagged while the radar was drawing, which
+    is far more damning than a flag left over from boot.
+    """
+    value = after if after is not None else read_throttled()
+    if value is None:
         report.add("power", WARN, "vcgencmd unavailable (not a Pi?)")
         return
-    raw = r.stdout.strip()
-    try:
-        value = int(raw.split("=")[1], 16)
-    except (IndexError, ValueError):
-        report.add("power", WARN, f"unparseable: {raw}")
+
+    # Did anything newly latch during the sample? That is the supply failing
+    # under exactly the load the session will put on it.
+    if before is not None and after is not None and after != before:
+        newly = [name for bit, name in {**THROTTLE_NOW, **THROTTLE_EVER}.items()
+                 if (after & bit) and not (before & bit)]
+        report.add("power", FAIL,
+                   f"supply sagged DURING the radar sample: {', '.join(newly)} ({describe_throttled(after)})",
+                   PSU_ADVICE)
         return
-    if value == 0:
-        report.add("power", OK, "no undervoltage (0x0)")
-    elif value & 0x1:
-        report.add("power", FAIL, f"UNDERVOLTAGE NOW ({raw})",
-                   "Use a 5.1V/2.5A+ supply and power the radar from a powered hub. "
-                   "An undervolted Pi clamps USB power and the radar will not enumerate")
+
+    if value & 0xF:
+        report.add("power", FAIL, describe_throttled(value), PSU_ADVICE)
+    elif value & 0xF0000:
+        report.add("power", WARN,
+                   f"{describe_throttled(value)} - since boot, but not right now",
+                   "If this happened with the radar attached, the supply is too weak "
+                   "for a session. " + PSU_ADVICE)
     else:
-        report.add("power", WARN, f"undervoltage has occurred previously ({raw})",
-                   "watch for it during the session")
+        report.add("power", OK, "no undervoltage or throttling (0x0)")
 
 
 def check_disk(report: Report, hours: float) -> None:
@@ -412,12 +450,17 @@ def main() -> int:
         if not args.no_services:
             check_devices(report)
             check_services(report)
-            check_undervoltage(report)
             check_disk(report, args.hours)
             check_migrations(report)
         print(f"Sampling the radar for {args.capture:.0f}s "
               f"(bowl a few balls now to test the velocity range)...", file=sys.stderr)
+        # Bracket the sample so a supply that sags under the radar's draw is
+        # caught in the act, not merely inferred from a boot-time flag.
+        throttled_before = read_throttled()
         frames, is_mock = capture_live(args.capture)
+        throttled_after = read_throttled()
+        if not args.no_services:
+            check_undervoltage(report, throttled_before, throttled_after)
         stats = check_capture(report, frames, is_mock, profile, "live")
 
     if args.json:

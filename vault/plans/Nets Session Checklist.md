@@ -31,8 +31,30 @@ npm run check                      # all 10 gates green
 ```
 
 Pack: the **data** USB cable (a charge-only cable enumerates nothing - this
-cost a whole session once), the powered hub, the 5.1V/2.5A+ Pi supply, tape
-measure, foil, tennis racket.
+cost a whole session once), the powered hub, tape measure, foil, tennis
+racket, and above all **the power bank, fully charged**.
+
+### Power: the thing that has broken this project twice
+
+A **Pi 3B+ needs 5.1V / 2.5A**. Everything else follows from that:
+
+- **A phone charger is not enough.** An iPhone-style plug is typically
+  5V/1A - about a third of what the Pi wants before the radar draws
+  anything. On 2026-09-06 the Pi cycled on and off on one, and settled the
+  moment the radar was unplugged. That is the signature: *stable without the
+  radar, cycling with it* means the supply, not the radar.
+- **The power bank is the known-good supply** - it has run the Pi with the
+  radar attached. Take it charged; a 10,000mAh bank covers a 2h session with
+  room to spare (the Pi draws roughly 6W with WiFi and the radar).
+- An undervolted Pi **clamps its USB ports**, so the radar stops enumerating
+  and `/dev/ttyUSB*` never appears. A "radar not detected" fault is very
+  often really a power fault.
+- Undervoltage also risks **SD-card corruption** on the unclean resets that
+  follow. It is not only an inconvenience.
+
+`preflight.py` brackets its radar sample with `vcgencmd get_throttled`, so a
+supply that sags *while the radar draws* is caught in the act and reported as
+a FAIL rather than a historical footnote.
 
 ---
 
