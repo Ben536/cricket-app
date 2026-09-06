@@ -146,7 +146,16 @@ def analyse_capture(frames: list[dict], profile: Optional[RadarProfile]) -> dict
     # The static-misassignment artefact sits at exactly 2x the base limit
     near_2x = sum(1 for v in speeds if abs(v - 2 * base) < 1.0)
     fast = sum(1 for v in speeds if v > base * 2.2)  # beyond the artefact band
+    # The band a real ball lives in. A cricket delivery is 17-28 m/s, and its
+    # radial component under the mount is less, so genuine motion lands
+    # between the clutter floor and the base limit. On 2026-09-06 this band
+    # held 0.1% of 215k points while 88.9% sat in the artefact - the measured
+    # signature of extendedMaxVelocity destroying the velocity data.
+    ball_band = sum(1 for v in speeds if base * 0.3 <= v <= base * 1.85)
     out.update({
+        "points_in_ball_band": ball_band,
+        "ball_band_pct": round(100.0 * ball_band / len(speeds), 2),
+        "artefact_pct": round(100.0 * near_2x / len(speeds), 2),
         "v_max_base_ms": round(base, 2),
         "v_max_ms": round(extended, 2),
         "points_above_base_limit": above_base,
@@ -155,11 +164,30 @@ def analyse_capture(frames: list[dict], profile: Optional[RadarProfile]) -> dict
     })
 
     if not profile.extended_max_velocity:
-        out["vmax_verdict"] = "NOT CONFIGURED"
-        out["vmax_detail"] = (
-            f"the .cfg does not enable extendedMaxVelocity: v_max is "
-            f"{base:.1f} m/s ({base * 3.6:.0f} km/h) and every cricket shot will alias"
-        )
+        # Disabled on purpose (2026-09-06). What matters now is not the mode
+        # but whether the doppler band a ball occupies is populated at all.
+        if near_2x > len(speeds) * 0.2:
+            out["vmax_verdict"] = "ARTEFACT PRESENT"
+            out["vmax_detail"] = (
+                f"{out['artefact_pct']:.0f}% of points still sit at 2x the base limit "
+                f"({2 * base:.1f} m/s) even with extendedMaxVelocity off. The chip is "
+                f"probably still running the OLD config - it needs a HARDWARE power-cycle"
+            )
+        elif ball_band < len(speeds) * 0.005:
+            out["vmax_verdict"] = "NO BALL-BAND MOTION"
+            out["vmax_detail"] = (
+                f"only {out['ball_band_pct']:.2f}% of points fall in {base*0.3:.1f}-"
+                f"{base*1.85:.1f} m/s, where a real ball reads. If something was moving "
+                f"during this capture, its velocity is not being measured"
+            )
+        else:
+            out["vmax_verdict"] = "BASE MODE OK"
+            out["vmax_detail"] = (
+                f"extendedMaxVelocity is off by choice: v_max {base:.1f} m/s "
+                f"({base * 3.6:.0f} km/h), artefact {out['artefact_pct']:.1f}%, "
+                f"{out['ball_band_pct']:.1f}% of points in the ball band. Faster balls "
+                f"alias and are de-aliased against track displacement"
+            )
     elif above_base == 0:
         out["vmax_verdict"] = "SUSPECT"
         out["vmax_detail"] = (
@@ -412,6 +440,17 @@ def check_capture(report: Report, frames: list[dict], is_mock: bool,
         report.add("extendedMaxVelocity", OK, detail)
     elif verdict == "ACTIVE (unexercised)":
         report.add("extendedMaxVelocity", OK, detail)
+    elif verdict == "BASE MODE OK":
+        report.add("doppler mode", OK, detail)
+    elif verdict == "ARTEFACT PRESENT":
+        report.add("doppler mode", FAIL, detail,
+                   "Power-cycle the radar hardware (unplug/replug the USB). A service "
+                   "restart reports success without applying a new chirp config")
+    elif verdict == "NO BALL-BAND MOTION":
+        report.add("doppler mode", FAIL, detail,
+                   "Bowl or wave something through the beam during the sample. If the band "
+                   "stays empty with real motion present, the velocity measurement is broken "
+                   "and no detector setting will find a ball")
     elif verdict in ("SUSPECT", "NOT CONFIGURED"):
         report.add("extendedMaxVelocity", FAIL, detail,
                    "Bowl 10 balls during a --capture and re-check. If it stays SUSPECT, the "

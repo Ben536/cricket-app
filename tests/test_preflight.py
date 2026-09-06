@@ -24,8 +24,18 @@ from preflight import analyse_capture, load_recording  # noqa: E402
 
 from radar.profile_cfg import load_profile, parse_profile  # noqa: E402
 
-PROFILE = load_profile()
-BASE = PROFILE.v_max_base_ms  # ~13.0 m/s
+SHIPPED = load_profile()
+BASE = SHIPPED.v_max_base_ms  # ~13.0 m/s
+
+# Both modes, built explicitly rather than read off whichever way the shipped
+# .cfg currently points - the verdicts for the two are different code paths
+# and both must keep working regardless of which one we ship.
+_CFG_TEXT = load_profile.__globals__["DEFAULT_PROFILE_PATH"].read_text()
+EXTENDED = parse_profile(_CFG_TEXT.replace("extendedMaxVelocity -1 0",
+                                           "extendedMaxVelocity -1 1"))
+BASE_MODE = parse_profile(_CFG_TEXT.replace("extendedMaxVelocity -1 1",
+                                            "extendedMaxVelocity -1 0"))
+PROFILE = EXTENDED  # the historical tests below are about extended mode
 
 
 def frames_with(dopplers, n_frames=20, period_ms=50):
@@ -39,8 +49,24 @@ def frames_with(dopplers, n_frames=20, period_ms=50):
 
 def test_profile_limits_are_what_the_verdict_rests_on():
     assert 12.5 < BASE < 13.5
-    assert PROFILE.extended_max_velocity is True
-    assert 37.5 < PROFILE.v_max_ms < 40.5
+    assert EXTENDED.extended_max_velocity is True
+    assert 37.5 < EXTENDED.v_max_ms < 40.5
+    assert BASE_MODE.extended_max_velocity is False
+    assert abs(BASE_MODE.v_max_ms - BASE) < 1e-9
+
+
+def test_the_shipped_profile_has_extended_mode_OFF():
+    """Disabled 2026-09-06 on measured evidence, not preference.
+
+    Over a 5-minute capture of real deliveries, 88.9% of 215k points sat at
+    2x the base limit and only 0.1% fell in the band a real ball occupies -
+    the velocity measurement was destroyed, and 90 labelled taps produced no
+    recoverable (lag, yaw) cluster. If this assertion fails, someone has
+    re-enabled it: re-measure the doppler distribution before trusting any
+    detection, and see the comment block in config/profile_cricket.cfg.
+    """
+    assert SHIPPED.extended_max_velocity is False, (
+        "extendedMaxVelocity was re-enabled - re-check the doppler histogram")
 
 
 def test_slow_scene_only_is_suspect():
@@ -64,11 +90,28 @@ def test_real_fast_motion_confirms_the_full_range():
     assert stats["points_above_artefact_band"] > 0
 
 
-def test_profile_without_extended_velocity_is_reported_as_misconfigured():
-    text = Path(PROFILE and str(load_profile.__globals__["DEFAULT_PROFILE_PATH"])).read_text()
-    off = parse_profile(text.replace("extendedMaxVelocity -1 1", "extendedMaxVelocity -1 0"))
-    stats = analyse_capture(frames_with([30.0]), off)
-    assert stats["vmax_verdict"] == "NOT CONFIGURED"
+def test_base_mode_with_healthy_motion_passes():
+    """Extended off and real motion in the ball band: the working state."""
+    stats = analyse_capture(frames_with([6.0, 9.0, 11.0, 0.5]), BASE_MODE)
+    assert stats["vmax_verdict"] == "BASE MODE OK"
+    assert stats["ball_band_pct"] > 50
+
+
+def test_base_mode_still_seeing_the_artefact_means_a_stale_chip_config():
+    """extendedMaxVelocity off in the .cfg but the artefact still dominating
+    means the chip is running the OLD config - it needs a hardware
+    power-cycle, because a service restart applies nothing."""
+    stats = analyse_capture(frames_with([2 * BASE, 2 * BASE, 2 * BASE, 0.0]), BASE_MODE)
+    assert stats["vmax_verdict"] == "ARTEFACT PRESENT"
+    assert stats["artefact_pct"] > 20
+
+
+def test_base_mode_with_an_empty_ball_band_is_a_failure():
+    """The 2026-09-06 signature: everything is either static or artefact, and
+    the band a ball lives in is empty. No detector setting can fix that."""
+    stats = analyse_capture(frames_with([0.0, 0.5, 1.0, 0.2]), BASE_MODE)
+    assert stats["vmax_verdict"] == "NO BALL-BAND MOTION"
+    assert stats["ball_band_pct"] < 0.5
 
 
 def test_rate_and_density_are_measured():

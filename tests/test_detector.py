@@ -374,17 +374,29 @@ def test_profile_cfg_derives_the_unambiguous_velocity():
     p = load_profile()
     assert p.num_tx == 3 and p.num_loops == 32
     assert p.frame_period_ms == 50 and p.frame_rate_hz == 20
-    assert p.extended_max_velocity is True
     assert 12.5 < p.v_max_base_ms < 13.5, p.summary()
-    assert 37.5 < p.v_max_ms < 40.5, p.summary()
     assert (p.range_min_m, p.range_max_m) == (0.25, 12.0)
+    # The SHIPPED profile runs in base mode - extendedMaxVelocity was
+    # disabled 2026-09-06 because it snapped 88.9% of returns to 2x the base
+    # limit and emptied the band a ball reads in. See the .cfg comment.
+    assert p.extended_max_velocity is False
+    assert abs(p.v_max_ms - p.v_max_base_ms) < 1e-9, p.summary()
     params = DetectorParams.from_profile(p)
     assert params.v_max_ms == p.v_max_ms
+
+    # The extended derivation itself must still be correct, for when the
+    # mode is re-tested: 3 TX x 13.0 = 39.0 m/s (140 km/h), NOT the 145 the
+    # cfg comment once claimed nor the 250 the detector used to assume.
+    ext = parse_profile(load_profile.__globals__["DEFAULT_PROFILE_PATH"].read_text()
+                        .replace("extendedMaxVelocity -1 0", "extendedMaxVelocity -1 1"))
+    assert ext.extended_max_velocity is True
+    assert 37.5 < ext.v_max_ms < 40.5, ext.summary()
 
 
 def test_profile_without_extended_velocity_has_the_base_limit():
     text = load_profile.__globals__["DEFAULT_PROFILE_PATH"].read_text().replace(
         "extendedMaxVelocity -1 1", "extendedMaxVelocity -1 0")
+    assert "extendedMaxVelocity -1 0" in text
     p = parse_profile(text)
     assert p.extended_max_velocity is False
     assert abs(p.v_max_ms - p.v_max_base_ms) < 1e-9
