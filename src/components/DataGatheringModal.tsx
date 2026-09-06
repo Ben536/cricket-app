@@ -72,7 +72,11 @@ interface RecordingDetail extends RecordingSummary {
   size_bytes?: number
 }
 
-const DURATIONS = [2, 5, 10] // minutes
+// Minutes. The nets checklist calls for a ~15 min "both" capture of 30+
+// balls, so 10 was short enough to auto-stop mid-session and split the run
+// across two files. The server caps a gathering session at 2h; the disk
+// check refuses anything the card cannot hold (~175 KB/s).
+const DURATIONS = [2, 5, 10, 20, 30]
 const OUTCOMES = ['dot', '1', '2', '3', '4', '6', 'W'] as const
 
 const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -189,6 +193,10 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
             if (p.last_error) {
               setError(`Recording STOPPED - write failed: ${p.last_error}. The file is truncated; free space on the Pi.`)
             } else {
+              // A banner, not a subtle status line: at the nets this means
+              // the bowling from here on was never recorded, and it is easy
+              // to keep going without noticing.
+              setError('Recording AUTO-STOPPED at the max duration. Start a new one to keep capturing.')
               setLastMark('Auto-stopped (max duration reached)')
             }
           }

@@ -73,8 +73,31 @@ The one manual step is joining the right WiFi. Two situations:
 | **At home** | Joins Drysdale Home | Stay on Drysdale Home, open `http://cricketradar.local:5173` (or `http://192.168.0.191:5173`) |
 | **At the nets** | Finds no known WiFi within ~45s, brings up its own AP | Join the **CricketRadar** WiFi, then open `http://10.42.0.1:5173` |
 
+### The access point only starts at BOOT - this will catch you out
+
+`cricket-autohotspot.service` is a `oneshot` that runs once, waits ~45s for a
+known WiFi, and brings up the AP only if none appears. It never runs again.
+
+So if you **power the Pi up at home**, it joins Drysdale Home, the hotspot
+script exits, and carrying the powered Pi to the nets leaves you with **no
+AP and no way for the phone to reach it**. The house WiFi is gone and nothing
+replaces it.
+
+Two ways to be safe:
+
+- **Boot the Pi at the nets**, not at home. Wait ~45s after power-up.
+- Or, if it is already running when you arrive:
+  `sudo systemctl restart cricket-autohotspot` (or `sudo nmcli connection up
+  CricketRadar`), which needs a keyboard or an SSH session you no longer
+  have - so prefer the first.
+
 Notes that matter in the field:
 
+- **Know the AP password before you leave.** It lives in NetworkManager on
+  the Pi, not in this repo, so it cannot be looked up from the laptop at the
+  ground: `sudo nmcli -s -t -f 802-11-wireless-security.psk connection show
+  CricketRadar`. Without it the phone cannot join, and with no phone there
+  are no wagon-wheel taps and therefore no mount calibration.
 - **Never use the Vercel URL.** It is served over https and browsers forbid
   an https page from opening the Pi's `ws://` socket. The app shows an orange
   banner saying exactly this, with the addresses that do work.
@@ -129,6 +152,13 @@ The Data and Rec screens show a red **RADAR NOT DETECTED** banner when the
 radar is absent. If you see it: stop, replug, re-run pre-flight. Never keep
 recording through it.
 
+A radar that disappears **part-way** is now caught too: the recording is
+tagged **PART MOCK** in the log and the detail view says how many of its
+frames are fabricated. If you see that badge, the cable or the supply moved -
+check both, and re-capture. Also watch for a **MARK NOT SAVED** banner: it
+means a wagon-wheel tap did not reach the disk, so that ball has no ground
+truth.
+
 ## 3. The captures, in this order
 
 **a. bowling** (~20 balls, no batter, ~5 min)
@@ -139,6 +169,11 @@ include a few as fast as you can.
 Shadow swings under the sensor. This is the dominant clutter source.
 
 **c. both** (30+ balls, ~15 min) - **the important one**
+
+Set the duration to **20 or 30 minutes** before starting. The recorder
+auto-stops at whatever is selected, and a session that stops at ball 12
+splits the capture in two.
+
 Bowl and hit. **Tap the wagon wheel for every single ball**, at the spot the
 ball actually went. Two rules:
 
@@ -182,7 +217,17 @@ rsync -avz bdrysdale@cricketradar.local:~/cricket-app/recordings/ ~/cricket-app/
 
 # fit the mount from the taps
 python3 tools/replay_jsonl.py recordings/both/<file>.jsonl --fit-yaw
+
+# ...but if recall is poor, tune first and fit from the tuned result
+python3 tools/tune_detector.py recordings/both/*.jsonl
+python3 tools/tune_detector.py recordings/both/*.jsonl --min-recall 0.8
 ```
+
+`tune_detector.py` sweeps the detector parameters against the taps and prints
+the best, the mount fit, and the `--set` flags to reproduce it. Prefer the
+`--min-recall` form for calibration: a clean set of true pairs fits a better
+yaw than a larger set containing ghosts. It refuses mock recordings and warns
+about any that lost the radar part-way.
 
 That prints `yaw_deg`, `mirror` and an RMS error. Put those, plus the
 measured height, into `radar/mount.json` and set `"calibrated": true`.
