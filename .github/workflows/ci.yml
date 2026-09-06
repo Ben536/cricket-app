@@ -48,7 +48,7 @@ jobs:
           # failing to load - is ignored.
           out=$(systemd-analyze verify scripts/systemd/*.service 2>&1 || true)
           echo "$out"
-          if echo "$out" | grep -E "cricket-[a-z]+\.service" | grep -qE "Unknown (key name|section)|Missing '='|Failed to parse|Invalid (value|argument)|Assignment outside of section"; then
+          if echo "$out" | grep -E "cricket-[a-z]+\.service" | grep -qE "Unknown (key name|section)|Missing '='|Failed to parse|Failed to resolve|Invalid (value|argument|slot)|Assignment outside of section"; then
             echo "systemd-analyze reported a unit-file problem"; exit 1
           fi
 

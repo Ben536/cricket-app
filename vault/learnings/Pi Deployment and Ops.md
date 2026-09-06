@@ -1,7 +1,19 @@
 # Learning: Pi Deployment and Ops
 
 ## Access
-- Pi on the LAN at **192.168.0.191** (mDNS `raspberrypi.local` / `cricketradar.local` was NOT resolving — use the IP). Hostname is `cricketradar`. MAC `b8:27:eb:…` (Raspberry Pi OUI).
+- Pi on the LAN at **192.168.0.191**, hostname `cricketradar`, MAC `b8:27:eb:38:60:d7`.
+  As of **2026-09-06** `cricketradar.local` DOES resolve from the Mac
+  (`raspberrypi.local` does not — it is not the hostname). Prefer the IP for
+  scripts; mDNS is fine interactively.
+- **Finding it when it is "missing":** sweep the subnet and look for the Pi
+  OUI rather than trusting mDNS —
+  `for i in $(seq 1 254); do (ping -c1 -W400 192.168.0.$i >/dev/null 2>&1 &); done; sleep 10; arp -a | grep -i b8:27:eb`.
+  No `b8:27:eb` on the subnet means the Pi is genuinely not on that network
+  (check for the `CricketRadar` AP instead — see the autohotspot section).
+- **The Pi 3B+ has no RTC.** After a cold boot its clock is whatever
+  fake-hwclock last saved until NTP corrects it, so early journal lines can
+  carry a date months old and `journalctl --list-boots` can look like one
+  enormous boot. Do not read that as an uptime figure.
 - SSH user `bdrysdale`. **Key-based auth installed** (`ssh-copy-id`) — no password needed now. Passwordless `sudo` works.
 - ⚠️ The login password was committed to the public repo (now redacted in working tree). **Still in git history — rotate + scrub.**
 
@@ -80,6 +92,35 @@ Two hard-won lessons:
 
 Verify rate: read `/dev/ttyUSB1` @921600, count magic headers `02 01 04 03 06 05 08 07`
 per second.
+
+## Session 2026-09-06: what a healthy-but-radarless Pi looks like
+
+Checked over SSH after the Pi appeared to "switch on and off" on a monitor.
+Findings worth keeping:
+
+- **`python3-websockets` on the Pi is 16.0** (apt), and the legacy
+  `websockets.server` API our server uses **still works there** — the server
+  started, listened and answered a real ping/pong. `requirements.txt` pins
+  `<16` on the belief the legacy API ends at 15; that pin is about the dev
+  environment and is now known to be conservative. Do not loosen it without
+  testing, but do not panic if apt installs 16 on the Pi.
+- **`connection rejected (400 Bad Request)` every 30s in `cricket-server`
+  logs is the OLD watchdog**, not a client bug: its probe opened a bare TCP
+  connection and never completed a handshake (2026-08 review, T1.4). If you
+  still see those lines, the Pi is running pre-2026-09 code.
+- **`vcgencmd get_throttled` = `0x50000`** means undervoltage and throttling
+  *have occurred since boot* but are not happening now (the low nibble is
+  clear). `dmesg` showed a 2-second dip 15s into boot — with **no radar
+  attached**. On a 3B+ that means the supply is marginal before the radar
+  even draws anything. Bits: 0 = under-voltage now, 2 = throttled now,
+  16 = under-voltage has occurred, 18 = throttling has occurred.
+- **`lsusb` is the fastest radar check.** Vendor `10c4` (Silicon Labs
+  CP2105) present = the board is on the bus; absent = no cable/no power/dead
+  cable, and `/dev/ttyUSB*` will never appear. `cricket-radar.service` then
+  sits in `activating`, counting down its 120s device wait, and retries
+  forever — which is expected, not a fault.
+- `connection_status.radar_connected` over the WebSocket reports the same
+  thing without SSH.
 
 ## radar recorder/streamer own the serial port
 Only one process should read `ttyUSB1`. The cricket-server owns it via the recorder/streamer — don't run a second reader concurrently.

@@ -106,6 +106,33 @@ def test_units_that_bind_all_interfaces_do_not_wait_for_network_online():
         assert "network-online.target" not in code, f"{name} waits for network-online.target"
 
 
+# Specifiers systemd substitutes in unit values (systemd.unit(5)). '%%' is a
+# literal percent. Anything else after '%' - notably the %20 of a URL-encoded
+# path - makes systemd log "Failed to resolve unit specifiers ... Invalid
+# slot" and DISCARD the whole line, silently.
+VALID_SPECIFIERS = set("aAbBCdEfgGhHiIjJlLmMnNoOpPsStTuUvVwWyY%")
+
+
+@pytest.mark.parametrize("unit", UNITS, ids=[u.name for u in UNITS])
+def test_percent_signs_are_escaped(unit):
+    problems = []
+    for lineno, line in enumerate(unit.read_text().splitlines(), 1):
+        stripped = line.strip()
+        if stripped.startswith("#") or "=" not in stripped:
+            continue
+        value = stripped.split("=", 1)[1]
+        i = 0
+        while i < len(value):
+            if value[i] == "%":
+                nxt = value[i + 1] if i + 1 < len(value) else ""
+                if nxt not in VALID_SPECIFIERS:
+                    problems.append(f"line {lineno}: '%{nxt}' is not a specifier - escape it as '%%{nxt}'")
+                i += 2  # skip the pair either way ('%%' is literal)
+                continue
+            i += 1
+    assert not problems, f"{unit.name}: {problems}"
+
+
 def test_read_write_paths_tolerate_missing_directories():
     for unit in UNITS:
         for line in unit.read_text().splitlines():

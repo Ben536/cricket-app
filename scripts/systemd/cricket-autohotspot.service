@@ -1,6 +1,10 @@
 [Unit]
 Description=CricketRadar - start AP if no known WiFi connects at boot
-Documentation=file:///home/bdrysdale/cricket-app/vault/learnings/Pi%20Deployment%20and%20Ops.md
+# '%' starts a specifier in a unit file, so the %20s of a URL-encoded path
+# must be escaped as %%20 - otherwise systemd logs "Failed to resolve unit
+# specifiers ... Invalid slot" and DROPS the whole line (seen on the Pi,
+# 2026-09-06).
+Documentation=file:///home/bdrysdale/cricket-app/vault/learnings/Pi%%20Deployment%%20and%%20Ops.md
 After=NetworkManager.service
 Wants=NetworkManager.service
 
