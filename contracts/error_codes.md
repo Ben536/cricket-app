@@ -110,6 +110,8 @@ never collide with the hardware codes above.
 | `E6103` | `NOT_RECORDING` | "Not currently recording" | Yes | stop/annotate sent with no active recording |
 | `E6104` | `RECORDING_NO_SESSION` | "Recording stop returned no session" | Yes | Internal recorder state error |
 | `E6105` | `RECORDING_STOP_FAILED` | "Failed to stop recording" | Yes | Recorder could not finalize (see message) |
+| `E6106` | `RECORDING_LIST_FAILED` | "Failed to list recordings" | Yes | Could not enumerate `recordings/` (see message) |
+| `E6107` | `RECORDING_READ_FAILED` | "Failed to read recording" | Yes | Could not read a recording's labels (see message). A path outside `recordings/` returns `E3004` instead |
 
 ---
 

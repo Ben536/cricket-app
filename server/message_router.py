@@ -134,6 +134,8 @@ VALID_CLIENT_TYPES = {
     "stop_recording",
     "get_recording_status",
     "add_annotation",
+    "list_recordings",
+    "get_recording",
     # Streaming
     "start_radar_stream",
     "stop_radar_stream",
@@ -157,6 +159,8 @@ MESSAGE_REQUIRED_FIELDS: dict[str, list[str]] = {
     "start_recording": ["payload.session_type"],
     "stop_recording": [],
     "get_recording_status": [],
+    "list_recordings": [],
+    "get_recording": ["payload.file"],
     # Streaming
     "start_radar_stream": [],
     "stop_radar_stream": [],
@@ -548,6 +552,18 @@ class MessageRouter:
             seed = payload.get("seed")
             if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
                 return invalid("seed", seed)
+
+        elif msg_type == "get_recording":
+            # The path is resolved inside recordings/ by the recorder; here
+            # just insist it is a plausible string.
+            f = payload.get("file")
+            if not isinstance(f, str) or not f.strip() or len(f) > 500 or "\x00" in f:
+                return invalid("file", f)
+
+        elif msg_type == "list_recordings":
+            st = payload.get("session_type")
+            if st is not None and not isinstance(st, str):
+                return invalid("session_type", st)
 
         elif msg_type == "add_annotation":
             # Stored verbatim as ground truth; keep it a small flat object.

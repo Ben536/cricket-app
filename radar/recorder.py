@@ -540,6 +540,84 @@ class RadarRecorder:
 
         return recordings
 
+    # Bound the reply: a 2h session can hold hundreds of marks, and this goes
+    # over a WebSocket to a phone.
+    MAX_ANNOTATIONS_RETURNED = 2000
+
+    def resolve_recording(self, file_path: str) -> Path:
+        """Resolve a client-supplied recording path INSIDE recordings_dir.
+
+        The path arrives from the network. Without this, '../../etc/passwd'
+        or an absolute path would be read straight off the Pi and sent back.
+        Accepts either a full path as listed by list_recordings, or a
+        '<type>/<name>.jsonl' relative one.
+
+        Raises ValueError if it escapes the directory or does not exist.
+        """
+        root = self.recordings_dir.resolve()
+        candidate = Path(file_path)
+        resolved = (candidate if candidate.is_absolute() else root / candidate).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            raise ValueError(f"Recording path is outside {root}") from None
+        if not resolved.is_file():
+            raise ValueError(f"No such recording: {file_path}")
+        if resolved.suffix not in (".jsonl", ".json"):
+            raise ValueError("Not a recording file")
+        return resolved
+
+    def read_annotations(self, file_path: str) -> dict:
+        """Read a recording's meta, marks and totals - NEVER its frames.
+
+        A gathering session's frames are ~1.25GB; only the labels are wanted
+        for review, and they are a few KB. The file is streamed line by line
+        so memory stays flat regardless of size.
+        """
+        path = self.resolve_recording(file_path)
+        meta: dict = {}
+        end: dict = {}
+        annotations: list[dict] = []
+        truncated = False
+        frames = 0
+
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue  # a crash can truncate the final line
+                kind = obj.get("type")
+                if kind == "frame":
+                    frames += 1
+                elif kind == "annotation":
+                    if len(annotations) < self.MAX_ANNOTATIONS_RETURNED:
+                        annotations.append(obj)
+                    else:
+                        truncated = True
+                elif kind == "meta":
+                    meta = obj
+                elif kind == "end":
+                    end = obj
+
+        return {
+            "file": str(path),
+            "session_type": meta.get("session_type", path.parent.name),
+            "start_time": meta.get("start_time"),
+            "mock": meta.get("mock", False),
+            "max_duration_seconds": meta.get("max_duration_seconds"),
+            "duration_seconds": end.get("duration_seconds", 0),
+            "frame_count": end.get("frame_count", frames),
+            "annotation_count": end.get("annotation_count", len(annotations)),
+            "incomplete": not end,
+            "annotations": annotations,
+            "annotations_truncated": truncated,
+            "size_bytes": path.stat().st_size,
+        }
+
     def _summarize_jsonl(self, file_path: Path, st: str) -> dict:
         """Summarize a JSONL recording from its meta (first) and end (last) lines.
 

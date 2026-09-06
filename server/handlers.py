@@ -68,6 +68,8 @@ ERROR_RECORDING_START_FAILED = "E6102"
 ERROR_NOT_RECORDING = "E6103"
 ERROR_RECORDING_NO_SESSION = "E6104"
 ERROR_RECORDING_STOP_FAILED = "E6105"
+ERROR_RECORDING_LIST_FAILED = "E6106"
+ERROR_RECORDING_READ_FAILED = "E6107"
 
 # Extended error messages
 EXTENDED_ERROR_MESSAGES = {
@@ -80,6 +82,8 @@ EXTENDED_ERROR_MESSAGES = {
     ERROR_NOT_RECORDING: ("Not currently recording", True),
     ERROR_RECORDING_NO_SESSION: ("Recording stop returned no session", True),
     ERROR_RECORDING_STOP_FAILED: ("Failed to stop recording", True),
+    ERROR_RECORDING_LIST_FAILED: ("Failed to list recordings", True),
+    ERROR_RECORDING_READ_FAILED: ("Failed to read recording", True),
 }
 
 
@@ -1273,6 +1277,96 @@ class MessageHandlers:
             },
         }
 
+    async def handle_list_recordings(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        List the recordings on the device, newest first.
+
+        Summaries only (type, time, duration, frame/mark counts, mock and
+        incomplete flags) - never frame data. A full scan of a crashed file
+        can be slow on the SD card, so this runs off the event loop.
+        """
+        payload = message.get("payload", {})
+        message_id = message.get("message_id")
+        session_type = payload.get("session_type")  # optional filter
+
+        if session_type is not None and session_type not in SESSION_TYPES:
+            return create_error_response(
+                ErrorCode.INVALID_FIELD_VALUE,
+                in_reply_to=message_id,
+                details={"field": "session_type", "value": str(session_type)[:100]},
+            )
+
+        recorder = get_recorder()
+        try:
+            recordings = await asyncio.to_thread(recorder.list_recordings, session_type)
+        except Exception as e:
+            logger.error(f"Failed to list recordings: {e}")
+            return create_extended_error(
+                ERROR_RECORDING_LIST_FAILED,
+                in_reply_to=message_id,
+                message_override=f"Failed to list recordings: {e}",
+            )
+
+        # Newest first: filenames are timestamps, and list_recordings already
+        # sorts within a type - re-sort across types.
+        recordings.sort(key=lambda r: str(r.get("start_time") or r.get("file")), reverse=True)
+
+        return {
+            "type": "recordings_list",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": {
+                "recordings": recordings,
+                "counts": await asyncio.to_thread(recorder.get_recording_counts),
+            },
+        }
+
+    async def handle_get_recording(
+        self,
+        client_id: str,
+        message: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Read one recording's labels back: meta, every annotation, totals.
+
+        Frames are never returned - a gathering session holds ~1.25GB of them
+        and the phone only wants the marks (to redraw the session's wagon
+        wheel). The path is resolved inside recordings/ or refused.
+        """
+        payload = message.get("payload", {})
+        message_id = message.get("message_id")
+        file_path = payload.get("file")
+
+        recorder = get_recorder()
+        try:
+            detail = await asyncio.to_thread(recorder.read_annotations, file_path)
+        except ValueError as e:
+            return create_error_response(
+                ErrorCode.INVALID_FIELD_VALUE,
+                in_reply_to=message_id,
+                details={"field": "file", "reason": str(e)[:200]},
+            )
+        except Exception as e:
+            logger.error(f"Failed to read recording {file_path}: {e}")
+            return create_extended_error(
+                ERROR_RECORDING_READ_FAILED,
+                in_reply_to=message_id,
+                message_override=f"Failed to read recording: {e}",
+            )
+
+        return {
+            "type": "recording_detail",
+            "message_id": generate_message_id(),
+            "timestamp": create_timestamp(),
+            "in_reply_to": message_id,
+            "payload": detail,
+        }
+
     # =========================================================================
     # RADAR STREAMING HANDLERS
     # =========================================================================
@@ -1575,6 +1669,8 @@ def register_handlers(
     server.message_router.register_handler("stop_recording", handlers.handle_stop_recording)
     server.message_router.register_handler("get_recording_status", handlers.handle_get_recording_status)
     server.message_router.register_handler("add_annotation", handlers.handle_add_annotation)
+    server.message_router.register_handler("list_recordings", handlers.handle_list_recordings)
+    server.message_router.register_handler("get_recording", handlers.handle_get_recording)
 
     # Streaming handlers
     server.message_router.register_handler("start_radar_stream", handlers.handle_start_radar_stream)

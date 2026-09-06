@@ -177,6 +177,51 @@ async def test_invalid_message_gets_error(server):
 
 
 @pytest.mark.asyncio
+async def test_recording_log_round_trip(server):
+    """Record a short session with labels, then list it and read the labels
+    back - the flow the Recordings tab uses at the nets."""
+    async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
+        await recv_type(ws, "connection_status")
+
+        await ws.send(envelope("start_recording", {"session_type": "both", "max_duration": 4}))
+        await recv_type(ws, "recording_started")
+        await asyncio.sleep(0.3)
+        for direction, outcome in ((35.0, "4"), (-70.0, "1")):
+            await ws.send(envelope("add_annotation", {
+                "direction_deg": direction, "distance_norm": 0.8, "outcome": outcome}))
+            await recv_type(ws, "annotation_added")
+        await ws.send(envelope("stop_recording", {}))
+        stopped = await recv_type(ws, "recording_stopped")
+        file_path = stopped["payload"]["file_path"]
+
+        listing = await request(ws, "list_recordings", {}, expect="recordings_list")
+        files = [r["file"] for r in listing["payload"]["recordings"]]
+        assert file_path in files
+        mine = next(r for r in listing["payload"]["recordings"] if r["file"] == file_path)
+        assert mine["annotation_count"] == 2
+        assert "annotations" not in mine  # the listing stays light
+
+        detail = await request(ws, "get_recording", {"file": file_path}, expect="recording_detail")
+        marks = detail["payload"]["annotations"]
+        assert [m["direction_deg"] for m in marks] == [35.0, -70.0]
+        assert [m["outcome"] for m in marks] == ["4", "1"]
+        assert detail["payload"]["mock"] is True  # no radar on the test host
+        # Frames must never come back over the wire
+        assert "points" not in json.dumps(detail["payload"])
+
+
+@pytest.mark.asyncio
+async def test_reading_outside_the_recordings_directory_is_refused(server):
+    async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
+        await recv_type(ws, "connection_status")
+        for bad in ("../../../etc/passwd", "/etc/passwd", "both/nope.jsonl"):
+            err = await request(ws, "get_recording", {"file": bad}, expect="error")
+            assert err["payload"]["code"] == "E3004", (bad, err)
+        # and the connection is still usable
+        assert (await request(ws, "ping", expect="pong"))["type"] == "pong"
+
+
+@pytest.mark.asyncio
 async def test_recording_lifecycle_mock(server):
     async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
         await recv_type(ws, "connection_status")

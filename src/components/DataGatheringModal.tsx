@@ -1,28 +1,37 @@
 /**
- * DataGatheringModal - capture raw radar data at the nets, labelled for tuning.
+ * DataGatheringModal - capture labelled radar data at the nets.
  *
- * Three capture types:
- *   - bowling: ball goes by, no batsman   (pure ball signature)
- *   - batting: batsman, no ball           (bat/body signature)
- *   - both:    ball bowled and hit        (real shot)
+ * Two tabs:
+ *   Record      start/stop a capture and label each ball on the wagon wheel
+ *   Recordings  the log of everything captured, and the wheel for each one
  *
- * For "both", each ball is labelled with the DIRECTION it went via a tappable
- * wagon-wheel -> ground truth for the horizontal angle the system must later
- * derive from radar. Frames + annotations stream to a crash-safe JSONL on the Pi.
+ * Capture types:
+ *   bowling: ball goes by, no batsman   (pure ball signature)
+ *   batting: batsman, no ball           (bat/body signature)
+ *   both:    ball bowled and hit        (real shot - the one that needs labels)
  *
- * Direction convention: 0deg = toward bowler, +90 = leg side, -90 = off side
- * (right-handed batter). NOTE: the game engine's simulate `angle` input uses
- * the OPPOSITE sign (+off/-leg) - flip the sign when tuning against this data.
+ * A label is one tap on the wheel: WHERE the ball went (direction) and HOW
+ * FAR (distance to the rope). An optional outcome (dot/1/2/3/4/6/W) can be
+ * armed before the tap, so one tap is always enough to record a ball and two
+ * give a fully labelled one. Nothing is ever lost by not choosing an outcome.
+ *
+ * Direction convention: 0deg = toward bowler, +90 = leg side, -90 = off side,
+ * always in the RIGHT-HANDED frame so every session is comparable. For a
+ * left-hander the display mirrors; the recorded value does not. NOTE the game
+ * engine's simulate `angle` uses the OPPOSITE sign (+off/-leg) - flip the
+ * sign when feeding this data to the engine.
  *
  * The recording lives on the server: closing this modal does NOT stop it, and
  * reopening re-attaches to the in-progress session via get_recording_status.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import type { MouseEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './RecordingModal.css'
+import { WagonWheel } from './WagonWheel'
+import type { WheelMark } from '../wagonWheelGeometry'
 
 type SessionType = 'bowling' | 'batting' | 'both'
+type Tab = 'record' | 'log'
 
 interface DataGatheringModalProps {
   isConnected: boolean
@@ -42,15 +51,57 @@ interface StatusPayload {
   last_error?: string | null
 }
 
-// Wagon-wheel geometry (SVG viewBox is SIZE x SIZE, batter at centre)
-const SIZE = 300
-const CX = SIZE / 2
-const CY = SIZE / 2
-const R = 130
+interface RecordingSummary {
+  file: string
+  session_type: string
+  start_time: string | null
+  duration_seconds: number
+  frame_count: number
+  annotation_count: number
+  mock?: boolean
+  incomplete?: boolean
+}
+
+interface RecordingDetail extends RecordingSummary {
+  annotations: Array<Record<string, unknown>>
+  annotations_truncated?: boolean
+  size_bytes?: number
+}
 
 const DURATIONS = [2, 5, 10] // minutes
+const OUTCOMES = ['dot', '1', '2', '3', '4', '6', 'W'] as const
+
+const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+function fmtWhen(iso: string | null): string {
+  if (!iso) return 'unknown time'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtSize(bytes?: number): string {
+  if (!bytes) return ''
+  if (bytes > 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
+  if (bytes > 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
+  return `${Math.round(bytes / 1024)}KB`
+}
+
+/** Annotations from the file -> marks the wheel can draw. */
+function toMarks(annotations: Array<Record<string, unknown>>): WheelMark[] {
+  return annotations
+    .filter((a) => typeof a.direction_deg === 'number')
+    .map((a) => ({
+      direction_deg: a.direction_deg as number,
+      distance_norm: typeof a.distance_norm === 'number' ? a.distance_norm : undefined,
+      outcome: typeof a.outcome === 'string' ? a.outcome : null,
+    }))
+}
 
 export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGatheringModalProps) {
+  const [tab, setTab] = useState<Tab>('record')
+
+  // --- recording state
   const [sessionType, setSessionType] = useState<string>('both')
   const [maxSeconds, setMaxSeconds] = useState(5 * 60)
   const [isRecording, setIsRecording] = useState(false)
@@ -59,8 +110,18 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
   const [frameCount, setFrameCount] = useState(0)
   const [markCount, setMarkCount] = useState(0)
   const [lastMark, setLastMark] = useState<string | null>(null)
-  const [tap, setTap] = useState<{ x: number; y: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // --- labelling
+  const [marks, setMarks] = useState<WheelMark[]>([])
+  const [pending, setPending] = useState<WheelMark | null>(null)
+  const [outcome, setOutcome] = useState<string | null>(null)
+  const [leftHanded, setLeftHanded] = useState(false)
+
+  // --- recordings log
+  const [recordings, setRecordings] = useState<RecordingSummary[] | null>(null)
+  const [detail, setDetail] = useState<RecordingDetail | null>(null)
+  const [logBusy, setLogBusy] = useState(false)
 
   // Re-attach to an in-progress recording (the server keeps recording if the
   // modal was closed or the page reloaded mid-session).
@@ -133,9 +194,40 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
     return () => window.clearInterval(poll)
   }, [isRecording, sendMessage])
 
+  const refreshLog = useCallback(() => {
+    if (!isConnected) return
+    setLogBusy(true)
+    sendMessage('list_recordings', {})
+      .then((resp) => {
+        const r = resp as { type: string; payload?: { recordings?: RecordingSummary[]; message?: string } }
+        if (r.type === 'recordings_list') setRecordings(r.payload?.recordings ?? [])
+        else setError(r.payload?.message ?? 'Could not list recordings')
+      })
+      .catch((e) => setError(`Could not list recordings: ${e}`))
+      .finally(() => setLogBusy(false))
+  }, [isConnected, sendMessage])
+
+  // Load the log when the tab is first opened, and after a recording stops
+  useEffect(() => {
+    if (tab === 'log' && recordings === null) refreshLog()
+  }, [tab, recordings, refreshLog])
+
+  const openRecording = (file: string) => {
+    setLogBusy(true)
+    setDetail(null)
+    sendMessage('get_recording', { file })
+      .then((resp) => {
+        const r = resp as { type: string; payload?: RecordingDetail & { message?: string } }
+        if (r.type === 'recording_detail' && r.payload) setDetail(r.payload)
+        else setError(r.payload?.message ?? 'Could not open that recording')
+      })
+      .catch((e) => setError(`Could not open that recording: ${e}`))
+      .finally(() => setLogBusy(false))
+  }
+
   const handleStart = async () => {
     if (!isConnected) { setError('Not connected to Pi'); return }
-    setError(null); setLastMark(null); setTap(null)
+    setError(null); setLastMark(null); setPending(null); setMarks([])
     try {
       const resp = await sendMessage('start_recording', {
         session_type: sessionType,
@@ -176,6 +268,7 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
     } catch (e) {
       setError(`Failed to stop: ${e}`)
     }
+    setRecordings(null) // the log is stale now
   }
 
   const sendMark = useCallback((mark: Record<string, unknown>, label: string) => {
@@ -189,27 +282,29 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
       .catch((e) => setError(`Mark failed: ${e}`))
   }, [sendMessage])
 
-  // Tap on the wagon-wheel -> direction the ball went
-  const handleWheelTap = (e: MouseEvent<SVGSVGElement>) => {
+  /** One tap on the wheel = one ball, recorded immediately. */
+  const handleWheelTap = (m: { direction_deg: number; distance_norm: number }) => {
     if (!isRecording) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const px = ((e.clientX - rect.left) / rect.width) * SIZE
-    const py = ((e.clientY - rect.top) / rect.height) * SIZE
-    const dx = px - CX            // +ve = right (leg, RH batter)
-    const dy = CY - py            // +ve = up (toward bowler)
-    // 0deg straight to bowler, +90 = leg (right), -90 = off (left), +/-180 = behind
-    const directionDeg = Math.round(Math.atan2(dx, dy) * (180 / Math.PI) * 10) / 10
-    const xn = Math.max(-1, Math.min(1, dx / R))
-    const yn = Math.max(-1, Math.min(1, dy / R))
-    setTap({ x: px, y: py })
+    const full: WheelMark = { ...m, outcome }
+    setPending(full)
+    setMarks((prev) => [...prev, full])
+    const rad = (m.direction_deg * Math.PI) / 180
     sendMark(
-      { direction_deg: directionDeg, x: Math.round(xn * 100) / 100, y: Math.round(yn * 100) / 100 },
-      `Ball -> ${directionDeg}deg`
+      {
+        direction_deg: m.direction_deg,
+        distance_norm: m.distance_norm,
+        outcome,
+        batting_hand: leftHanded ? 'left' : 'right',
+        // x/y kept for the existing offline tools
+        x: Math.round(Math.sin(rad) * m.distance_norm * 100) / 100,
+        y: Math.round(Math.cos(rad) * m.distance_norm * 100) / 100,
+      },
+      `Ball -> ${m.direction_deg > 0 ? '+' : ''}${m.direction_deg}deg${outcome ? ` (${outcome})` : ''}`,
     )
   }
 
-  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   const progressPct = Math.min(100, (elapsed / maxSeconds) * 100)
+  const detailMarks = detail ? toMarks(detail.annotations) : []
 
   return (
     <>
@@ -222,137 +317,253 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
+        <div className="dg-tabs">
+          <button className={`dg-tab ${tab === 'record' ? 'active' : ''}`} onClick={() => setTab('record')}>
+            Record{isRecording ? ' ●' : ''}
+          </button>
+          <button className={`dg-tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>
+            Recordings{recordings ? ` (${recordings.length})` : ''}
+          </button>
+        </div>
+
         <div className="recording-content">
           {!isConnected && <div className="recording-warning">Not connected to Pi server</div>}
-          {isMock && (
+          {isMock && isRecording && (
             <div className="recording-warning">
               ⚠️ RADAR NOT DETECTED — this session records fabricated mock data,
               not real radar. Check the radar's USB connection, then stop and
               start again.
             </div>
           )}
+          {error && <div className="recording-error">{error}</div>}
 
-          {/* Capture type */}
-          <div className="recording-section">
-            <label>Capture Type</label>
-            <div className="session-type-buttons">
-              {([
-                ['bowling', 'Ball only'],
-                ['batting', 'Batsman only'],
-                ['both', 'Ball + hit'],
-              ] as [SessionType, string][]).map(([type, lbl]) => (
-                <button
-                  key={type}
-                  className={`type-btn ${sessionType === type ? 'active' : ''}`}
-                  onClick={() => setSessionType(type)}
-                  disabled={isRecording}
-                >
-                  {lbl}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* ============================= RECORD ============================= */}
+          {tab === 'record' && (
+            <>
+              <div className="recording-section">
+                <label>Capture Type</label>
+                <div className="session-type-buttons">
+                  {([
+                    ['bowling', 'Ball only'],
+                    ['batting', 'Batsman only'],
+                    ['both', 'Ball + hit'],
+                  ] as [SessionType, string][]).map(([type, lbl]) => (
+                    <button
+                      key={type}
+                      className={`type-btn ${sessionType === type ? 'active' : ''}`}
+                      onClick={() => setSessionType(type)}
+                      disabled={isRecording}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Duration */}
-          {!isRecording && (
-            <div className="recording-section">
-              <label>Max Duration</label>
-              <div className="session-type-buttons">
-                {DURATIONS.map((m) => (
+              {!isRecording && (
+                <div className="recording-section">
+                  <label>Max Duration</label>
+                  <div className="session-type-buttons">
+                    {DURATIONS.map((m) => (
+                      <button
+                        key={m}
+                        className={`type-btn ${maxSeconds === m * 60 ? 'active' : ''}`}
+                        onClick={() => setMaxSeconds(m * 60)}
+                      >
+                        {m} min
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="recording-section">
+                {isRecording ? (
+                  <div className="recording-status recording">
+                    <div className="recording-indicator"><span className="rec-dot" /> REC</div>
+                    <div className="recording-time">{fmtClock(elapsed)} / {fmtClock(maxSeconds)}</div>
+                    <div className="progress-bar"><div className="progress-fill" style={{ width: `${progressPct}%` }} /></div>
+                    <div style={{ marginTop: 8, fontSize: 13 }}>
+                      {frameCount} frames &middot; {markCount} balls marked
+                    </div>
+                  </div>
+                ) : (
+                  <div className="recording-status ready">Ready to record</div>
+                )}
+              </div>
+
+              {/* Labelling */}
+              {isRecording && sessionType === 'both' && (
+                <div className="recording-section">
+                  <div className="dg-label-row">
+                    <label>Tap where the ball went</label>
+                    <button className="dg-hand-btn" onClick={() => setLeftHanded((v) => !v)}>
+                      {leftHanded ? 'Left-handed' : 'Right-handed'}
+                    </button>
+                  </div>
+
+                  <div className="dg-outcome-row">
+                    {OUTCOMES.map((o) => (
+                      <button
+                        key={o}
+                        className={`dg-outcome ${outcome === o ? 'active' : ''}`}
+                        onClick={() => setOutcome(outcome === o ? null : o)}
+                      >
+                        {o === 'dot' ? '•' : o}
+                      </button>
+                    ))}
+                  </div>
+
+                  <WagonWheel marks={marks} pending={pending} mirror={leftHanded} onTap={handleWheelTap} />
+
+                  <p className="note" style={{ textAlign: 'center', marginTop: 6 }}>
+                    One tap = one ball. Tap near the rope for a boundary, near the
+                    middle for a short one. Pick an outcome first to label it too.
+                  </p>
+                </div>
+              )}
+
+              {isRecording && sessionType !== 'both' && (
+                <div className="recording-section">
                   <button
-                    key={m}
-                    className={`type-btn ${maxSeconds === m * 60 ? 'active' : ''}`}
-                    onClick={() => setMaxSeconds(m * 60)}
+                    className="record-btn start"
+                    onClick={() => sendMark({ label: sessionType === 'bowling' ? 'ball' : 'swing' }, 'Marked')}
                   >
-                    {m} min
+                    Mark {sessionType === 'bowling' ? 'Ball' : 'Swing'}
+                  </button>
+                </div>
+              )}
+
+              <div className="recording-section">
+                {isRecording ? (
+                  <>
+                    <button className="record-btn stop" onClick={handleStop}>Stop &amp; Save</button>
+                    <p className="note" style={{ textAlign: 'center', marginTop: 6 }}>
+                      Closing this window keeps recording — reopen to re-attach.
+                    </p>
+                  </>
+                ) : (
+                  <button className="record-btn start" onClick={handleStart} disabled={!isConnected}>
+                    Start Recording
+                  </button>
+                )}
+              </div>
+
+              {lastMark && <div className="recording-success">{lastMark}</div>}
+
+              <div className="recording-section instructions">
+                <p><strong>Ball only:</strong> bowl past, no batsman — pure ball signature.</p>
+                <p><strong>Batsman only:</strong> shadow shots, no ball — bat/body signature.</p>
+                <p><strong>Ball + hit:</strong> real shots — tap the wheel for each ball.</p>
+                <p className="note">Saved crash-safe to the Pi as you go (one file per session).</p>
+              </div>
+            </>
+          )}
+
+          {/* =========================== RECORDINGS =========================== */}
+          {tab === 'log' && !detail && (
+            <>
+              <div className="recording-section">
+                <div className="dg-label-row">
+                  <label>Saved recordings</label>
+                  <button className="dg-hand-btn" onClick={refreshLog} disabled={!isConnected || logBusy}>
+                    {logBusy ? 'Loading…' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {recordings === null && <div className="recording-status ready">{logBusy ? 'Loading…' : 'Not loaded'}</div>}
+              {recordings?.length === 0 && (
+                <div className="recording-status ready">No recordings on the device yet.</div>
+              )}
+
+              <div className="dg-list">
+                {recordings?.map((r) => (
+                  <button key={r.file} className="dg-list-item" onClick={() => openRecording(r.file)}>
+                    <div className="dg-list-top">
+                      <span className="dg-type">{r.session_type}</span>
+                      <span className="dg-when">{fmtWhen(r.start_time)}</span>
+                    </div>
+                    <div className="dg-list-stats">
+                      <span>{Math.round(r.duration_seconds)}s</span>
+                      <span>{r.frame_count} frames</span>
+                      <span>{r.annotation_count} marks</span>
+                      {r.mock && <span className="dg-badge mock">MOCK</span>}
+                      {r.incomplete && <span className="dg-badge warn">INCOMPLETE</span>}
+                    </div>
                   </button>
                 ))}
               </div>
-            </div>
+            </>
           )}
 
-          {/* Status */}
-          <div className="recording-section">
-            {isRecording ? (
-              <div className="recording-status recording">
-                <div className="recording-indicator"><span className="rec-dot" /> REC</div>
-                <div className="recording-time">{fmt(elapsed)} / {fmt(maxSeconds)}</div>
-                <div className="progress-bar"><div className="progress-fill" style={{ width: `${progressPct}%` }} /></div>
-                <div style={{ marginTop: 8, fontSize: 13 }}>
-                  {frameCount} frames &middot; {markCount} balls marked
+          {tab === 'log' && detail && (
+            <>
+              <div className="recording-section">
+                <div className="dg-label-row">
+                  <button className="dg-hand-btn" onClick={() => setDetail(null)}>← Back</button>
+                  <span className="dg-when">{fmtWhen(detail.start_time)}</span>
                 </div>
               </div>
-            ) : (
-              <div className="recording-status ready">Ready to record</div>
-            )}
-          </div>
 
-          {/* Marking area */}
-          {isRecording && sessionType === 'both' && (
-            <div className="recording-section">
-              <label>Tap where the ball went</label>
-              <svg
-                viewBox={`0 0 ${SIZE} ${SIZE}`}
-                onClick={handleWheelTap}
-                style={{ width: '100%', maxWidth: 320, touchAction: 'manipulation', background: '#0b3d2e', borderRadius: 8, display: 'block', margin: '0 auto' }}
-              >
-                <circle cx={CX} cy={CY} r={R} fill="#0f5132" stroke="#2e8b57" strokeWidth={2} />
-                <circle cx={CX} cy={CY} r={R * 0.5} fill="none" stroke="#2e8b57" strokeWidth={1} strokeDasharray="4 4" />
-                {/* crosshair */}
-                <line x1={CX} y1={CY - R} x2={CX} y2={CY + R} stroke="#2e8b57" strokeWidth={1} />
-                <line x1={CX - R} y1={CY} x2={CX + R} y2={CY} stroke="#2e8b57" strokeWidth={1} />
-                {/* batter */}
-                <circle cx={CX} cy={CY} r={5} fill="#ffd700" />
-                {/* labels */}
-                <text x={CX} y={CY - R + 16} fill="#cde" fontSize={13} textAnchor="middle">Bowler</text>
-                <text x={CX} y={CY + R - 6} fill="#cde" fontSize={13} textAnchor="middle">Keeper</text>
-                <text x={CX - R + 18} y={CY + 4} fill="#cde" fontSize={13} textAnchor="middle">Off</text>
-                <text x={CX + R - 18} y={CY + 4} fill="#cde" fontSize={13} textAnchor="middle">Leg</text>
-                {tap && <line x1={CX} y1={CY} x2={tap.x} y2={tap.y} stroke="#ffd700" strokeWidth={2} />}
-                {tap && <circle cx={tap.x} cy={tap.y} r={6} fill="#ff4136" />}
-              </svg>
-              <p className="note" style={{ textAlign: 'center', marginTop: 6 }}>
-                Off/Leg shown for a right-handed batter. Tap = one ball.
-              </p>
-            </div>
+              {detail.mock && (
+                <div className="recording-warning">
+                  ⚠️ MOCK DATA — the radar was not detected for this recording.
+                  The frames are fabricated: do not tune anything against it.
+                </div>
+              )}
+              {detail.incomplete && (
+                <div className="recording-warning">
+                  This session has no end marker — it crashed or was interrupted.
+                  The counts below are recovered by scanning the file.
+                </div>
+              )}
+
+              <div className="recording-section">
+                <div className="dg-detail-stats">
+                  <div><b>{detail.session_type}</b></div>
+                  <div>{Math.round(detail.duration_seconds)}s &middot; {detail.frame_count} frames &middot; {detail.annotation_count} marks</div>
+                  <div className="note">{detail.file.split('/').slice(-2).join('/')} {fmtSize(detail.size_bytes)}</div>
+                </div>
+              </div>
+
+              {detailMarks.length > 0 ? (
+                <div className="recording-section">
+                  <label>Where the balls went ({detailMarks.length})</label>
+                  <WagonWheel marks={detailMarks} />
+                </div>
+              ) : (
+                <div className="recording-section">
+                  <div className="recording-status ready">
+                    No directional marks in this recording
+                    {detail.annotation_count > 0 ? ' (marks were timing-only)' : ''}.
+                  </div>
+                </div>
+              )}
+
+              {detail.annotations.length > 0 && (
+                <div className="recording-section">
+                  <label>Marks</label>
+                  <div className="dg-marks">
+                    {detail.annotations.map((a, i) => (
+                      <div key={i} className="dg-mark-row">
+                        <span className="dg-mark-t">{fmtClock(Math.round(Number(a.t_ms ?? 0) / 1000))}</span>
+                        <span>
+                          {typeof a.direction_deg === 'number'
+                            ? `${(a.direction_deg as number) > 0 ? '+' : ''}${a.direction_deg}°`
+                            : String(a.label ?? '—')}
+                        </span>
+                        <span className="dg-mark-out">{typeof a.outcome === 'string' ? a.outcome : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {detail.annotations_truncated && (
+                    <p className="note">Only the first {detail.annotations.length} marks are shown.</p>
+                  )}
+                </div>
+              )}
+            </>
           )}
-
-          {isRecording && sessionType !== 'both' && (
-            <div className="recording-section">
-              <button
-                className="record-btn start"
-                onClick={() => sendMark({ label: sessionType === 'bowling' ? 'ball' : 'swing' }, 'Marked')}
-              >
-                Mark {sessionType === 'bowling' ? 'Ball' : 'Swing'}
-              </button>
-            </div>
-          )}
-
-          {/* Start / Stop */}
-          <div className="recording-section">
-            {isRecording ? (
-              <>
-                <button className="record-btn stop" onClick={handleStop}>Stop &amp; Save</button>
-                <p className="note" style={{ textAlign: 'center', marginTop: 6 }}>
-                  Closing this window keeps recording — reopen to re-attach.
-                </p>
-              </>
-            ) : (
-              <button className="record-btn start" onClick={handleStart} disabled={!isConnected}>
-                Start Recording
-              </button>
-            )}
-          </div>
-
-          {error && <div className="recording-error">{error}</div>}
-          {lastMark && <div className="recording-success">{lastMark}</div>}
-
-          <div className="recording-section instructions">
-            <p><strong>Ball only:</strong> bowl past, no batsman — pure ball signature.</p>
-            <p><strong>Batsman only:</strong> shadow shots, no ball — bat/body signature.</p>
-            <p><strong>Ball + hit:</strong> real shots — tap the wheel to log the direction each ball went.</p>
-            <p className="note">Saved crash-safe to the Pi as you go (one file per session).</p>
-          </div>
         </div>
       </div>
     </>

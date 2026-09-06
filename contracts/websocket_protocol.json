@@ -1274,6 +1274,78 @@
         "payload"
       ],
       "additionalProperties": false
+    },
+    "list_recordings": {
+      "type": "object",
+      "description": "List the recordings held on the device (summaries only, never frame data).",
+      "properties": {
+        "type": {
+          "const": "list_recordings"
+        },
+        "message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session_type": {
+              "type": "string",
+              "description": "Optional filter: bowling|batting|both|foil_ball|racket|racket_foil"
+            }
+          },
+          "required": [],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "type",
+        "message_id",
+        "timestamp",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "get_recording": {
+      "type": "object",
+      "description": "Read one recording's labels back: meta, every annotation and totals. Frames are NEVER returned (a gathering session holds ~1.25GB). The path is resolved inside recordings/ and refused otherwise.",
+      "properties": {
+        "type": {
+          "const": "get_recording"
+        },
+        "message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Path as given by recordings_list, or '<type>/<name>.jsonl'"
+            }
+          },
+          "required": [
+            "file"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "type",
+        "message_id",
+        "timestamp",
+        "payload"
+      ],
+      "additionalProperties": false
     }
   },
   "serverToClient": {
@@ -2059,6 +2131,135 @@
             "points"
           ],
           "additionalProperties": true
+        }
+      },
+      "required": [
+        "type",
+        "message_id",
+        "timestamp",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "recordings_list": {
+      "type": "object",
+      "description": "Reply to list_recordings: one summary per recording, newest first.",
+      "properties": {
+        "type": {
+          "const": "recordings_list"
+        },
+        "message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "recordings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "counts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [],
+          "additionalProperties": true
+        },
+        "in_reply_to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "message_id",
+        "timestamp",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "recording_detail": {
+      "type": "object",
+      "description": "Reply to get_recording: meta, marks and totals for one recording. No frames.",
+      "properties": {
+        "type": {
+          "const": "recording_detail"
+        },
+        "message_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "session_type": {
+              "type": "string"
+            },
+            "start_time": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mock": {
+              "type": "boolean"
+            },
+            "duration_seconds": {
+              "type": "number"
+            },
+            "frame_count": {
+              "type": "integer"
+            },
+            "annotation_count": {
+              "type": "integer"
+            },
+            "incomplete": {
+              "type": "boolean",
+              "description": "No end marker: the session crashed or was interrupted"
+            },
+            "annotations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Ground-truth marks, in recording order"
+            },
+            "annotations_truncated": {
+              "type": "boolean"
+            },
+            "size_bytes": {
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "additionalProperties": true
+        },
+        "in_reply_to": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [

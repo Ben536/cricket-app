@@ -49,7 +49,7 @@ def router():
     for t in ("set_field", "set_difficulty", "select_profile", "create_profile", "update_profile",
               "manual_input", "start_session", "end_session", "undo", "ping", "simulate_shot",
               "start_recording", "stop_recording", "get_recording_status", "add_annotation",
-              "start_radar_stream", "stop_radar_stream"):
+              "start_radar_stream", "stop_radar_stream", "list_recordings", "get_recording"):
         r.register_handler(t, handler)
     r.calls = calls  # type: ignore[attr-defined]
     return r
@@ -92,6 +92,11 @@ MALFORMED = [
     ("start_recording", {"session_type": ["both"]}),
     ("simulate_shot", {**GOOD_SIM, "exit_speed": 10 ** 400}),
     ("add_annotation", {f"k{i}": i for i in range(40)}),
+    ("get_recording", {"file": 42}),
+    ("get_recording", {"file": ""}),
+    ("get_recording", {"file": "x" * 600}),
+    ("get_recording", {"file": "both/a\x00.jsonl"}),
+    ("list_recordings", {"session_type": ["both"]}),
 ]
 
 
@@ -159,6 +164,9 @@ async def test_well_formed_messages_still_route(router):
         ("ping", {}),
         ("add_annotation", {"direction_deg": 35.0, "label": "4"}),
         ("start_recording", {"session_type": "both", "max_duration": 300}),
+        ("list_recordings", {}),
+        ("list_recordings", {"session_type": "both"}),
+        ("get_recording", {"file": "both/2026-09-06_10-00-00.jsonl"}),
     ]
     for t, p in ok:
         response = await router.route("client", envelope(t, p))

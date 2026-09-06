@@ -292,3 +292,159 @@
 .recording-section.instructions strong {
   color: var(--sky-gold);
 }
+
+/* ============================================================
+   Data-gathering: tabs, recordings log, labelling controls
+   ============================================================ */
+
+.dg-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dg-tab {
+  flex: 1;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: 'Roboto Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.dg-tab.active {
+  color: var(--sky-gold, #f5a623);
+  border-bottom-color: var(--sky-gold, #f5a623);
+}
+
+.dg-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dg-hand-btn {
+  padding: 8px 14px;
+  min-height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dg-hand-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Outcome selector: big touch targets for a phone at the nets */
+.dg-outcome-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.dg-outcome {
+  flex: 1;
+  min-height: 46px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dg-outcome.active {
+  background: var(--sky-gold, #f5a623);
+  border-color: var(--sky-gold, #f5a623);
+  color: #1a1a1a;
+}
+
+.wagon-wheel-svg { user-select: none; -webkit-user-select: none; }
+
+/* The log */
+.dg-list { display: flex; flex-direction: column; gap: 8px; }
+
+.dg-list-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  min-height: 60px;
+}
+
+.dg-list-item:active { background: rgba(255, 255, 255, 0.12); }
+
+.dg-list-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.dg-type {
+  font-family: 'Roboto Condensed', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sky-gold, #f5a623);
+}
+
+.dg-when { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+
+.dg-list-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dg-badge {
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.dg-badge.mock { background: #e63946; color: #fff; }
+.dg-badge.warn { background: #b8860b; color: #fff; }
+
+.dg-detail-stats { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+
+.dg-marks {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.dg-mark-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 48px;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.dg-mark-row:last-child { border-bottom: none; }
+.dg-mark-t { color: rgba(255, 255, 255, 0.5); font-variant-numeric: tabular-nums; }
+.dg-mark-out { text-align: right; color: var(--sky-gold, #f5a623); font-weight: 700; }
