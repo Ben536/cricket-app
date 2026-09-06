@@ -1264,6 +1264,17 @@ class MessageHandlers:
             )
 
         annotation = await asyncio.to_thread(recorder.add_annotation, payload)
+        if annotation is None:
+            # The recording ended between the is_recording check above and the
+            # write - an auto-stop firing, or another client stopping it. The
+            # mark was NOT stored, and reporting success here would let the UI
+            # draw a ball on the wheel that exists nowhere on disk. At the nets
+            # those taps are the entire ground truth, so this must be loud.
+            return create_extended_error(
+                ERROR_NOT_RECORDING,
+                in_reply_to=message_id,
+                message_override="Recording ended before the mark was saved - it was NOT recorded",
+            )
         current = recorder.current_session
 
         return {

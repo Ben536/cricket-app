@@ -275,15 +275,42 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
     setRecordings(null) // the log is stale now
   }
 
-  const sendMark = useCallback((mark: Record<string, unknown>, label: string) => {
+  /**
+   * Send one ground-truth mark.
+   *
+   * The server RESOLVES error replies rather than rejecting them, so a
+   * `type: 'error'` response has to be checked explicitly. Without that check
+   * a mark that was never stored still drew a ball on the wheel and pushed
+   * the counter up - so a session could show "30 marks" with far fewer
+   * actually on disk, and the taps are the only ground truth the trip
+   * produces. On failure the optimistic mark is rolled back so the wheel
+   * shows what is genuinely recorded.
+   */
+  const sendMark = useCallback((
+    mark: Record<string, unknown>,
+    label: string,
+    onFailure?: () => void,
+  ) => {
     sendMessage('add_annotation', mark)
       .then((resp) => {
-        const p = (resp as { payload?: { annotation_count?: number } })?.payload
+        const r = resp as {
+          type?: string
+          payload?: { annotation_count?: number; annotation?: unknown; message?: string }
+        }
+        if (r?.type === 'error' || r?.payload?.annotation == null) {
+          onFailure?.()
+          setError(`MARK NOT SAVED: ${r?.payload?.message ?? 'the server did not store it'}`)
+          return
+        }
+        const p = r.payload
         if (p?.annotation_count != null) setMarkCount(p.annotation_count)
         else setMarkCount((c) => c + 1)
         setLastMark(label)
       })
-      .catch((e) => setError(`Mark failed: ${e}`))
+      .catch((e) => {
+        onFailure?.()
+        setError(`MARK NOT SAVED: ${e}`)
+      })
   }, [sendMessage])
 
   /** One tap on the wheel = one ball, recorded immediately. */
@@ -292,6 +319,10 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
     const full: WheelMark = { ...m, outcome }
     setPending(full)
     setMarks((prev) => [...prev, full])
+    const rollback = () => {
+      setMarks((prev) => prev.filter((x) => x !== full))
+      setPending((cur) => (cur === full ? null : cur))
+    }
     const rad = (m.direction_deg * Math.PI) / 180
     sendMark(
       {
@@ -304,6 +335,7 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
         y: Math.round(Math.cos(rad) * m.distance_norm * 100) / 100,
       },
       `Ball -> ${m.direction_deg > 0 ? '+' : ''}${m.direction_deg}deg${outcome ? ` (${outcome})` : ''}`,
+      rollback,
     )
   }
 

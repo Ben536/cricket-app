@@ -239,3 +239,25 @@ async def test_recording_lifecycle_mock(server):
         stopped = await recv_type(ws, "recording_stopped")
         assert stopped["payload"]["annotation_count"] == 1
         assert stopped["payload"]["frame_count"] > 0
+
+
+@pytest.mark.asyncio
+async def test_a_mark_that_was_not_saved_is_reported_as_an_error(server):
+    """A tap after the recording has ended must NOT come back as success.
+
+    The wagon-wheel taps are the only ground truth a nets session produces.
+    Reporting a stored mark that is not on disk lets the UI show a ball count
+    higher than the data, which is discovered only back at the laptop.
+    """
+    async with websockets.connect(f"ws://127.0.0.1:{PORT}") as ws:
+        await recv_type(ws, "connection_status")
+
+        await ws.send(envelope("start_recording", {"session_type": "both", "max_duration": 1}))
+        await recv_type(ws, "recording_started")
+        await ws.send(envelope("stop_recording", {}))
+        await recv_type(ws, "recording_stopped")
+
+        await ws.send(envelope("add_annotation", {"direction_deg": 12.0}))
+        resp = await recv_type(ws, "error")
+        assert resp["payload"]["code"]
+        assert "record" in resp["payload"]["message"].lower()
