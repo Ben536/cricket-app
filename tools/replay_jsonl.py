@@ -35,44 +35,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from radar.detector import BallDetector, DetectorParams  # noqa: E402
-from radar.geometry import DEFAULT_MOUNT_PATH, MountCalibration, fit_yaw  # noqa: E402
+from radar.detector import DetectorParams  # noqa: E402
+from radar.geometry import DEFAULT_MOUNT_PATH, MountCalibration  # noqa: E402
 from radar.profile_cfg import DEFAULT_PROFILE_PATH, load_profile  # noqa: E402
-from radar.tlv import RadarFrame, RadarPoint  # noqa: E402
-
-MATCH_WINDOW_MS = 1500  # annotation tap within this window of an event = match
-
-
-def load_recording(path: Path):
-    frames, annotations, meta = [], [], {}
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue  # truncated line from a crash
-            kind = obj.get("type")
-            if kind == "meta":
-                meta = obj
-            elif kind == "frame":
-                t_ms = obj.get("t_ms", obj.get("timestamp_ms", 0))
-                frames.append((t_ms, RadarFrame(
-                    frame_number=obj.get("frame_number", 0),
-                    cpu_time_ms=obj.get("cpu_time_ms", obj.get("timestamp_ms", 0)),
-                    num_points=obj.get("num_points", len(obj.get("points", []))),
-                    points=[
-                        RadarPoint(x=p["x"], y=p["y"], z=p["z"],
-                                   doppler=p.get("doppler", p.get("v", 0.0)),
-                                   snr=p.get("snr", 0.0), noise=p.get("noise", 0.0))
-                        for p in obj.get("points", [])
-                    ],
-                )))
-            elif kind == "annotation":
-                annotations.append(obj)
-    return meta, frames, annotations
+from radar.tuning import (  # noqa: E402
+    MATCH_WINDOW_MS,
+    detect,
+    fit_from_matches,
+    load_recording,
+    match_events,
+)
 
 
 def parse_overrides(items: list[str]) -> dict:
@@ -133,37 +105,22 @@ def main() -> int:
 
     calibration = MountCalibration.load(args.mount) if args.mount.exists() else MountCalibration()
 
-    meta, frames, annotations = load_recording(args.recording)
+    rec = load_recording(args.recording)
+    meta, frames, annotations = rec.meta, rec.frames, rec.annotations
 
     if meta.get("mock"):
         print("WARNING: this recording is flagged MOCK - the radar was absent; "
               "frames are fabricated and useless for tuning.", file=sys.stderr)
 
-    detector = BallDetector(params, calibration=calibration)
-    events = []
-    for t_ms, frame in frames:
-        events.extend(detector.process_frame(frame, t_ms))
-    events.extend(detector.flush())
+    events = detect(rec, params, calibration)
+    scoring = match_events(events, annotations)
+    matches = [{"annotation": m.annotation, "event": m.event.to_dict(), "dt_ms": m.dt_ms}
+               for m in scoring.matches]
+    unmatched_events = scoring.unmatched_events
 
-    # Match events to ground-truth taps (nearest in time within the window)
-    matches = []
-    unmatched_events = list(events)
-    for ann in annotations:
-        ann_t = ann.get("t_ms", 0)
-        best, best_dt = None, MATCH_WINDOW_MS + 1
-        for ev in unmatched_events:
-            dt = abs(ev.t_end_ms - ann_t)
-            if dt < best_dt:
-                best, best_dt = ev, dt
-        if best is not None and best_dt <= MATCH_WINDOW_MS:
-            unmatched_events.remove(best)
-            matches.append({"annotation": ann, "event": best.to_dict(), "dt_ms": best_dt})
-
-    fit = None
-    pairs = [(m["event"]["direction_sensor_deg"], m["annotation"]["direction_deg"])
-             for m in matches if m["annotation"].get("direction_deg") is not None]
-    if args.fit_yaw:
-        fit = fit_yaw(pairs)
+    pairs = [m for m in scoring.matches
+             if isinstance(m.annotation.get("direction_deg"), (int, float))]
+    fit = fit_from_matches(scoring.matches) if args.fit_yaw else None
 
     report = {
         "recording": str(args.recording),
