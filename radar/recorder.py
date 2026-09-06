@@ -73,11 +73,23 @@ class RecordingSession:
     max_duration_seconds: float = MAX_RECORDING_SECONDS
     annotation_count: int = 0
     is_mock: bool = False  # True = radar absent at start, frames are FABRICATED
+    # Frames written while the radar was absent. is_mock covers "absent at
+    # START"; this covers a radar that DROPS OUT mid-session (a knocked USB
+    # cable, a sagging supply), which otherwise leaves a file that says
+    # mock=false while half its frames are fabricated.
+    mock_frame_count: int = 0
+    mode_changes: int = 0
     annotations: list[dict] = field(default_factory=list)
     file_path: Optional[str] = None
     # Set when the recording stopped ITSELF because a write failed (card
     # full, I/O error). The file is truncated at that point.
     error: Optional[str] = None
+
+    @property
+    def partial_mock(self) -> bool:
+        """Started real but lost the radar: the worst case, because nothing
+        in the UI flagged it at the time and the file looks genuine."""
+        return not self.is_mock and self.mock_frame_count > 0
 
     def to_dict(self) -> dict:
         return {
@@ -88,6 +100,9 @@ class RecordingSession:
             "frame_count": self.frame_count,
             "annotation_count": self.annotation_count,
             "is_mock": self.is_mock,
+            "mock_frame_count": self.mock_frame_count,
+            "mode_changes": self.mode_changes,
+            "partial_mock": self.partial_mock,
             "annotations": self.annotations,
             "error": self.error,
         }
@@ -130,6 +145,8 @@ class RadarRecorder:
         self._jsonl = None                      # open file handle during recording
         self._frame_count = 0
         self._annotation_count = 0
+        self._mock_frame_count = 0
+        self._mode_changes = 0
         self._max_duration = float(MAX_RECORDING_SECONDS)
         self._last_mock: bool = False
         self._auto_stop_timer: Optional[threading.Timer] = None
@@ -232,6 +249,8 @@ class RadarRecorder:
             self.write_error = None
             self._frame_count = 0
             self._annotation_count = 0
+            self._mock_frame_count = 0
+            self._mode_changes = 0
             self._jsonl = jsonl
             session.file_path = str(file_path)
             self._start_time = time.time()
@@ -361,8 +380,15 @@ class RadarRecorder:
         t_ms = int((time.time() - self._start_time) * 1000)
         if source_mock != self._last_mock:
             self._last_mock = source_mock
+            self._mode_changes += 1
             self._write_line({"type": "mode_change", "t_ms": t_ms, "mock": source_mock})
-            logger.warning(f"Recording mode changed mid-session: mock={source_mock}")
+            logger.warning(
+                f"Recording mode changed mid-session: mock={source_mock}. "
+                + ("The radar has DROPPED OUT - frames from here are fabricated."
+                   if source_mock else "The radar is back - frames are real again.")
+            )
+        if source_mock:
+            self._mock_frame_count += 1
 
         self._write_line({
             "type": "frame",
@@ -473,6 +499,8 @@ class RadarRecorder:
         session.duration_seconds = (time.time() - self._start_time) if self._start_time else 0.0
         session.frame_count = self._frame_count
         session.annotation_count = self._annotation_count
+        session.mock_frame_count = self._mock_frame_count
+        session.mode_changes = self._mode_changes
         session.error = self.write_error
 
         self._write_line({
@@ -481,6 +509,11 @@ class RadarRecorder:
             "duration_seconds": round(session.duration_seconds, 2),
             "frame_count": session.frame_count,
             "annotation_count": session.annotation_count,
+            # Written into the end line so the LISTING can flag a partially
+            # fabricated file without scanning it: _summarize_jsonl only
+            # reads the head and tail.
+            "mock_frame_count": session.mock_frame_count,
+            "mode_changes": session.mode_changes,
         })
         with self._lock:
             if self._jsonl is not None:
@@ -594,6 +627,9 @@ class RadarRecorder:
         annotations: list[dict] = []
         truncated = False
         frames = 0
+        mock_frames = 0
+        mode_changes = 0
+        cur_mock = False   # set from meta below on the first line
 
         with open(path) as f:
             for line in f:
@@ -607,6 +643,11 @@ class RadarRecorder:
                 kind = obj.get("type")
                 if kind == "frame":
                     frames += 1
+                    if cur_mock:
+                        mock_frames += 1
+                elif kind == "mode_change":
+                    cur_mock = bool(obj.get("mock"))
+                    mode_changes += 1
                 elif kind == "annotation":
                     if len(annotations) < self.MAX_ANNOTATIONS_RETURNED:
                         annotations.append(obj)
@@ -614,14 +655,21 @@ class RadarRecorder:
                         truncated = True
                 elif kind == "meta":
                     meta = obj
+                    cur_mock = bool(obj.get("mock", False))
                 elif kind == "end":
                     end = obj
 
+        started_mock = bool(meta.get("mock", False))
         return {
             "file": str(path),
             "session_type": meta.get("session_type", path.parent.name),
             "start_time": meta.get("start_time"),
-            "mock": meta.get("mock", False),
+            "mock": started_mock,
+            "mock_frame_count": mock_frames,
+            "mode_changes": mode_changes,
+            # Looked genuine at the time but is not: the radar dropped out
+            # part-way and those frames are fabricated.
+            "partial_mock": (not started_mock) and mock_frames > 0,
             "max_duration_seconds": meta.get("max_duration_seconds"),
             "duration_seconds": end.get("duration_seconds", 0),
             "frame_count": end.get("frame_count", frames),
@@ -677,6 +725,8 @@ class RadarRecorder:
             "session_type": meta.get("session_type", st),
             "start_time": meta.get("start_time"),
             "mock": meta.get("mock", False),
+            "mock_frame_count": end.get("mock_frame_count", 0),
+            "mode_changes": end.get("mode_changes", 0),
             "duration_seconds": end.get("duration_seconds", 0),
             "frame_count": end.get("frame_count", 0),
             "annotation_count": end.get("annotation_count", 0),
@@ -684,6 +734,7 @@ class RadarRecorder:
         if not end:
             summary.update(self._recover_crashed_jsonl(file_path))
             summary["incomplete"] = True
+        summary["partial_mock"] = (not summary["mock"]) and summary["mock_frame_count"] > 0
         return summary
 
     def _recover_crashed_jsonl(self, file_path: Path) -> dict:
@@ -693,6 +744,9 @@ class RadarRecorder:
         frames = 0
         annotations = 0
         last_t_ms = 0
+        mock_frames = 0
+        mode_changes = 0
+        cur_mock = False
         with open(file_path) as f:
             for line in f:
                 line = line.strip()
@@ -705,8 +759,15 @@ class RadarRecorder:
                 kind = obj.get("type")
                 if kind == "frame":
                     frames += 1
+                    if cur_mock:
+                        mock_frames += 1
                     # t_ms is the current field; timestamp_ms appears in older files
                     last_t_ms = max(last_t_ms, obj.get("t_ms", obj.get("timestamp_ms", 0)))
+                elif kind == "meta":
+                    cur_mock = bool(obj.get("mock", False))
+                elif kind == "mode_change":
+                    cur_mock = bool(obj.get("mock"))
+                    mode_changes += 1
                 elif kind == "annotation":
                     annotations += 1
                     last_t_ms = max(last_t_ms, obj.get("t_ms", 0))
@@ -714,6 +775,8 @@ class RadarRecorder:
             "duration_seconds": round(last_t_ms / 1000, 2),
             "frame_count": frames,
             "annotation_count": annotations,
+            "mock_frame_count": mock_frames,
+            "mode_changes": mode_changes,
         }
 
 

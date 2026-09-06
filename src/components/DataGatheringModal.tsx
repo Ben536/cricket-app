@@ -59,6 +59,10 @@ interface RecordingSummary {
   frame_count: number
   annotation_count: number
   mock?: boolean
+  // The radar dropped out PART-WAY through: mock is false (it was present at
+  // the start) but this many frames are fabricated.
+  mock_frame_count?: number
+  partial_mock?: boolean
   incomplete?: boolean
 }
 
@@ -489,6 +493,9 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
                       <span>{r.frame_count} frames</span>
                       <span>{r.annotation_count} marks</span>
                       {r.mock && <span className="dg-badge mock">MOCK</span>}
+                      {!r.mock && r.partial_mock && (
+                        <span className="dg-badge mock">PART MOCK</span>
+                      )}
                       {r.incomplete && <span className="dg-badge warn">INCOMPLETE</span>}
                     </div>
                   </button>
@@ -510,6 +517,14 @@ export function DataGatheringModal({ isConnected, onClose, sendMessage }: DataGa
                 <div className="recording-warning">
                   ⚠️ MOCK DATA — the radar was not detected for this recording.
                   The frames are fabricated: do not tune anything against it.
+                </div>
+              )}
+              {!detail.mock && detail.partial_mock && (
+                <div className="recording-warning">
+                  ⚠️ RADAR DROPPED OUT — {detail.mock_frame_count} of {detail.frame_count} frames
+                  are fabricated. The radar was present when this started and disappeared
+                  part-way (check the cable and the power supply). The real frames are still
+                  usable; the fabricated ones are not.
                 </div>
               )}
               {detail.incomplete && (

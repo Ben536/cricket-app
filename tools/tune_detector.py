@@ -236,6 +236,15 @@ def main() -> int:
             continue
         recs.append(rec)
 
+    partial = [r for r in recs if r.partial_mock]
+    if partial:
+        print(f"WARNING: {len(partial)} recording(s) lost the radar part-way through. Those "
+              f"stretches are fabricated and will drag the score down:", file=sys.stderr)
+        for r in partial:
+            pct = 100.0 * r.mock_frame_count / max(1, len(r.frames))
+            print(f"  {r.path}: {r.mock_frame_count}/{len(r.frames)} frames ({pct:.0f}%) fabricated",
+                  file=sys.stderr)
+
     if skipped:
         print(f"Skipped {len(skipped)} MOCK recording(s) - the radar was absent and the "
               f"frames are fabricated, so tuning on them is meaningless:", file=sys.stderr)
@@ -294,6 +303,7 @@ def main() -> int:
     report = {
         "recordings": [str(r.path) for r in recs],
         "skipped_mock": [str(s) for s in skipped],
+        "partial_mock": {str(r.path): r.mock_frame_count for r in partial},
         "frames": sum(len(r.frames) for r in recs),
         "taps": total_taps,
         "grid": args.grid,

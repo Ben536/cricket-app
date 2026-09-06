@@ -9,7 +9,7 @@ import time
 from radar.reader import RadarSource
 from radar.recorder import RadarRecorder
 from radar.streamer import RadarStreamer
-from radar.tlv import MAGIC_BYTES, TLVParser
+from radar.tlv import MAGIC_BYTES, RadarFrame, TLVParser
 
 
 def make_packet(frame_number=1, cpu_time=100, points=()):
@@ -267,3 +267,112 @@ class TestRadarStack:
         assert summary["incomplete"] is True
         assert summary["frame_count"] == 50
         assert summary["duration_seconds"] == 4.9
+
+
+class FakeSource:
+    """A radar source whose mock state the test drives directly.
+
+    RadarSource on /dev/nonexistent is permanently mock, so it cannot
+    reproduce the case that matters: a radar that is PRESENT at the start and
+    disappears part-way through.
+    """
+
+    def __init__(self):
+        self._is_mock = False
+        self._callbacks = []
+
+    @property
+    def is_mock(self):
+        return self._is_mock
+
+    def ensure_running(self):
+        pass
+
+    def wait_until_ready(self, timeout=None):
+        return True
+
+    def subscribe(self, cb):
+        self._callbacks.append(cb)
+
+    def unsubscribe(self, cb):
+        if cb in self._callbacks:
+            self._callbacks.remove(cb)
+
+    def emit(self, n=1):
+        for i in range(n):
+            frame = RadarFrame(frame_number=i, cpu_time_ms=i * 50, num_points=0, points=[])
+            for cb in list(self._callbacks):
+                cb(frame)
+
+
+class TestMidSessionRadarDropout:
+    """The radar drops out mid-capture - a knocked USB cable, a sagging
+    supply. The session keeps recording FABRICATED frames, and before this
+    was tracked the resulting file reported mock=false while half its
+    contents were invented. That is how a previous trip came home with
+    unusable data and no way to tell which part was real.
+    """
+
+    def _record_with_dropout(self, tmp):
+        src = FakeSource()
+        rec = RadarRecorder(recordings_dir=tmp, source=src)
+        session = rec.start_recording("both", max_duration_seconds=60)
+        assert session.is_mock is False, "the fixture must start with a real radar"
+        src.emit(10)                 # 10 genuine frames
+        src._is_mock = True          # the cable is knocked
+        src.emit(6)                  # 6 fabricated frames
+        return rec, rec.stop_recording()
+
+    def test_dropout_is_counted_and_flagged(self, tmp_path):
+        rec, done = self._record_with_dropout(str(tmp_path))
+        assert done.frame_count == 16
+        assert done.mock_frame_count == 6
+        assert done.mode_changes == 1
+        assert done.is_mock is False
+        assert done.partial_mock is True, "a half-fabricated file must not look genuine"
+
+    def test_the_listing_flags_it_without_scanning_the_file(self, tmp_path):
+        """list_recordings reads only the head and tail, so the counts have
+        to survive in the end line or the log silently shows it as real."""
+        rec, done = self._record_with_dropout(str(tmp_path))
+        summary = rec.list_recordings("both")[0]
+        assert summary["mock"] is False
+        assert summary["mock_frame_count"] == 6
+        assert summary["partial_mock"] is True
+
+    def test_the_detail_view_flags_it_too(self, tmp_path):
+        rec, done = self._record_with_dropout(str(tmp_path))
+        detail = rec.read_annotations(done.file_path)
+        assert detail["mock_frame_count"] == 6
+        assert detail["mode_changes"] == 1
+        assert detail["partial_mock"] is True
+
+    def test_a_crashed_file_still_reports_its_fabricated_frames(self, tmp_path):
+        """No end line, so the counts come from the recovery scan instead."""
+        src = FakeSource()
+        rec = RadarRecorder(recordings_dir=str(tmp_path), source=src)
+        rec.start_recording("both", max_duration_seconds=60)
+        src.emit(5)
+        src._is_mock = True
+        src.emit(4)
+        path = rec.current_session.file_path
+        with rec._lock:                     # simulate a power cut: no end line
+            rec._jsonl.flush()
+        import shutil
+        crashed = tmp_path / "both" / "crashed.jsonl"
+        shutil.copyfile(path, crashed)
+        rec.stop_recording()
+
+        summary = next(s for s in rec.list_recordings("both") if s["file"].endswith("crashed.jsonl"))
+        assert summary["incomplete"] is True
+        assert summary["mock_frame_count"] == 4
+        assert summary["partial_mock"] is True
+
+    def test_a_fully_real_recording_is_not_flagged(self, tmp_path):
+        src = FakeSource()
+        rec = RadarRecorder(recordings_dir=str(tmp_path), source=src)
+        rec.start_recording("both", max_duration_seconds=60)
+        src.emit(12)
+        done = rec.stop_recording()
+        assert done.mock_frame_count == 0 and done.partial_mock is False
+        assert rec.list_recordings("both")[0]["partial_mock"] is False

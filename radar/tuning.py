@@ -41,10 +41,19 @@ class Recording:
     meta: dict = field(default_factory=dict)
     frames: list[tuple[int, RadarFrame]] = field(default_factory=list)
     annotations: list[dict] = field(default_factory=list)
+    # Frames recorded while the radar was absent. Non-zero with is_mock False
+    # means the radar dropped out part-way: the file looks genuine but part
+    # of it is fabricated.
+    mock_frame_count: int = 0
+    mode_changes: int = 0
 
     @property
     def is_mock(self) -> bool:
         return bool(self.meta.get("mock"))
+
+    @property
+    def partial_mock(self) -> bool:
+        return not self.is_mock and self.mock_frame_count > 0
 
     @property
     def session_type(self) -> str:
@@ -67,6 +76,7 @@ class Recording:
 def load_recording(path: Path) -> Recording:
     """Read a JSONL capture. Truncated final lines (a crash) are skipped."""
     rec = Recording(path=Path(path))
+    cur_mock = False
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -79,7 +89,13 @@ def load_recording(path: Path) -> Recording:
             kind = obj.get("type")
             if kind == "meta":
                 rec.meta = obj
+                cur_mock = bool(obj.get("mock", False))
+            elif kind == "mode_change":
+                cur_mock = bool(obj.get("mock"))
+                rec.mode_changes += 1
             elif kind == "frame":
+                if cur_mock:
+                    rec.mock_frame_count += 1
                 t_ms = obj.get("t_ms", obj.get("timestamp_ms", 0))
                 rec.frames.append((t_ms, RadarFrame(
                     frame_number=obj.get("frame_number", 0),
