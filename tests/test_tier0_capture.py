@@ -178,6 +178,26 @@ def test_frame_number_gaps_are_counted():
     parser.add_data(build_packet(GOOD, frame_number=10))
     parser.add_data(build_packet(GOOD, frame_number=14))
     assert parser.frames_lost == 3
+    assert parser.gap_events == 1
+
+
+def test_gap_logging_is_rate_limited_but_the_count_is_exact(caplog):
+    """The gap warning runs on the READER thread and journald writes it to
+    the SD card, so logging every gap delays the loop whose lateness caused
+    the gap - a feedback loop that turned a 20Hz stream into 6.4Hz on the Pi.
+    Thin the logging; never the counters."""
+    import logging
+
+    parser = TLVParser()
+    with caplog.at_level(logging.WARNING, logger="radar.tlv"):
+        for i in range(1, 61):
+            parser.add_data(build_packet(GOOD, frame_number=i * 3))  # a gap every frame
+
+    assert parser.gap_events == 59, "every gap must still be counted"
+    assert parser.frames_lost == 59 * 2
+    gap_logs = [r for r in caplog.records if "frame gap" in r.message]
+    assert len(gap_logs) <= 4, f"{len(gap_logs)} log writes for 59 gaps - not rate limited"
+    assert gap_logs, "the first gap should still be reported"
 
 
 def test_parser_recovers_after_corruption():

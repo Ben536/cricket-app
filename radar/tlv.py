@@ -128,6 +128,7 @@ class TLVParser:
         self.frames_dropped = 0        # structurally invalid or physically implausible
         self.lengths_rejected = 0      # implausible totalPacketLen (false magic)
         self.frames_lost = 0           # gaps in the hardware frame counter
+        self.gap_events = 0            # how many separate gaps (for rate-limiting)
         self._last_frame_number: int | None = None
 
     def _note_drop(self, reason: str, detail: str) -> None:
@@ -139,7 +140,17 @@ class TLVParser:
             )
 
     def _track_frame_number(self, frame_number: int) -> None:
-        """Count gaps in the hardware counter - the visible symptom of byte loss."""
+        """Count gaps in the hardware counter - the visible symptom of byte loss.
+
+        RATE-LIMITED, and that is not cosmetic. This runs on the reader
+        thread, and a logger.warning goes synchronously to journald, which on
+        the Pi writes to the SD card. Logging every gap therefore DELAYS the
+        very loop whose lateness caused the gap - each lost frame bought
+        another write, which bought more lost frames. Measured on the Pi
+        (2026-09-06): the radar emitted a clean 20.0 Hz while the parser
+        surfaced 6.4 Hz with 162 lost and 81 corrupt frames, on an idle CPU.
+        The counters below are always exact; only the logging is thinned.
+        """
         prev = self._last_frame_number
         self._last_frame_number = frame_number
         if prev is None or frame_number <= prev:
@@ -147,10 +158,12 @@ class TLVParser:
         missing = frame_number - prev - 1
         if missing > 0:
             self.frames_lost += missing
-            logger.warning(
-                f"Radar frame gap: {prev} -> {frame_number} ({missing} lost) "
-                f"[{self.frames_lost} lost so far]"
-            )
+            self.gap_events += 1
+            if self.gap_events % LOG_EVERY_N_DROPS == 1:
+                logger.warning(
+                    f"Radar frame gap: {prev} -> {frame_number} ({missing} lost) "
+                    f"[{self.frames_lost} lost over {self.gap_events} gaps so far]"
+                )
 
     def add_data(self, data: bytes) -> list[RadarFrame]:
         """Add data to buffer and extract complete frames."""

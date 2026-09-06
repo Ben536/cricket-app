@@ -122,6 +122,52 @@ Findings worth keeping:
 - `connection_status.radar_connected` over the WebSocket reports the same
   thing without SSH.
 
+## Frame rate: where the missing frames actually go (measured 2026-09-06)
+
+The radar was configured and streaming, but preflight reported **6.4 Hz**
+against a profile that asks for 20. Measured step by step on the Pi, with the
+CPU otherwise idle:
+
+| measurement | result |
+|---|---|
+| Raw bytes off `/dev/ttyUSB1` | **49 KB/s, 20.0 Hz of frame headers** — the radar is fine |
+| `TLVParser` throughput, profiled on captured bytes | **646 frames/s** (1.55 ms/frame) — the parser is 30x faster than needed |
+| Packets actually found in the byte stream | 17.4 Hz — so **~13% never arrive intact** |
+| Of those, structurally valid | **85% accepted, 15% truncated TLV** |
+| Rejected for trailing bytes / count mismatch | **zero** — the T0.1 validation is not over-strict |
+| Full `RadarSource` path (reader + dispatch + subscriber) | 9.8 Hz |
+
+Conclusions, in order of what they rule out:
+
+1. **Not the radar** and **not the parser.** Both are comfortably fast.
+2. **Bytes are lost at the UART/USB layer**, mid-packet, ~15% of frames. The
+   symptom is `truncated TLV`, and every such loss also shows as a gap in
+   the hardware frame counter. `in_waiting` never exceeded **511 bytes**, so
+   there is only ~11 ms of slack at 49 KB/s: any pause longer than that and
+   bytes are gone.
+3. **The rest is our own pipeline.** A tight read loop keeps 14.8 Hz; going
+   through the reader thread, the queue, the dispatch thread and a subscriber
+   costs another ~5 Hz to GIL contention.
+
+### The unrate-limited log line that made it worse
+
+`TLVParser._track_frame_number` logged a WARNING for **every** frame gap,
+on the reader thread, and journald writes that to the SD card. Each lost
+frame therefore bought a synchronous write, which delayed the reader, which
+lost more frames. Rate-limiting it (as `_note_drop` already was) took the
+observed rate from **6.4 Hz to 9.8 Hz** with no other change. Never log
+per-event on the reader thread.
+
+### The cheap win still on the table
+
+`guiMonitor -1 1 1 1 0 0 1` enables `logMagRange` and `noiseProfile`, which
+`radar/tlv.py` parses and throws away: **1,024 of ~2,418 bytes per frame,
+42% of the traffic, for nothing**. `guiMonitor -1 1 0 0 0 0 1` keeps the
+point cloud, side info and stats and drops the rest, taking the stream from
+49 KB/s to ~28 KB/s. That is proportionally more slack against the 511-byte
+buffer. **Requires a hardware power-cycle of the radar** (unplug/replug USB)
+- a service restart reports success and leaves the chip silent.
+
 ## radar recorder/streamer own the serial port
 Only one process should read `ttyUSB1`. The cricket-server owns it via the recorder/streamer — don't run a second reader concurrently.
 
