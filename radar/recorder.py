@@ -46,6 +46,10 @@ MAX_GATHERING_SECONDS = 7200        # 2h safety backstop; gathering sessions are
 # reader logs and swallows - recording silently stops while the UI still says
 # "recording". Refuse to start rather than discover that at the nets.
 FSYNC_INTERVAL_SECONDS = 1.0
+# Python-side write buffer. Frames are ~8-10KB of JSON, so this batches
+# roughly a second of them into one SD write. Bounded by the explicit flush
+# at the fsync cadence, so it never delays durability.
+WRITE_BUFFER_BYTES = 1 << 20
 BYTES_PER_SECOND_ESTIMATE = 175_000
 DISK_HEADROOM_BYTES = 200 * 1024 * 1024   # never fill the card to the brim
 
@@ -194,7 +198,10 @@ class RadarRecorder:
             type_dir = self.recordings_dir / session_type
             type_dir.mkdir(parents=True, exist_ok=True)
             file_path = self._unique_file_path(type_dir)
-            jsonl = open(file_path, "w")
+            # A generous buffer so frames batch into few, large SD writes
+            # instead of many small ones (see _write_line). The explicit
+            # flush at the fsync cadence keeps at most ~1s unwritten.
+            jsonl = open(file_path, "w", buffering=WRITE_BUFFER_BYTES)
 
             # Resolve mock/real BEFORE subscribing, so the meta line and the
             # first frames agree. A missing radar must never silently produce
@@ -308,20 +315,27 @@ class RadarRecorder:
                 return
             try:
                 self._jsonl.write(json.dumps(obj) + "\n")
-                self._jsonl.flush()
             except OSError as e:
                 self.write_error = str(e)
                 logger.error(f"Recording write failed ({e}) - the recording will stop")
                 return
-            # flush() only moves bytes into the OS page cache. The realistic
-            # failure at the nets is a battery/power cut, which loses everything
-            # still dirty there - up to ~30s of a session that cannot be
-            # repeated. fsync every FSYNC_INTERVAL_SECONDS bounds that loss;
-            # doing it per frame would be an SD-card write per frame, which is
-            # exactly the stall that used to corrupt the stream.
+            # Durability lives HERE, not in a per-frame flush().
+            #
+            # flush() only pushes bytes into the OS page cache - it does not
+            # survive the realistic failure (a battery/power cut), which is
+            # what fsync is for. But it IS a write syscall to the SD card, and
+            # doing one per frame measurably starved the reader thread of the
+            # serial port: measured on the Pi 2026-09-06, per-frame flush gave
+            # 5.6 Hz recorded where flushing only at the fsync cadence gave
+            # 14.0 Hz, with identical fsync timing and zero queue drops.
+            #
+            # So: buffer the writes, and flush+fsync together on the interval.
+            # Worst case on a PROCESS crash is the same ~1s the fsync cadence
+            # already allowed; power-cut durability is unchanged.
             now = time.time()
             if now - self._last_fsync >= FSYNC_INTERVAL_SECONDS:
                 try:
+                    self._jsonl.flush()
                     os.fsync(self._jsonl.fileno())
                     self._last_fsync = now
                 except OSError as e:

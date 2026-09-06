@@ -351,6 +351,31 @@ def test_recording_starts_when_there_is_room(tmp_path, monkeypatch):
         rec.stop_recording()
 
 
+def test_frames_are_not_flushed_one_by_one(tmp_path, monkeypatch):
+    """A flush() per frame is a write syscall to the SD card and it starved
+    the reader thread of the serial port: 5.6 Hz recorded vs 14.0 Hz when
+    flushing only at the fsync cadence (Pi, 2026-09-06). Durability is
+    unaffected - fsync, not flush, is what survives a power cut."""
+    rec = RadarRecorder(recordings_dir=str(tmp_path))
+    flushes = []
+
+    class Usage:
+        free = 10 ** 12
+
+    monkeypatch.setattr("shutil.disk_usage", lambda _p: Usage)
+    monkeypatch.setattr("os.fsync", lambda fd: None)
+    rec.start_recording("both", max_duration_seconds=30)
+    try:
+        real_flush = rec._jsonl.flush
+        monkeypatch.setattr(rec._jsonl, "flush", lambda: (flushes.append(1), real_flush())[1])
+        rec._last_fsync = time.time()          # interval NOT elapsed
+        for i in range(25):
+            rec._write_line({"type": "frame", "t_ms": i})
+        assert flushes == [], f"{len(flushes)} flushes for 25 frames - back to one per frame"
+    finally:
+        rec.stop_recording()
+
+
 def test_frames_are_fsynced_not_just_flushed(tmp_path, monkeypatch):
     """flush() only reaches the page cache; a battery cut loses it."""
     rec = RadarRecorder(recordings_dir=str(tmp_path))

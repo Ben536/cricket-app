@@ -167,9 +167,19 @@ class TestRadarStack:
         """unsubscribe() sets the stop event and joins OUTSIDE the lock; a
         concurrent subscribe() used to clear the same event and start new
         threads while the old ones were still running - two dispatch
-        threads, and with a real port two readers on one tty."""
+        threads, and with a real port two readers on one tty.
+
+        Asserts on THIS source's own threads rather than every thread named
+        'radar-*' in the process: other tests own sources too, and a global
+        assertion made this flaky when run alongside them.
+        """
         src = RadarSource(serial_port="/dev/nonexistent")
         got_a, got_b = [], []
+
+        def live_threads():
+            own = [t for t in (src._thread, src._dispatch_thread) if t is not None]
+            return [t for t in own if t.is_alive()], [t for t in src._retired if t.is_alive()]
+
         for _ in range(5):
             src.subscribe(got_a.append)
             time.sleep(0.15)
@@ -177,15 +187,20 @@ class TestRadarStack:
             stopper.start()
             src.subscribe(got_b.append)  # races the stop
             stopper.join(timeout=5)
-            time.sleep(0.3)
-            alive = [t.name for t in threading.enumerate() if t.name.startswith("radar-")]
-            assert sorted(alive) == ["radar-dispatch", "radar-reader"], alive
+            time.sleep(0.4)
+
+            current, retired = live_threads()
+            assert len(current) == 2, f"expected one reader + one dispatch, got {current}"
+            assert not retired, f"a previous generation is still alive: {retired}"
+
             before = len(got_b)
-            time.sleep(0.2)
+            time.sleep(0.25)
             assert len(got_b) > before, "the surviving generation must deliver frames"
+
             src.unsubscribe(got_b.append)
-            time.sleep(0.1)
-            assert not [t for t in threading.enumerate() if t.name.startswith("radar-")]
+            time.sleep(0.15)
+            current, retired = live_threads()
+            assert not current and not retired, f"threads outlived the last unsubscribe: {current} {retired}"
 
     def test_same_second_starts_get_distinct_files(self):
         tmp = tempfile.mkdtemp()
