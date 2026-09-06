@@ -138,7 +138,7 @@ function App() {
   const [showRecordingModal, setShowRecordingModal] = useState(false)
   const [showDataGathering, setShowDataGathering] = useState(false)
   const [showRadarViz, setShowRadarViz] = useState(false)
-  const { isConnected, connectionState, simulateAsync, sendMessage, statusMessage, error: connectionError, reconnect } = useServerSimulation()
+  const { isConnected, connectionState, simulateAsync, sendMessage, statusMessage, error: connectionError, reconnect, mixedContentBlocked } = useServerSimulation()
 
   // Shot simulator state
   const [simAngle, setSimAngle] = useState('30')
@@ -709,6 +709,21 @@ function App() {
 
   return (
     <div className="app">
+      {/* An https:// page can never open the Pi's ws:// socket - the browser
+          forbids it. Retrying cannot help, so say so up front instead of
+          showing a bare "Offline" and hiding the reason in the settings
+          modal. This is the copy of the app served from Vercel; the one that
+          works at the nets is served by the Pi itself. */}
+      {mixedContentBlocked && (
+        <div className="mixed-content-banner">
+          <strong>Simulator only.</strong> This page is served over https, so it cannot
+          reach the CricketRadar server (browsers block ws:// from https://).
+          Recording and radar need the app served <em>by the Pi</em>:
+          {' '}<code>http://cricketradar.local:5173</code> — or its IP, or
+          {' '}<code>http://10.42.0.1:5173</code> on the CricketRadar hotspot.
+        </div>
+      )}
+
       {/* Header */}
       <header className="header">
         <div className="header-brand">

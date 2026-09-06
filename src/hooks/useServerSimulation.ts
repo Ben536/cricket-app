@@ -62,6 +62,12 @@ interface UseServerSimulationResult {
   reconnect: () => void
   /** Connected server URL */
   serverUrl: string | null
+  /**
+   * This page is https:// so the browser will never allow a ws:// socket to
+   * the Pi. No amount of retrying helps - the user has to open the app from
+   * the Pi instead. Surfaced prominently rather than as a generic "Offline".
+   */
+  mixedContentBlocked: boolean
 }
 
 const HEARTBEAT_INTERVAL_MS = 20000
@@ -531,5 +537,6 @@ export function useServerSimulation(): UseServerSimulationResult {
     error,
     reconnect,
     serverUrl,
+    mixedContentBlocked: isMixedContentBlocked(),
   }
 }

@@ -222,6 +222,31 @@ describe('useServerSimulation', () => {
     expect(r.runs).toBe(4)
   })
 
+  it('flags mixed content on an https page and never opens a socket', async () => {
+    // The Vercel copy: https page, ws:// server. The browser forbids it, so
+    // retrying is pointless and the app must say why rather than sit on
+    // "Offline". jsdom's location is http by default; override the protocol.
+    const original = window.location
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...original, protocol: 'https:', hostname: 'cricket-app.vercel.app', search: '' },
+    })
+    try {
+      await mount()
+      expect(latest!.mixedContentBlocked).toBe(true)
+      expect(latest!.connectionState).toBe('disconnected')
+      expect(FakeWebSocket.instances).toHaveLength(0)
+      expect(latest!.error).toMatch(/https/)
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: original })
+    }
+  })
+
+  it('does not flag mixed content when served over http', async () => {
+    await mount()
+    expect(latest!.mixedContentBlocked).toBe(false)
+  })
+
   it('an unsolicited error still surfaces globally', async () => {
     await mount()
     const live = await connectFully()

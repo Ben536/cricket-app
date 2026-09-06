@@ -1869,3 +1869,23 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* Shown only when the page is https and therefore can never reach the Pi's
+   ws:// server (the Vercel copy). Retrying cannot fix it, so the reason and
+   the fix are stated up front rather than hidden behind the settings modal. */
+.mixed-content-banner {
+  padding: 10px 16px;
+  background: #7a3b00;
+  color: #ffe6c7;
+  font-size: 13px;
+  line-height: 1.5;
+  border-bottom: 2px solid var(--sky-gold, #f5a623);
+}
+
+.mixed-content-banner code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
